@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { chapters, arcs } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
-import MicButton from '@/components/shared/MicButton';
-import { Mic, AlertTriangle } from 'lucide-react';
+import NoteComposer from '@/components/shared/NoteComposer';
+import { Mic } from 'lucide-react';
 
 const tabs = ['Arcs globaux', 'Chapitres', 'Scènes', 'Beats', 'Timeline réelle', 'Ordre du récit', 'Révélations', 'Payoffs', 'Conséquences'];
 
@@ -12,9 +12,9 @@ export default function ArchitecturePage() {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-display font-bold text-foreground">Architecture Tome</h1>
-        <MicButton label="Note sur l'architecture" />
+      <div>
+        <p className="editorial-eyebrow">Pilotage narratif</p>
+        <h1 className="text-3xl editorial-heading text-foreground mt-1">Architecture Tome</h1>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 border-b border-border">
@@ -57,7 +57,7 @@ export default function ArchitecturePage() {
                   <td className="py-2 px-3 text-xs text-destructive max-w-[200px] truncate">{ch.mainAlert || '—'}</td>
                   <td className="py-2 px-3 font-mono text-xs">v{ch.version}</td>
                   <td className="py-2 px-3">{ch.hasAudio && <Mic size={12} className="text-rose" />}</td>
-                  <td className="py-2 px-3"><MicButton size="sm" label="" /></td>
+                  <td className="py-2 px-3"><button className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-border bg-card hover:border-rose/40 text-muted-foreground hover:text-foreground transition-colors"><Mic size={11} className="text-rose/70" /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -156,6 +156,8 @@ export default function ArchitecturePage() {
           <p className="text-xs text-muted-foreground mt-2 font-mono">Future connexion requise</p>
         </div>
       )}
+
+      <NoteComposer target={`architecture · ${activeTab}`} />
     </div>
   );
 }

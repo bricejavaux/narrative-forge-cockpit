@@ -3,6 +3,7 @@ import { chapters, arcs, characters, audioNotes } from '@/data/dummyData';
 import ScoreBar from '@/components/shared/ScoreBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
+import NoteComposer from '@/components/shared/NoteComposer';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
 import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle } from 'lucide-react';
 
@@ -121,6 +122,9 @@ export default function DiagnosticsPage() {
             </div>
           </div>
 
+          {/* Transverse note composer */}
+          <NoteComposer target="diagnostic global du tome" compact />
+
           {/* Multi-line */}
           <div className="cockpit-card">
             <h3 className="editorial-eyebrow mb-3">Courbes multidimensionnelles</h3>
@@ -187,6 +191,9 @@ export default function DiagnosticsPage() {
                       <button className="px-2 py-1 rounded bg-card border border-border text-[11px] hover:border-primary/40">Ouvrir le chapitre</button>
                       <button className="px-2 py-1 rounded bg-card border border-border text-[11px] hover:border-primary/40">Lancer audit</button>
                     </div>
+                  </div>
+                  <div className="col-span-3">
+                    <NoteComposer target={`Ch.${ch.number} · ${ch.title}`} compact />
                   </div>
                 </div>
               )}
