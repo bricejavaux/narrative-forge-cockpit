@@ -129,6 +129,7 @@ export default function SettingsPage() {
             </ul>
           </div>
           <ConnectionReadinessPanel />
+          <OpenAITestPanel />
           <OneDriveRepositoryPanel />
         </div>
       )}
