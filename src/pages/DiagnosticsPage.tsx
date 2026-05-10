@@ -90,24 +90,26 @@ export default function DiagnosticsPage() {
               <div>
                 <p className="editorial-eyebrow mb-1.5">Pourquoi ce score</p>
                 <p className="text-foreground/80 leading-relaxed">
-                  Le score global combine 7 dimensions pondérées : cohérence canon (20%), tension (15%),
-                  densité scientifique (12%), payoff (15%), rythme (12%), personnages (15%), style (11%).
+                  Score Tome I = combiné de 9 dimensions spécifiques : cohérence canon (15%),
+                  hiérarchie Lagrange-4/Walvis Bay (10%), alternance macro/micro (10%), un détail
+                  technique par scène (10%), coût par activation (10%), phrase-couteau de fin (10%),
+                  Trace non-humanisée (10%), distribution B+ (10%), Brice ingénieur → gardien (15%).
                 </p>
               </div>
               <div>
                 <p className="editorial-eyebrow mb-1.5">Risques détectés</p>
                 <ul className="space-y-1 text-foreground/80">
-                  <li className="flex gap-1.5"><AlertTriangle size={11} className="text-destructive mt-1 shrink-0" /> Ch.9 sous le seuil (45/100)</li>
-                  <li className="flex gap-1.5"><AlertTriangle size={11} className="text-amber mt-1 shrink-0" /> Arc politique en progression lente</li>
-                  <li className="flex gap-1.5"><AlertTriangle size={11} className="text-amber mt-1 shrink-0" /> Payoff conspiration manquant</li>
+                  <li className="flex gap-1.5"><AlertTriangle size={11} className="text-destructive mt-1 shrink-0" /> Ch.13 — Trust score critique (57/100)</li>
+                  <li className="flex gap-1.5"><AlertTriangle size={11} className="text-amber mt-1 shrink-0" /> Arc C — doctrine en risque de thèse</li>
+                  <li className="flex gap-1.5"><AlertTriangle size={11} className="text-amber mt-1 shrink-0" /> 7 phrases-couteaux à finaliser (Ch.3, 7, 9-14)</li>
                 </ul>
               </div>
               <div>
                 <p className="editorial-eyebrow mb-1.5">Recommandations</p>
                 <ul className="space-y-1 text-foreground/80">
-                  <li>→ Réécriture profonde Ch.9 (priorité haute)</li>
-                  <li>→ Beat de payoff à insérer Ch.10–11</li>
-                  <li>→ Audit cohérence Ch.7–9</li>
+                  <li>→ Réécriture profonde Ch.13 (Le Trust)</li>
+                  <li>→ Condenser la doctrine — éviter la nomination explicite</li>
+                  <li>→ Tâche : insérer un détail technique par scène manquante</li>
                 </ul>
               </div>
             </div>
