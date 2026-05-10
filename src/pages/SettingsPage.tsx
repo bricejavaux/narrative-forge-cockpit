@@ -4,6 +4,7 @@ import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
 import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
 import OpenAITestPanel from '@/components/shared/OpenAITestPanel';
+import DataFlowDoctrineBanner from '@/components/shared/DataFlowDoctrineBanner';
 import { getRuntimeMode, setRuntimeMode, type RuntimeMode } from '@/lib/runtimeMode';
 import { Sliders, Mic } from 'lucide-react';
 
