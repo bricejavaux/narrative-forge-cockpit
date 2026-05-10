@@ -31,9 +31,17 @@ export default function AudioPage() {
             apparaît également dans chaque page (canon, personnages, chapitres, agents, runs, diagnostics).
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-rose/30 bg-rose/5 text-rose text-xs font-mono">
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono ${
+          audioPipelineReady ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700'
+          : openaiReady ? 'border-amber/30 bg-amber/5 text-amber'
+          : 'border-rose/30 bg-rose/5 text-rose'
+        }`}>
           <Mic size={12} />
-          Whisper simulé
+          {audioPipelineReady
+            ? 'Whisper actif'
+            : openaiReady
+              ? 'OpenAI configuré — pipeline fichier audio en attente'
+              : 'Whisper simulé — clé OpenAI absente'}
         </div>
       </div>
 
