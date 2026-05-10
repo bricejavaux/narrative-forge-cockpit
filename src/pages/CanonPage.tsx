@@ -4,7 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import {
   ChevronRight, ChevronDown, BookOpen, Globe, Shield, AlertOctagon, Building2,
-  Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic
+  Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic, Database
 } from 'lucide-react';
 
 const categoryMeta: Record<string, { icon: any; label: string }> = {
@@ -15,13 +15,14 @@ const categoryMeta: Record<string, { icon: any; label: string }> = {
   Technologie: { icon: Cpu, label: 'Technologies' },
   Lieu: { icon: MapPin, label: 'Lieux' },
   Glossaire: { icon: BookMarked, label: 'Glossaire' },
+  Source: { icon: Database, label: 'Sources & index' },
 };
 
 export default function CanonPage() {
   const [selectedRule, setSelectedRule] = useState<string | null>('CAN-001');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     Monde: true, Contrainte: true, Organisation: true,
-    Technologie: true, Lieu: true, Glossaire: false, Panne: false,
+    Technologie: true, Lieu: true, Glossaire: false, Panne: true, Source: true,
   });
   const [search, setSearch] = useState('');
 
