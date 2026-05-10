@@ -38,12 +38,14 @@ export default function CanonPage() {
   const rule = canonRules.find((r) => r.id === selectedRule);
   const meta = rule ? categoryMeta[rule.category] : null;
 
-  // Simulated linked references
-  const linkedChars = rule ? characters.slice(0, 3) : [];
-  const linkedChapters = rule ? chapters.slice(0, 4) : [];
-  const linkedArcs = rule ? arcs.slice(0, 2) : [];
-  const linkedAudio = rule ? audioNotes.filter((a) => a.targetType === 'canon').slice(0, 2) : [];
-  const related = rule ? canonRules.filter((r) => r.id !== rule.id).slice(0, 3) : [];
+  // Explicit linked references
+  const linkedChars = rule?.linkedCharacterIds?.map((id) => characters.find((c) => c.id === id)).filter(Boolean) as typeof characters || [];
+  const linkedChapters = rule?.linkedChapterIds?.map((id) => chapters.find((c) => c.id === id)).filter(Boolean) as typeof chapters || [];
+  const linkedArcs = rule?.linkedArcIds?.map((id) => arcs.find((a) => a.id === id)).filter(Boolean) as typeof arcs || [];
+  const linkedAudio = rule
+    ? audioNotes.filter((a) => (rule.linkedAudioNoteIds?.includes(a.id)) || (a.linkedCanonIds?.includes(rule.id)))
+    : [];
+  const related = rule ? canonRules.filter((r) => r.id !== rule.id && r.category === rule.category).slice(0, 4) : [];
 
   return (
     <div className="animate-slide-in">
