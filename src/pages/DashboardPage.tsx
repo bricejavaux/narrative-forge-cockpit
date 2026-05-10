@@ -10,14 +10,12 @@ import ScoreBar from '@/components/shared/ScoreBar';
 import { project, connectors, chapters, arcs, recentActivity, audioNotes, runs } from '@/data/dummyData';
 
 const criticalWarnings = [
-  { text: 'OpenAI API — non branchée. Aucune génération, audit ou transcription possible.', severity: 'critical' as const },
-  { text: 'Supabase — non branché. Aucune persistance de données.', severity: 'critical' as const },
-  { text: 'Dropbox — non branché. Corpus documentaires inaccessibles.', severity: 'critical' as const },
-  { text: 'MS Teams / SharePoint / OneDrive — non branché. Repositories externes inaccessibles.', severity: 'critical' as const },
-  { text: 'Indexes vectoriels — entièrement simulés. Aucune recherche sémantique réelle.', severity: 'warning' as const },
-  { text: 'Exports — moteur simulé. Aucun fichier réel généré.', severity: 'warning' as const },
-  { text: 'Couverture / assets visuels — moteur non branché.', severity: 'warning' as const },
-  { text: 'Audio / transcription — simulé. Whisper non connecté.', severity: 'info' as const },
+  { text: 'OpenAI API — non branchée. Pas de génération, audit ni transcription.', severity: 'critical' as const },
+  { text: 'Supabase (DB / Auth / Storage) — non branché. Pas de persistance ni d\'auth.', severity: 'critical' as const },
+  { text: 'OneDrive — non branché. Référentiel documentaire long terme inaccessible.', severity: 'critical' as const },
+  { text: 'Indexes vectoriels — simulés. Pas de recherche sémantique réelle.', severity: 'warning' as const },
+  { text: 'Whisper / transcription — simulé. Notes audio non transcrites.', severity: 'warning' as const },
+  { text: 'Exports texte / markdown / JSON — moteur simulé.', severity: 'info' as const },
 ];
 
 export default function DashboardPage() {
