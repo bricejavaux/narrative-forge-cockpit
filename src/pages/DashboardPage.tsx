@@ -3,6 +3,7 @@ import {
   FileText, Mic, Download, Upload, DollarSign, Clock, Activity, Zap
 } from 'lucide-react';
 import WarningBanner from '@/components/shared/WarningBanner';
+import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
 import KpiCard from '@/components/shared/KpiCard';
 import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -30,6 +31,8 @@ export default function DashboardPage() {
       </div>
 
       <WarningBanner warnings={criticalWarnings} />
+
+      <ConnectionReadinessPanel compact />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">

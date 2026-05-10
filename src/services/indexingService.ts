@@ -1,18 +1,17 @@
-// Mock indexing service. NOT connected.
-// Two future migration strategies for legacy Chroma archives:
-//  - 're-vectorize-source' : re-vectorize from raw source documents
-//  - 'extract-chroma'      : extract chunks/embeddings from existing Chroma archives
-export type IndexMigrationStrategy = 're-vectorize-source' | 'extract-chroma' | 'native-supabase' | 'pending-decision';
-
 export const indexingService = {
-  isConnected: () => false,
-  async reindex(_indexId: string): Promise<{ jobId: string }> {
-    return Promise.resolve({ jobId: 'sim-' + Math.random().toString(36).slice(2, 8) });
+  async queueRefresh(index_name: string) {
+    return { ok: true, queued: index_name, mode: 'mock' as const };
   },
-  async migrate(_indexId: string, _strategy: IndexMigrationStrategy): Promise<void> {
-    return Promise.resolve();
+  async listQueue() {
+    return [] as Array<{ index_name: string; status: string }>;
   },
-  async queue(): Promise<{ id: string; name: string; status: string }[]> {
-    return Promise.resolve([]);
+  async migrationStrategy() {
+    return {
+      options: [
+        { id: 'A', label: 'Re-vectorize from original source documents' },
+        { id: 'B', label: 'Extract chunks/embeddings from existing Chroma archives' },
+      ],
+      selected: null,
+    };
   },
 };
