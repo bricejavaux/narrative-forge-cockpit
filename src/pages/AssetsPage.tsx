@@ -128,8 +128,37 @@ export default function AssetsPage() {
                   <p className="text-xs text-muted-foreground">Référentiel documentaire long terme — unique</p>
                 </div>
               </div>
-              <StatusBadge status={onedrive.status} />
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                  driveMode === 'live' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                  : driveMode === 'degraded' ? 'bg-rose-500/10 text-rose-600 border-rose-500/30'
+                  : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                }`}>
+                  {driveMode === 'unknown' ? '…' : `mode : ${driveMode}`}
+                </span>
+                <StatusBadge status={onedrive.status} />
+              </div>
             </div>
+
+            {driveError && (
+              <div className="flex items-start gap-2 text-[11px] text-rose-600 rounded border border-rose-500/30 bg-rose-500/5 p-2">
+                <AlertTriangle size={11} className="mt-0.5" /> {driveError}
+              </div>
+            )}
+
+            {expectedFiles.length > 0 && (
+              <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                <p className="editorial-eyebrow mb-1.5">Fichiers attendus</p>
+                <ul className="text-[11px] font-mono space-y-0.5">
+                  {expectedFiles.map((f) => (
+                    <li key={f.path} className="flex items-center gap-1.5">
+                      {f.found ? <CheckCircle2 size={10} className="text-emerald-600" /> : <AlertTriangle size={10} className="text-amber" />}
+                      <span className={f.found ? 'text-foreground' : 'text-muted-foreground'}>{f.path}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <p className="text-sm text-foreground/80 leading-relaxed">{onedrive.description}</p>
 
