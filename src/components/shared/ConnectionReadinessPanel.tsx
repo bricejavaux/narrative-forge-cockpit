@@ -59,14 +59,12 @@ export default function ConnectionReadinessPanel({ compact = false }: { compact?
   }
   if (!data) return null;
 
-  const blocks = compact
-    ? [
-        ['Supabase', data.supabase.project_connected, data.supabase.tables_created ? 'tables' : 'no tables'],
-        ['OpenAI', data.openai.api_key_configured, data.openai.lovable_ai_gateway_available ? 'lovable AI fallback' : 'no fallback'],
-        ['OneDrive', data.onedrive.oauth_configured, data.onedrive.sync_available ? 'sync ready' : 'auth pending'],
-      ] as const;
-
   if (compact) {
+    const blocks: Array<[string, boolean, string]> = [
+      ['Supabase', data.supabase.project_connected, data.supabase.tables_created ? 'tables' : 'no tables'],
+      ['OpenAI', data.openai.api_key_configured, data.openai.lovable_ai_gateway_available ? 'lovable AI fallback' : 'no fallback'],
+      ['OneDrive', data.onedrive.oauth_configured, data.onedrive.sync_available ? 'sync ready' : 'auth pending'],
+    ];
     return (
       <div className="rounded-lg border border-border/60 bg-card/40 p-4">
         <div className="flex items-center justify-between mb-3">
