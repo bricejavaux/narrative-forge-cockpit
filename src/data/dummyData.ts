@@ -212,6 +212,12 @@ export const canonRules: CanonRule[] = [
 ];
 
 // ── Agents ──
+export type AgentPermissionLevel =
+  | 'read-only'
+  | 'recommendation'
+  | 'targeted-rewrite-with-validation'
+  | 'deep-rewrite-with-validation';
+
 export interface Agent {
   id: string;
   name: string;
@@ -221,6 +227,7 @@ export interface Agent {
   criticality: 'haute' | 'moyenne' | 'basse';
   status: 'ready' | 'simulated' | 'disabled';
   rewriteRights: boolean;
+  permissionLevel: AgentPermissionLevel;
   futureIndexes: string[];
   lastRun?: string;
 }
