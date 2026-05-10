@@ -61,9 +61,9 @@ export default function DiagnosticsPage() {
               <p className="text-5xl editorial-heading text-foreground mt-2">72<span className="text-2xl text-muted-foreground">/100</span></p>
               <div className="mt-3"><ScoreBar value={72} /></div>
               <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
-                Le tome 2 présente une <span className="text-foreground">progression solide</span> mais une
-                <span className="text-amber"> dette dramatique élevée sur l'arc politique</span> et trois chapitres en
-                dessous du seuil de validation.
+                Tome I — Les Arches de Brice : <span className="text-foreground">hiérarchie Lagrange-4 → Walvis Bay tenue</span>,
+                alternance macro/micro globalement respectée, mais
+                <span className="text-amber"> arc C (doctrine silencieuse) en risque didactique</span> et trois chapitres sous le seuil.
               </p>
             </div>
             <div className="col-span-8 cockpit-card">
