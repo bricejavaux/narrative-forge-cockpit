@@ -25,6 +25,9 @@ Deno.serve(async (req) => {
 
     const r = await callOpenAI({
       model,
+      temperature,
+      maxOutputTokens,
+      reasoningEffort,
       system:
         'Tu es un agent éditorial du roman "Les Portes du Monde, Tome I". ' +
         'Tu exécutes une mission (audit / diagnostic / suggestion) et retournes un JSON ' +

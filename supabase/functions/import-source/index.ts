@@ -31,7 +31,7 @@ const CHAR_SCHEMA = `Réponds STRICTEMENT en JSON :
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { target, model } = await req.json().catch(() => ({}));
+    const { target, model, temperature, maxOutputTokens, reasoningEffort } = await req.json().catch(() => ({}));
     const def = TARGETS[target as string];
     if (!def) return json({ error: `target invalide. Attendus: ${Object.keys(TARGETS).join(', ')}` }, 400);
 
@@ -58,6 +58,9 @@ Deno.serve(async (req) => {
     const schemaHint = def.kind === 'canon' ? CANON_SCHEMA : CHAR_SCHEMA;
     const r = await callOpenAI({
       model,
+      temperature,
+      maxOutputTokens,
+      reasoningEffort,
       system: `Tu structures un document du roman "Les Portes du Monde, Tome I". ${schemaHint}`,
       user: text,
       json: true,
