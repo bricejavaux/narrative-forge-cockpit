@@ -10,6 +10,11 @@ describe('data-quality · canon stabilization', () => {
     });
   });
 
+  it('no chapter has empty scale', () => {
+    chapters.forEach((c) => {
+      expect(['macro', 'micro', 'mixte']).toContain(c.scale);
+    });
+
   it('every critical canon rule has an index', () => {
     canonRules.filter((r) => r.criticality === 'haute').forEach((r) => {
       expect(r.indexAssociated, `${r.id} missing index`).toBeTruthy();
