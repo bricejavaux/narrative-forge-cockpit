@@ -39,15 +39,39 @@ type Result = {
   raw: unknown;
 };
 
+const MODEL_OPTIONS = [
+  { value: '', label: 'Défaut Edge Function (OPENAI_MODEL)' },
+  { value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' },
+  { value: 'gpt-4.1', label: 'gpt-4.1' },
+  { value: 'gpt-4o-mini', label: 'gpt-4o-mini' },
+  { value: 'gpt-4o', label: 'gpt-4o' },
+  { value: 'o4-mini', label: 'o4-mini' },
+  { value: '__custom__', label: 'Personnalisé…' },
+];
+
 export default function OpenAITestPanel() {
   const [running, setRunning] = useState<FnKey | null>(null);
   const [results, setResults] = useState<Record<FnKey, Result | undefined>>({} as any);
+  const [modelChoice, setModelChoice] = useState<string>(() => localStorage.getItem('openai_test_model') ?? '');
+  const [customModel, setCustomModel] = useState<string>(() => localStorage.getItem('openai_test_model_custom') ?? '');
+
+  const effectiveModel = (modelChoice === '__custom__' ? customModel : modelChoice).trim();
+
+  const handleModelChange = (v: string) => {
+    setModelChoice(v);
+    localStorage.setItem('openai_test_model', v);
+  };
+  const handleCustomChange = (v: string) => {
+    setCustomModel(v);
+    localStorage.setItem('openai_test_model_custom', v);
+  };
 
   const run = async (t: typeof TESTS[number]) => {
     setRunning(t.key);
     const t0 = performance.now();
     try {
-      const { data, error } = await supabase.functions.invoke(t.key, { body: t.body });
+      const body = { ...t.body, ...(effectiveModel ? { model: effectiveModel } : {}) };
+      const { data, error } = await supabase.functions.invoke(t.key, { body });
       const ms = Math.round(performance.now() - t0);
       const d = (data ?? {}) as any;
       const res: Result = {
