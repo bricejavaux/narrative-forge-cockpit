@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { agents } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
-import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database } from 'lucide-react';
+import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2 } from 'lucide-react';
+import { OPENAI_MODELS, defaultModelForCategory, defaultProfileForCategory, modelById } from '@/lib/openaiModels';
+import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import { openaiService } from '@/services/openaiService';
 
 const categories = ['Tous', 'génération', 'audit', 'diagnostic', 'réécriture', 'style', 'export'];
 
