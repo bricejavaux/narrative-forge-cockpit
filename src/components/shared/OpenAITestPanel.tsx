@@ -133,6 +133,30 @@ export default function OpenAITestPanel() {
         </button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+        <span className="text-[11px] font-medium text-muted-foreground">Modèle OpenAI</span>
+        <select
+          value={modelChoice}
+          onChange={(e) => handleModelChange(e.target.value)}
+          className="text-xs bg-card border border-border rounded px-2 py-1 font-mono"
+        >
+          {MODEL_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {modelChoice === '__custom__' && (
+          <input
+            value={customModel}
+            onChange={(e) => handleCustomChange(e.target.value)}
+            placeholder="ex: gpt-4.1-nano"
+            className="text-xs bg-card border border-border rounded px-2 py-1 font-mono w-44"
+          />
+        )}
+        <span className="text-[10px] font-mono text-muted-foreground ml-auto">
+          envoyé : <code>{effectiveModel || '(défaut Edge Function)'}</code>
+        </span>
+      </div>
+
       <div className="divide-y divide-border/40">
         {TESTS.map((t) => {
           const r = results[t.key];
