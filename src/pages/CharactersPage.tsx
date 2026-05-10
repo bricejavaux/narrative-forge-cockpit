@@ -12,8 +12,8 @@ export default function CharactersPage() {
   const [activeView, setActiveView] = useState(views[0]);
   const [selectedChar, setSelectedChar] = useState<string | null>(characters[0]?.id ?? null);
   const char = characters.find((c) => c.id === selectedChar);
-  const charChapters = char ? chapters.slice(0, 5) : [];
-  const charAudio = char ? audioNotes.filter((a) => a.targetType === 'personnage').slice(0, 2) : [];
+  const charChapters = char ? chapters.filter((c) => char.linkedChapterIds?.includes(c.id) || c.linkedCharacterIds?.includes(char.id)) : [];
+  const charAudio = char ? audioNotes.filter((a) => a.linkedCharacterIds?.includes(char.id) || a.target === char.name).slice(0, 4) : [];
 
   return (
     <div className="animate-slide-in space-y-6">
