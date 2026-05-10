@@ -6,15 +6,20 @@ export type ConnectionReadiness = {
     tables_created: boolean;
     storage_buckets_created: boolean;
     auth_configured: boolean;
+    rls_policies_configured?: boolean;
     mock_fallback_active: boolean;
   };
   openai: {
     api_key_configured: boolean;
     edge_functions_deployed: boolean;
+    provider_active?: 'openai' | 'none';
+    model?: string | null;
     transcription_available: boolean;
+    transcription_pipeline_status?: string;
     structuring_available: boolean;
     agent_runs_available: boolean;
     lovable_ai_gateway_available: boolean;
+    lovable_ai_gateway_role?: string;
   };
   onedrive: {
     oauth_configured: boolean;
