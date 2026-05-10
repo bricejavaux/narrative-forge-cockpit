@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       edge_functions_deployed: true,
       provider_active: openai ? 'openai' : 'none',
       model: openai ? openai_model : null,
-      transcription_available: false, // pipeline pending even when key present
+      transcription_available: openai,
       transcription_pipeline_status: openai ? 'pending_audio_pipeline' : 'no_key',
       structuring_available: openai,
       agent_runs_available: openai,

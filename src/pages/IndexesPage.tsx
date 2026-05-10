@@ -20,6 +20,14 @@ export default function IndexesPage() {
           Chaque index est dédié à une finalité narrative. Alimenté par OneDrive et Supabase,
           consulté par les agents OpenAI selon leur objectif.
         </p>
+        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+          <span className="px-2 py-0.5 rounded-full border font-mono bg-amber/10 text-amber border-amber/30">
+            pgvector : en attente — table/index réels non créés
+          </span>
+          <span className="px-2 py-0.5 rounded-full border font-mono bg-muted text-muted-foreground border-border">
+            Chroma (OneDrive) : archives techniques — pas des indexes actifs
+          </span>
+        </div>
       </div>
 
       {/* Queue */}

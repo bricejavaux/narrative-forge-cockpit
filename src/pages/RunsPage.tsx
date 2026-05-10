@@ -1,24 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { runs, agents, chapters } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
+import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
 const modes = ['Dry run (simulation seule)', 'SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome', 'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final', 'Vérification cross-chapitres', 'Vérification notes audio'];
 
-const checklist = [
-  { label: 'OpenAI disponible', ok: false },
-  { label: 'Supabase disponible', ok: false },
-  { label: 'OneDrive disponible', ok: false },
-  { label: 'Indexes requis disponibles', ok: true, note: 'simulés' },
-  { label: 'Notes audio non traitées revues', ok: false, note: '9 ouvertes' },
-  { label: 'Objets cibles sélectionnés', ok: true },
-  { label: 'Format de sortie sélectionné', ok: true },
-];
-
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState(modes[0]);
-  const ready = checklist.every((c) => c.ok);
+  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  const [loadingReadiness, setLoadingReadiness] = useState(true);
+
+  useEffect(() => {
+    supabaseService.getReadiness()
+      .then(setReadiness)
+      .catch(() => setReadiness(null))
+      .finally(() => setLoadingReadiness(false));
+  }, []);
+
+  const openaiOk = !!readiness?.openai?.api_key_configured;
+  const supabaseOk = !!readiness?.supabase?.project_connected;
+  const onedriveOk = !!readiness?.onedrive?.oauth_configured;
+
+  const checklist = [
+    { label: 'OpenAI disponible', ok: openaiOk, note: openaiOk ? readiness?.openai?.model ?? undefined : 'clé absente' },
+    { label: 'Supabase disponible', ok: supabaseOk },
+    { label: 'OneDrive disponible', ok: onedriveOk, note: onedriveOk ? undefined : 'optionnel' },
+    { label: 'Indexes requis disponibles', ok: true, note: 'simulés' },
+    { label: 'Objets cibles sélectionnés', ok: true },
+    { label: 'Format de sortie sélectionné', ok: true },
+  ];
+  const required = [openaiOk, supabaseOk]; // OneDrive optional
+  const ready = required.every(Boolean);
+  const isDryRun = selectedMode === modes[0];
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -98,9 +113,9 @@ export default function RunsPage() {
           {/* Pre-run checklist */}
           <div className="cockpit-card space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="editorial-eyebrow">Checklist pré-run</h3>
+              <h3 className="editorial-eyebrow">Checklist pré-run {loadingReadiness && <span className="text-[10px] text-muted-foreground">· vérification…</span>}</h3>
               <span className={`text-[11px] font-mono ${ready ? 'text-emerald-600' : 'text-amber'}`}>
-                {ready ? 'prêt' : 'non prêt — Lancer désactivé'}
+                {ready ? (isDryRun ? 'prêt (dry run)' : 'prêt (live)') : 'non prêt — Lancer désactivé'}
               </span>
             </div>
             <ul className="text-xs space-y-1">
@@ -160,11 +175,11 @@ export default function RunsPage() {
               <Zap size={14} /> Simuler (dry run)
             </button>
             <button
-              disabled
-              title="OpenAI et Supabase non branchés"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-display cursor-not-allowed opacity-50"
+              disabled={!ready || isDryRun}
+              title={!ready ? 'OpenAI ou Supabase non branchés' : isDryRun ? 'Mode Dry Run sélectionné — change de mode pour lancer en live' : 'Lancer en live'}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-display ${ready && !isDryRun ? 'bg-primary text-primary-foreground hover:opacity-90 cursor-pointer' : 'bg-primary text-primary-foreground opacity-50 cursor-not-allowed'}`}
             >
-              <Play size={14} /> Lancer le Run
+              <Play size={14} /> Lancer le Run {!isDryRun && ready && '(live)'}
             </button>
             <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
               <Save size={14} /> Sauver preset
@@ -176,9 +191,13 @@ export default function RunsPage() {
               <ExternalLink size={14} /> Dernier résultat
             </button>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-amber">
-            <AlertTriangle size={11} />
-            « Lancer le Run » désactivé tant que OpenAI et Supabase ne sont pas branchés. Mode par défaut : dry run.
+          <div className={`flex items-center gap-2 text-[11px] ${ready ? 'text-emerald-600' : 'text-amber'}`}>
+            {ready ? <CheckCircle2 size={11} /> : <AlertTriangle size={11} />}
+            {ready
+              ? (isDryRun
+                ? 'Dry Run actif — aucun appel OpenAI ne sera effectué.'
+                : `Live prêt — provider OpenAI (${readiness?.openai?.model ?? 'défaut'}).`)
+              : '« Lancer le Run » désactivé tant que OpenAI et Supabase ne sont pas branchés.'}
           </div>
         </div>
 

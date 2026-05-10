@@ -1,11 +1,11 @@
 // deno-lint-ignore-file
-// Import & reconcile preview: downloads a source from OneDrive, runs Lovable AI
-// extraction, and returns the parsed result so the UI can show a reconcile diff.
-// No DB writes yet — the user validates before persistence.
+// Import & reconcile preview: downloads a source from OneDrive, runs OpenAI extraction
+// and returns the parsed result so the UI can show a reconcile diff.
+// Runtime AI provider = OpenAI only. Lovable AI Gateway is NEVER used at runtime.
 
-import { corsHeaders, hasLovableAI, hasOneDrive, json } from '../_shared/cors.ts';
+import { corsHeaders, hasOneDrive, json } from '../_shared/cors.ts';
 import { downloadText } from '../_shared/onedrive.ts';
-import { callLovableAI } from '../_shared/lovableAI.ts';
+import { callOpenAI, hasOpenAIKey } from '../_shared/openai.ts';
 
 const ROOT = 'Documents/Projet Roman/Les_Arches';
 
@@ -31,16 +31,20 @@ const CHAR_SCHEMA = `Réponds STRICTEMENT en JSON :
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { target } = await req.json().catch(() => ({}));
+    const { target, model } = await req.json().catch(() => ({}));
     const def = TARGETS[target as string];
     if (!def) return json({ error: `target invalide. Attendus: ${Object.keys(TARGETS).join(', ')}` }, 400);
 
-    if (!hasOneDrive() || !hasLovableAI()) {
+    if (!hasOneDrive() || !hasOpenAIKey()) {
       return json({
         mode: 'mock',
+        provider: 'none',
+        reason: !hasOpenAIKey()
+          ? 'OPENAI_API_KEY missing — runtime provider not configured'
+          : 'OneDrive non disponible',
         target,
         path: def.path,
-        message: 'OneDrive ou Lovable AI non disponibles — preview simulée.',
+        message: 'Preview simulée — providers requis non disponibles.',
         extracted: null,
       });
     }
@@ -52,21 +56,21 @@ Deno.serve(async (req) => {
     const text = (dl.text ?? '').slice(0, 80000);
 
     const schemaHint = def.kind === 'canon' ? CANON_SCHEMA : CHAR_SCHEMA;
-    const r = await callLovableAI({
-      messages: [
-        { role: 'system', content: `Tu structures un document du roman "Les Portes du Monde, Tome I". ${schemaHint}` },
-        { role: 'user', content: text },
-      ],
+    const r = await callOpenAI({
+      model,
+      system: `Tu structures un document du roman "Les Portes du Monde, Tome I". ${schemaHint}`,
+      user: text,
       json: true,
     });
-    if (!r.ok) return json({ mode: 'degraded', target, path: def.path, source_size: dl.size, error: r.error }, 200);
+    if (!r.ok) return json({ mode: 'degraded', provider: 'openai', target, path: def.path, source_size: dl.size, error: r.error, status: r.status }, 200);
 
     return json({
       mode: 'live',
+      provider: 'openai',
+      model: r.model,
       target,
       path: def.path,
       source_size: dl.size,
-      model: r.model,
       extracted: r.parsed ?? null,
       raw_preview: r.parsed ? undefined : (r.text ?? '').slice(0, 4000),
     });

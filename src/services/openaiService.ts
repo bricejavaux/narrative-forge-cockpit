@@ -8,19 +8,20 @@ async function invoke<T = any>(name: string, body?: Record<string, unknown>): Pr
 }
 
 export const openaiService = {
-  transcribeAudio: (audio_path: string, audio_note_id?: string) =>
-    invoke('openai-transcribe-audio', { audio_path, audio_note_id }),
-  structureNote: (text: string, target_type?: string, target_id?: string) =>
-    invoke('openai-structure-note', { text, target_type, target_id }),
-  extractCanon: (source_file_id: string, text?: string) =>
-    invoke('openai-extract-canon', { source_file_id, text }),
-  extractCharacters: (source_file_id: string, text?: string) =>
-    invoke('openai-extract-characters', { source_file_id, text }),
-  summarizeSource: (source_file_id: string, text?: string) =>
-    invoke('openai-summarize-source', { source_file_id, text }),
-  generateDiagnostic: (scope: string) => invoke('openai-generate-diagnostic', { scope }),
-  suggestRewrite: (target_type: string, target_id: string, instruction: string) =>
-    invoke('openai-suggest-rewrite', { target_type, target_id, instruction }),
-  runAgent: (agent_id: string, payload: Record<string, unknown>) =>
-    invoke('openai-agent-run', { agent_id, payload }),
+  transcribeAudio: (audio_path: string, audio_note_id?: string, model?: string) =>
+    invoke('openai-transcribe-audio', { audio_path, audio_note_id, model }),
+  structureNote: (text: string, target_type?: string, target_id?: string, model?: string) =>
+    invoke('openai-structure-note', { text, target_type, target_id, model }),
+  extractCanon: (source_file_id: string, text?: string, model?: string) =>
+    invoke('openai-extract-canon', { source_file_id, text, model }),
+  extractCharacters: (source_file_id: string, text?: string, model?: string) =>
+    invoke('openai-extract-characters', { source_file_id, text, model }),
+  summarizeSource: (source_file_id: string, text?: string, model?: string) =>
+    invoke('openai-summarize-source', { source_file_id, text, model }),
+  generateDiagnostic: (scope: string, model?: string, context?: string) =>
+    invoke('openai-generate-diagnostic', { scope, model, context }),
+  suggestRewrite: (target_type: string, target_id: string, instruction: string, current_text?: string, model?: string) =>
+    invoke('openai-suggest-rewrite', { target_type, target_id, instruction, current_text, model }),
+  runAgent: (agent_id: string, payload: Record<string, unknown>, model?: string, instruction?: string) =>
+    invoke('openai-agent-run', { agent_id, payload, model, instruction }),
 };

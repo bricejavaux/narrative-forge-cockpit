@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { agents } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
-import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database } from 'lucide-react';
+import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2 } from 'lucide-react';
+import { OPENAI_MODELS, defaultModelForCategory, defaultProfileForCategory, modelById } from '@/lib/openaiModels';
+import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import { openaiService } from '@/services/openaiService';
 
 const categories = ['Tous', 'génération', 'audit', 'diagnostic', 'réécriture', 'style', 'export'];
 
@@ -26,6 +29,44 @@ export default function AgentsPage() {
   const filtered = filter === 'Tous' ? agents : agents.filter((a) => a.category === filter);
   const agent = agents.find((a) => a.id === selectedAgent);
 
+  // Readiness (live / mock)
+  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  useEffect(() => {
+    supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
+  }, []);
+  const openaiReady = !!readiness?.openai?.api_key_configured;
+
+  // Per-agent model selection (persisted in localStorage)
+  const [modelByAgent, setModelByAgent] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('agent_model_map') ?? '{}'); } catch { return {}; }
+  });
+  const currentModel = useMemo(() => {
+    if (!agent) return '';
+    return modelByAgent[agent.id] || agent.defaultModel || defaultModelForCategory(agent.category);
+  }, [agent, modelByAgent]);
+  const setModel = (id: string, value: string) => {
+    const next = { ...modelByAgent, [id]: value };
+    setModelByAgent(next);
+    localStorage.setItem('agent_model_map', JSON.stringify(next));
+  };
+  const modelMeta = modelById(currentModel);
+  const profile = agent?.modelProfile || (agent ? defaultProfileForCategory(agent.category) : undefined);
+
+  const [running, setRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<any>(null);
+  const launchAgent = async () => {
+    if (!agent) return;
+    setRunning(true); setLastRun(null);
+    try {
+      const res = await openaiService.runAgent(agent.id, { objective: agent.objective }, currentModel);
+      setLastRun(res);
+    } catch (e) {
+      setLastRun({ error: e instanceof Error ? e.message : 'unknown' });
+    } finally {
+      setRunning(false);
+    }
+  };
+
   return (
     <div className="animate-slide-in space-y-6">
       <div>
@@ -35,6 +76,14 @@ export default function AgentsPage() {
           Chaque agent est un module d'intelligence orchestré par OpenAI. Inspectez son objectif,
           ses indexes consommés, sa mémoire, et ajustez son comportement par texte ou voix.
         </p>
+        <div className="mt-2 flex items-center gap-2 text-[11px]">
+          <span className={`px-2 py-0.5 rounded-full border font-mono ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+            {openaiReady ? 'OpenAI : clé détectée — exécution live possible' : 'OpenAI : clé absente — mode mock'}
+          </span>
+          {readiness?.openai?.model && (
+            <span className="text-muted-foreground font-mono">défaut Edge: {readiness.openai.model}</span>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -92,18 +141,66 @@ export default function AgentsPage() {
 
               <div className="grid grid-cols-3 gap-2 pt-2">
                 <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
-                  <p className="editorial-eyebrow flex items-center gap-1"><DollarSign size={9} /> Coût simulé</p>
-                  <p className="text-sm font-mono text-foreground mt-0.5">{agent.simulatedCost}</p>
+                  <p className="editorial-eyebrow flex items-center gap-1"><DollarSign size={9} /> Coût estimé</p>
+                  <p className="text-sm font-mono text-foreground mt-0.5">{modelMeta?.costEstimate ?? agent.simulatedCost}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
-                  <p className="editorial-eyebrow flex items-center gap-1"><Clock size={9} /> Latence</p>
-                  <p className="text-sm font-mono text-foreground mt-0.5">~2.4s</p>
+                  <p className="editorial-eyebrow flex items-center gap-1"><Clock size={9} /> Latence estimée</p>
+                  <p className="text-sm font-mono text-foreground mt-0.5">{modelMeta?.latencyEstimate ?? '~2.4s'}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
-                  <p className="editorial-eyebrow flex items-center gap-1"><Database size={9} /> Modèle</p>
-                  <p className="text-[11px] font-mono text-muted-foreground mt-0.5">OpenAI — sélection future · non branché</p>
+                  <p className="editorial-eyebrow flex items-center gap-1"><Database size={9} /> Modèle OpenAI</p>
+                  <select
+                    value={currentModel}
+                    onChange={(e) => setModel(agent.id, e.target.value)}
+                    className="mt-0.5 w-full bg-card border border-border rounded px-1.5 py-0.5 text-[11px] font-mono text-foreground"
+                  >
+                    {OPENAI_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>{m.label} · {m.tier}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                  <p className="editorial-eyebrow mb-1">Profil qualité</p>
+                  <p className="font-mono text-foreground">{profile}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                  <p className="editorial-eyebrow mb-1">Adéquation</p>
+                  <p className="text-foreground/80">
+                    {profile && modelMeta?.suitableFor?.includes(profile)
+                      ? `${modelMeta.label} adapté à ${profile}.`
+                      : `${modelMeta?.label ?? currentModel} possible mais non optimal pour ${profile ?? 'ce profil'}.`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={launchAgent}
+                  disabled={running}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
+                >
+                  {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                  {openaiReady ? 'Exécuter (live OpenAI)' : 'Exécuter (mock)'}
+                </button>
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+                  {openaiReady ? 'mode : live' : 'mode : mock'}
+                </span>
+                {agent.status === 'simulated' && (
+                  <span className="text-[10px] text-muted-foreground">orchestration agent encore stubbée</span>
+                )}
+              </div>
+
+              {lastRun && (
+                <details className="mt-1">
+                  <summary className="text-[11px] text-muted-foreground cursor-pointer">Dernier appel — {lastRun.mode ?? 'error'} {lastRun.model ? `· ${lastRun.model}` : ''}</summary>
+                  <pre className="text-[10px] font-mono bg-muted/40 p-2 rounded mt-1 overflow-auto max-h-48">{JSON.stringify(lastRun, null, 2)}</pre>
+                </details>
+              )}
+
 
               <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
                 <p className="editorial-eyebrow mb-1">Niveau de permission</p>
