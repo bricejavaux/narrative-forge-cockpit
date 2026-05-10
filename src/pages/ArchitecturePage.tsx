@@ -129,10 +129,10 @@ export default function ArchitecturePage() {
         <div className="cockpit-card space-y-4">
           <h3 className="font-display font-semibold text-foreground">Révélations & Payoffs</h3>
           {[
-            { rev: 'Signal d\'origine humaine', chapter: 8, payoff: 'Ch. 12 (planifié)', status: 'pending', delay: '4 chapitres' },
-            { rev: 'Données mission Aether', chapter: 3, payoff: 'Non planifié', status: 'warning', delay: 'Indéfini' },
-            { rev: 'Programme Ombre Stellaire', chapter: 5, payoff: 'Ch. 9 (planifié)', status: 'critical', delay: 'Retardé' },
-            { rev: 'IA ARIA consciente', chapter: 7, payoff: 'Ch. 15 (planifié)', status: 'active', delay: '8 chapitres' },
+            { rev: 'Walvis Bay — première Arche au sol ouverte sans coordination', chapter: 5, payoff: 'Ch.5 (posé) → Ch.12-13', status: 'active', delay: '7-8 chapitres' },
+            { rev: 'Le Trust — clé partagée, pas de gardien unique', chapter: 7, payoff: 'Ch.12-13 (planifié)', status: 'pending', delay: '5-6 chapitres' },
+            { rev: 'Trace cosmique B+ — horizon, jamais personnage', chapter: 3, payoff: 'Ch.14 / Tome II', status: 'warning', delay: 'Diffus — règle non-humanisation' },
+            { rev: 'Doctrine silencieuse — friction = résilience', chapter: 4, payoff: 'Ch.13 (planifié)', status: 'critical', delay: 'À condenser' },
           ].map((item, i) => (
             <div key={i} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
               <div className="flex items-center gap-3">

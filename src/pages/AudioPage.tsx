@@ -105,7 +105,7 @@ export default function AudioPage() {
               <div>
                 <span className="text-xs text-muted-foreground uppercase">Transcription brute</span>
                 <p className="mt-1 text-xs text-muted-foreground italic bg-surface-2 p-3 rounded">
-                  "Il faut absolument approfondir le dilemme moral de Nakamura au chapitre 8. La confrontation avec les données Aether n'est pas assez viscérale..."
+                  "Sur le Ch.6 Anvers — Brice ne doit pas expliquer la doctrine. Il la tient. Resserrer le dialogue avec le leader syndical, garder la sobriété."
                 </p>
               </div>
               <div>
@@ -123,20 +123,20 @@ export default function AudioPage() {
 
       {activeSection === 'Relectures chapitres' && (
         <div className="cockpit-card space-y-4">
-          <h3 className="font-display font-semibold text-foreground">Lecture commentée — Ch. 8 La Fréquence Noire (simulé)</h3>
+          <h3 className="font-display font-semibold text-foreground">Lecture commentée — Ch.5 Walvis Bay : « Nous avons ouvert. » (simulé)</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-surface-2 rounded p-4 text-sm text-muted-foreground leading-relaxed max-h-[400px] overflow-y-auto">
-              <p className="text-foreground mb-4">[Extrait simulé du chapitre 8]</p>
-              <p>Le signal traversa les couches de bruit cosmique comme une lame de verre fendant un océan d'encre. Nakamura fixait l'oscilloscope, ses doigts blancs agrippés au bord de la console. Quatre-vingt-douze heures sans sommeil, et pourtant chaque fibre de son être vibrait d'une clarté terrifiante.</p>
-              <p className="mt-3">«La modulation est artificielle», murmura Elara sans lever les yeux de ses calculs. «Pas naturelle. Pas aléatoire. Quelqu'un — ou quelque chose — structure ce signal.»</p>
-              <p className="mt-3">Le silence qui suivit pesa plus lourd que toute la masse de Jupiter, dont la station Aether dessinait l'ombre colossale sur leurs visages blêmes.</p>
+              <p className="text-foreground mb-4">[Extrait simulé — Ch.5]</p>
+              <p>À 04:17, la fenêtre s'était ouverte sans eux. Brice apprit la nouvelle par un canal latéral, dans la voix neutre de Jonas : « Walvis Bay vient de coupler. » Pas d'autorisation du Trust, pas de latence consentie. Juste un État qui avait décidé que sa vitesse ne se discutait plus.</p>
+              <p className="mt-3">Sur l'écran, ΔS oscillait à la limite haute de la fenêtre. R montait. Personne ne parlait, parce qu'il n'y avait rien à dire qui n'aurait pas l'air d'une plainte.</p>
+              <p className="mt-3">Amina, depuis le SAS, transmit une seule ligne : « Nous avons ouvert. » Brice reposa la tasse. C'était le monde qui venait de basculer, dans une cuisine, à mi-voix.</p>
             </div>
             <div className="space-y-3">
               <h4 className="text-xs text-muted-foreground uppercase tracking-wider">Commentaires oraux</h4>
               {[
-                { time: '0:45', text: 'Très bonne ouverture — garder cette tension', status: 'done' },
-                { time: '1:20', text: 'Le dialogue d\'Elara est trop expositoire ici', status: 'open' },
-                { time: '2:10', text: 'La métaphore de Jupiter est forte — à étoffer', status: 'in_progress' },
+                { time: '0:45', text: 'Garder la sobriété du « 04:17 » — pas de dramatisation', status: 'done' },
+                { time: '1:20', text: 'Jonas est trop neutre — un détail de corps suffirait', status: 'open' },
+                { time: '2:10', text: 'La cuisine en clôture est juste — phrase-couteau à resserrer', status: 'in_progress' },
               ].map((c, i) => (
                 <div key={i} className="flex items-start gap-2 p-2 bg-surface-2 rounded">
                   <span className="font-mono text-[10px] text-rose w-10 shrink-0">{c.time}</span>
