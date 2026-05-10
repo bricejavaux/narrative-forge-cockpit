@@ -35,7 +35,7 @@ const MOCK = [
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { source_file_id, text } = await req.json().catch(() => ({}));
+    const { source_file_id, text, model } = await req.json().catch(() => ({}));
     if (!hasOpenAIKey() || !text || typeof text !== 'string') {
       return json({
         mode: 'mock',
@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
       });
     }
     const r = await callOpenAI({
+      model,
       system: SYSTEM,
       user: `Extrait la fiche personnages depuis ce document :\n\n${text.slice(0, 60000)}`,
       json: true,
