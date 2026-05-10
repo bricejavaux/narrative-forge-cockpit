@@ -218,6 +218,16 @@ export type AgentPermissionLevel =
   | 'targeted-rewrite-with-validation'
   | 'deep-rewrite-with-validation';
 
+export type AgentModelProfile =
+  | 'extraction_fast'
+  | 'extraction_reliable'
+  | 'diagnostic_standard'
+  | 'rewrite_quality'
+  | 'tome_audit_premium'
+  | 'chapter_generation_premium';
+
+export type AgentCostTier = 'fast' | 'standard' | 'premium';
+
 export interface Agent {
   id: string;
   name: string;
@@ -230,6 +240,14 @@ export interface Agent {
   permissionLevel?: AgentPermissionLevel;
   futureIndexes: string[];
   lastRun?: string;
+  // Model configuration (OpenAI only at runtime)
+  defaultModel?: string;
+  allowedModels?: string[];
+  modelProfile?: AgentModelProfile;
+  temperature?: number;
+  maxOutputTokens?: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
+  costTier?: AgentCostTier;
 }
 
 export const agents: Agent[] = [
