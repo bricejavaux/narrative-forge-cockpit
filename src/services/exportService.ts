@@ -1,10 +1,18 @@
-// Mock export service. NOT connected.
-// Priority formats: Markdown, JSON, Text. Secondary: DOCX. Future: PDF, EPUB.
-export type ExportFormat = 'markdown' | 'json' | 'text' | 'docx' | 'pdf' | 'epub';
+import { supabase } from '@/integrations/supabase/client';
+
+export type ExportFormat = 'text' | 'markdown' | 'json';
 
 export const exportService = {
-  isConnected: () => false,
-  async export(_format: ExportFormat): Promise<{ url: string }> {
-    return Promise.resolve({ url: 'simulated://export' });
+  async createSimulated(name: string, format: ExportFormat) {
+    return {
+      mode: 'mock' as const,
+      name,
+      format,
+      preview: `# ${name}\n\n(Simulation — sera persisté dans la table \`exports\` une fois la sélection humaine validée.)`,
+    };
+  },
+  async list() {
+    const { data } = await supabase.from('exports').select('*').order('created_at', { ascending: false }).limit(50);
+    return data ?? [];
   },
 };
