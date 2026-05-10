@@ -116,6 +116,17 @@ export default function SettingsPage() {
       {activeSection === 'Readiness Supabase / OpenAI / OneDrive' && (
         <div className="space-y-5">
           <RuntimeModeSwitch />
+          <div className="cockpit-card space-y-2">
+            <p className="editorial-eyebrow">Runtime AI Provider</p>
+            <h3 className="text-base editorial-heading text-foreground">OpenAI via Supabase Edge Functions</h3>
+            <ul className="text-sm text-muted-foreground space-y-1 mt-2">
+              <li>• <span className="text-foreground">Attendu :</span> OpenAI uniquement (clé stockée en secret Edge Function).</li>
+              <li>• <span className="text-foreground">Actuel :</span> OpenAI si <code>OPENAI_API_KEY</code> présent, sinon <em>not configured</em>.</li>
+              <li>• <span className="text-foreground">Références Gemini en runtime :</span> doivent être à zéro.</li>
+              <li>• <span className="text-foreground">Lovable AI Gateway :</span> usage interne Lovable, jamais runtime application.</li>
+              <li>• <span className="text-foreground">RLS :</span> activé sans policies — écritures via Edge Functions, lectures en mock/fallback tant que les policies ne sont pas écrites.</li>
+            </ul>
+          </div>
           <ConnectionReadinessPanel />
           <OneDriveRepositoryPanel />
         </div>
