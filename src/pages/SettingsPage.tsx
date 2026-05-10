@@ -35,6 +35,34 @@ function Toggle({ label, value, hint }: { label: string; value: boolean; hint?: 
   );
 }
 
+function RuntimeModeSwitch() {
+  const [mode, setMode] = useState<RuntimeMode>(getRuntimeMode());
+  const update = (m: RuntimeMode) => { setRuntimeMode(m); setMode(m); };
+  return (
+    <div className="rounded-lg border border-border/60 bg-card/40 p-4 flex items-center justify-between">
+      <div>
+        <p className="editorial-eyebrow">Mode runtime</p>
+        <h4 className="text-sm font-medium text-foreground mt-1">
+          {mode === 'connected' ? 'Connected — lecture Supabase + fallback mock par fonction' : 'Mock — dummy data uniquement'}
+        </h4>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Les Edge Functions OpenAI dégradent automatiquement en mock si la clé n'est pas configurée.
+        </p>
+      </div>
+      <div className="flex items-center gap-1 text-xs">
+        <button
+          onClick={() => update('mock')}
+          className={`px-3 py-1.5 rounded-md border ${mode === 'mock' ? 'bg-secondary border-border text-foreground' : 'border-transparent text-muted-foreground'}`}
+        >mock</button>
+        <button
+          onClick={() => update('connected')}
+          className={`px-3 py-1.5 rounded-md border ${mode === 'connected' ? 'bg-primary/10 border-primary/40 text-foreground' : 'border-transparent text-muted-foreground'}`}
+        >connected</button>
+      </div>
+    </div>
+  );
+}
+
 const sections = [
   'Connecteurs',
   'Readiness Supabase / OpenAI / OneDrive',
