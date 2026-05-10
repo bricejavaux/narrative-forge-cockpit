@@ -1,129 +1,297 @@
-import { useState } from 'react';
-import { canonRules } from '@/data/dummyData';
+import { useState, useMemo } from 'react';
+import { canonRules, characters, chapters, arcs, audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
-import MicButton from '@/components/shared/MicButton';
-import { ChevronRight, Edit, Copy, Archive, Database, X } from 'lucide-react';
+import NoteComposer from '@/components/shared/NoteComposer';
+import {
+  ChevronRight, ChevronDown, BookOpen, Globe, Shield, AlertOctagon, Building2,
+  Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic
+} from 'lucide-react';
 
-const tabs = ['Règles du monde', 'Contraintes', 'Modes de panne', 'Organisations', 'Technologies', 'Lieux', 'Glossaire', 'Sources & index'];
+const categoryMeta: Record<string, { icon: any; label: string }> = {
+  Monde: { icon: Globe, label: 'Règles du monde' },
+  Contrainte: { icon: Shield, label: 'Contraintes' },
+  Panne: { icon: AlertOctagon, label: 'Modes de panne' },
+  Organisation: { icon: Building2, label: 'Organisations' },
+  Technologie: { icon: Cpu, label: 'Technologies' },
+  Lieu: { icon: MapPin, label: 'Lieux' },
+  Glossaire: { icon: BookMarked, label: 'Glossaire' },
+};
 
 export default function CanonPage() {
-  const [activeTab, setActiveTab] = useState(tabs[0]);
-  const [selectedRule, setSelectedRule] = useState<string | null>(null);
+  const [selectedRule, setSelectedRule] = useState<string | null>('CAN-001');
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({
+    Monde: true, Contrainte: true, Organisation: true,
+    Technologie: true, Lieu: true, Glossaire: false, Panne: false,
+  });
+  const [search, setSearch] = useState('');
 
-  const rule = canonRules.find(r => r.id === selectedRule);
+  const grouped = useMemo(() => {
+    const map: Record<string, typeof canonRules> = {};
+    canonRules.forEach((r) => {
+      if (search && !r.title.toLowerCase().includes(search.toLowerCase())) return;
+      (map[r.category] ||= []).push(r);
+    });
+    return map;
+  }, [search]);
+
+  const rule = canonRules.find((r) => r.id === selectedRule);
+  const meta = rule ? categoryMeta[rule.category] : null;
+
+  // Simulated linked references
+  const linkedChars = rule ? characters.slice(0, 3) : [];
+  const linkedChapters = rule ? chapters.slice(0, 4) : [];
+  const linkedArcs = rule ? arcs.slice(0, 2) : [];
+  const linkedAudio = rule ? audioNotes.filter((a) => a.targetType === 'canon').slice(0, 2) : [];
+  const related = rule ? canonRules.filter((r) => r.id !== rule.id).slice(0, 3) : [];
 
   return (
-    <div className="space-y-6 animate-slide-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-display font-bold text-foreground">Canon</h1>
-        <MicButton label="Note audio sur le canon" size="md" />
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto pb-2 border-b border-border">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-3 py-2 text-xs whitespace-nowrap rounded-t transition-colors ${
-              activeTab === tab
-                ? 'bg-surface-2 text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex gap-6">
-        {/* Table */}
-        <div className={`${selectedRule ? 'w-1/2' : 'w-full'} transition-all`}>
-          <div className="cockpit-card overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
-                  <th className="text-left py-2 px-3">ID</th>
-                  <th className="text-left py-2 px-3">Titre</th>
-                  <th className="text-left py-2 px-3">Catégorie</th>
-                  <th className="text-left py-2 px-3">Criticité</th>
-                  <th className="text-left py-2 px-3">Statut</th>
-                  <th className="text-left py-2 px-3">V.</th>
-                  <th className="text-left py-2 px-3">Index</th>
-                  <th className="text-left py-2 px-3">Source</th>
-                  <th className="text-left py-2 px-3">MAJ</th>
-                  <th className="py-2 px-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {canonRules.map(r => (
-                  <tr
-                    key={r.id}
-                    className={`border-b border-border/50 hover:bg-surface-2 cursor-pointer transition-colors ${selectedRule === r.id ? 'bg-surface-2' : ''}`}
-                    onClick={() => setSelectedRule(r.id)}
-                  >
-                    <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{r.id}</td>
-                    <td className="py-2 px-3 text-foreground">{r.title}</td>
-                    <td className="py-2 px-3"><StatusBadge status={r.category} /></td>
-                    <td className="py-2 px-3"><StatusBadge status={r.criticality === 'haute' ? 'critical' : r.criticality === 'moyenne' ? 'warning' : 'low'} /></td>
-                    <td className="py-2 px-3"><StatusBadge status={r.status} /></td>
-                    <td className="py-2 px-3 font-mono text-xs">v{r.version}</td>
-                    <td className="py-2 px-3 font-mono text-xs text-cyan">{r.indexAssociated}</td>
-                    <td className="py-2 px-3 text-xs text-muted-foreground">{r.source}</td>
-                    <td className="py-2 px-3 text-xs text-muted-foreground">{r.lastUpdate}</td>
-                    <td className="py-2 px-3"><ChevronRight size={14} className="text-muted-foreground" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+    <div className="animate-slide-in">
+      <div className="flex items-baseline justify-between mb-1">
+        <div>
+          <p className="editorial-eyebrow">Pilotage narratif</p>
+          <h1 className="text-3xl editorial-heading text-foreground mt-1">Canon</h1>
         </div>
+        {rule && meta && (
+          <nav className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <BookOpen size={12} />
+            <span>Canon</span>
+            <ChevronRight size={11} />
+            <span>{meta.label}</span>
+            <ChevronRight size={11} />
+            <span className="text-foreground">{rule.title}</span>
+          </nav>
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
+        Le canon est la colonne vertébrale du monde. Naviguez les règles, contraintes, organisations,
+        technologies et lieux — chaque objet est relié aux personnages, chapitres et notes vocales associés.
+      </p>
 
-        {/* Detail panel */}
-        {rule && (
-          <div className="w-1/2 cockpit-card space-y-4 animate-slide-in">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display font-semibold text-foreground">{rule.title}</h2>
-              <button onClick={() => setSelectedRule(null)} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+      <div className="grid grid-cols-12 gap-6">
+        {/* Tree navigation */}
+        <aside className="col-span-3">
+          <div className="cockpit-card sticky top-24 space-y-3">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher dans le canon…"
+              className="w-full text-xs rounded-lg border border-border bg-background/60 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring/30"
+            />
+            <div className="space-y-0.5 max-h-[calc(100vh-260px)] overflow-y-auto">
+              {Object.entries(categoryMeta).map(([cat, m]) => {
+                const items = grouped[cat] || [];
+                const Icon = m.icon;
+                const isOpen = expanded[cat];
+                return (
+                  <div key={cat}>
+                    <button
+                      onClick={() => setExpanded((s) => ({ ...s, [cat]: !s[cat] }))}
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs text-foreground hover:bg-secondary/60 rounded-md"
+                    >
+                      {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      <Icon size={12} className="text-muted-foreground" />
+                      <span className="flex-1 text-left">{m.label}</span>
+                      <span className="text-[10px] text-muted-foreground font-mono">{items.length}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="ml-5 border-l border-border pl-2 space-y-0.5">
+                        {items.length === 0 && (
+                          <div className="px-2 py-1 text-[10px] text-muted-foreground italic">— vide —</div>
+                        )}
+                        {items.map((r) => (
+                          <button
+                            key={r.id}
+                            onClick={() => setSelectedRule(r.id)}
+                            className={`w-full text-left px-2 py-1.5 rounded text-xs truncate transition-colors ${
+                              selectedRule === r.id
+                                ? 'bg-primary/10 text-primary'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
+                            }`}
+                          >
+                            {r.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex gap-2">
-              <StatusBadge status={rule.status} />
-              <StatusBadge status={rule.criticality === 'haute' ? 'critical' : 'warning'} />
-              <span className="text-xs font-mono text-muted-foreground">Rigidité: {rule.rigidity}</span>
-            </div>
+          </div>
+        </aside>
 
-            <div className="space-y-3 text-sm">
-              <div><span className="text-xs text-muted-foreground uppercase">Résumé</span><p className="text-foreground mt-1">{rule.summary}</p></div>
-              <div><span className="text-xs text-muted-foreground uppercase">Description</span><p className="text-muted-foreground mt-1">{rule.description}</p></div>
-              <div><span className="text-xs text-muted-foreground uppercase">Exceptions</span><p className="text-muted-foreground mt-1">{rule.exceptions}</p></div>
-            </div>
+        {/* Detail */}
+        <main className="col-span-6 space-y-5">
+          {rule ? (
+            <>
+              <div className="cockpit-card-elevated space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="editorial-eyebrow mb-1">{rule.id} · {meta?.label}</p>
+                    <h2 className="text-2xl editorial-heading text-foreground">{rule.title}</h2>
+                  </div>
+                  <button
+                    onClick={() => setSelectedRule(null)}
+                    className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-secondary"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
 
-            <div className="space-y-2">
-              <span className="text-xs text-muted-foreground uppercase">Liens</span>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="px-2 py-1 rounded bg-surface-2 text-cyan font-mono">→ {rule.indexAssociated}</span>
-                <span className="px-2 py-1 rounded bg-surface-2 text-muted-foreground">Ch. 1, 3, 8</span>
-                <span className="px-2 py-1 rounded bg-surface-2 text-muted-foreground">Audit Canon</span>
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge status={rule.status} />
+                  <StatusBadge status={rule.criticality === 'haute' ? 'critical' : rule.criticality === 'moyenne' ? 'warning' : 'low'} />
+                  <span className="px-2 py-0.5 rounded text-xs font-mono border border-border bg-secondary/40 text-muted-foreground">
+                    rigidité · {rule.rigidity}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-xs font-mono border border-border bg-secondary/40 text-muted-foreground">
+                    v{rule.version}
+                  </span>
+                </div>
+
+                <div className="soft-divider" />
+
+                <div className="space-y-4 text-sm">
+                  <div>
+                    <p className="editorial-eyebrow mb-1">Résumé</p>
+                    <p className="text-foreground leading-relaxed">{rule.summary}</p>
+                  </div>
+                  <div>
+                    <p className="editorial-eyebrow mb-1">Description</p>
+                    <p className="text-foreground/85 leading-relaxed">{rule.description}</p>
+                  </div>
+                  <div>
+                    <p className="editorial-eyebrow mb-1">Exceptions</p>
+                    <p className="text-foreground/75 leading-relaxed italic">{rule.exceptions}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes & comments */}
+              <NoteComposer target={rule.title} />
+
+              {/* Timeline */}
+              <div className="cockpit-card space-y-3">
+                <div className="flex items-center gap-2">
+                  <Clock size={14} className="text-muted-foreground" />
+                  <h3 className="editorial-eyebrow">Historique des modifications</h3>
+                </div>
+                <ol className="relative border-l border-border ml-1 space-y-3">
+                  {[
+                    { date: rule.lastUpdate, label: `v${rule.version} — révision mineure`, who: rule.source },
+                    { date: '2026-03-20', label: `v${rule.version - 1} — passage en active`, who: 'Auteur' },
+                    { date: '2026-03-01', label: 'v1 — création', who: 'Auteur' },
+                  ].map((h, i) => (
+                    <li key={i} className="ml-4">
+                      <span className="absolute -left-[5px] w-2.5 h-2.5 rounded-full bg-card border-2 border-primary/40" />
+                      <p className="text-sm text-foreground">{h.label}</p>
+                      <p className="text-[11px] text-muted-foreground font-mono">{h.date} · {h.who}</p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </>
+          ) : (
+            <div className="cockpit-card p-12 text-center text-muted-foreground">
+              <BookOpen size={28} className="mx-auto mb-3 opacity-40" />
+              <p className="text-sm">Sélectionne un objet du canon dans l'arborescence</p>
+            </div>
+          )}
+        </main>
+
+        {/* Linked references */}
+        <aside className="col-span-3">
+          {rule && (
+            <div className="cockpit-card sticky top-24 space-y-4">
+              <div className="flex items-center gap-2">
+                <Link2 size={13} className="text-violet" />
+                <h3 className="editorial-eyebrow !text-violet">Références liées</h3>
+              </div>
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <Users size={10} /> Personnages
+                </p>
+                <div className="space-y-1">
+                  {linkedChars.map((c) => (
+                    <button key={c.id} className="w-full text-left text-xs text-foreground hover:text-primary transition-colors py-0.5">
+                      → {c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <GitBranch size={10} /> Arcs
+                </p>
+                <div className="space-y-1">
+                  {linkedArcs.map((a) => (
+                    <button key={a.id} className="w-full text-left text-xs text-foreground hover:text-primary transition-colors py-0.5">
+                      → {a.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <FileText size={10} /> Chapitres
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {linkedChapters.map((c) => (
+                    <button
+                      key={c.id}
+                      className="px-2 py-0.5 rounded text-[11px] font-mono border border-border bg-secondary/40 text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                    >
+                      Ch.{c.number}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {linkedAudio.length > 0 && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                    <Mic size={10} /> Notes audio
+                  </p>
+                  <div className="space-y-1.5">
+                    {linkedAudio.map((a) => (
+                      <div key={a.id} className="text-xs">
+                        <p className="text-foreground">{a.proposedAction || '—'}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{a.duration} · {a.transcriptionStatus}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="soft-divider" />
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Index cible</p>
+                <span className="px-2 py-1 rounded text-xs font-mono bg-primary/10 text-primary">
+                  {rule.indexAssociated}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Objets connexes</p>
+                <div className="space-y-1">
+                  {related.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => setSelectedRule(r.id)}
+                      className="w-full text-left text-xs text-muted-foreground hover:text-foreground transition-colors py-0.5"
+                    >
+                      → {r.title}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:text-foreground transition-colors cursor-not-allowed opacity-70">
-                <Edit size={12} /> Éditer
-              </button>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:text-foreground transition-colors cursor-not-allowed opacity-70">
-                <Copy size={12} /> Dupliquer
-              </button>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:text-foreground transition-colors cursor-not-allowed opacity-70">
-                <Archive size={12} /> Archiver
-              </button>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:text-foreground transition-colors cursor-not-allowed opacity-70">
-                <Database size={12} /> Envoyer vers index
-              </button>
-              <MicButton label="Note audio" size="sm" />
-            </div>
-          </div>
-        )}
+          )}
+        </aside>
       </div>
     </div>
   );
