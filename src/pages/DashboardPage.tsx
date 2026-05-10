@@ -4,6 +4,8 @@ import {
 } from 'lucide-react';
 import WarningBanner from '@/components/shared/WarningBanner';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
+import ImportReconcilePanel from '@/components/shared/ImportReconcilePanel';
+import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
 import KpiCard from '@/components/shared/KpiCard';
 import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -11,12 +13,11 @@ import ScoreBar from '@/components/shared/ScoreBar';
 import { project, connectors, chapters, arcs, recentActivity, audioNotes, runs } from '@/data/dummyData';
 
 const criticalWarnings = [
-  { text: 'OpenAI API — non branchée. Pas de génération, audit ni transcription.', severity: 'critical' as const },
-  { text: 'Supabase (DB / Auth / Storage) — non branché. Pas de persistance ni d\'auth.', severity: 'critical' as const },
-  { text: 'OneDrive — non branché. Référentiel documentaire long terme inaccessible.', severity: 'critical' as const },
-  { text: 'Indexes vectoriels — simulés. Pas de recherche sémantique réelle.', severity: 'warning' as const },
-  { text: 'Whisper / transcription — simulé. Notes audio non transcrites.', severity: 'warning' as const },
-  { text: 'Exports texte / markdown / JSON — moteur simulé.', severity: 'info' as const },
+  { text: 'OneDrive — connecté en lecture. Téléchargement réel des sources actif.', severity: 'info' as const },
+  { text: 'Lovable AI Gateway — actif (Gemini). Extraction canon/personnages et diagnostics fonctionnels.', severity: 'info' as const },
+  { text: 'Whisper / transcription audio — encore simulée (clé OpenAI requise).', severity: 'warning' as const },
+  { text: 'Persistance Supabase — preview uniquement. Validation humaine avant écriture.', severity: 'warning' as const },
+  { text: 'Indexes vectoriels — pgvector pas encore activé. Archives Chroma en attente.', severity: 'warning' as const },
 ];
 
 export default function DashboardPage() {
@@ -33,6 +34,11 @@ export default function DashboardPage() {
       <WarningBanner warnings={criticalWarnings} />
 
       <ConnectionReadinessPanel compact />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <OneDriveRepositoryPanel />
+        <ImportReconcilePanel />
+      </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">

@@ -4,6 +4,7 @@ import { ONEDRIVE_REPOSITORY } from '@/lib/runtimeMode';
 export type OneDriveFolderDescriptor = {
   path: string;
   files?: string[];
+  sizes?: Record<string, number>;
   subfolders?: string[];
 };
 
@@ -12,22 +13,29 @@ export type OneDriveStructure = {
   folders: OneDriveFolderDescriptor[];
 };
 
+export type OneDriveCheckResult = {
+  mode: 'mock' | 'live' | 'degraded';
+  structure: OneDriveStructure;
+  message?: string;
+  drive_ok?: boolean;
+  drive_error?: string;
+};
+
 export const oneDriveService = {
   repository: ONEDRIVE_REPOSITORY,
 
-  async checkConnection(): Promise<{ mode: 'mock' | 'live' | 'degraded'; structure: OneDriveStructure; message?: string; drive_ok?: boolean }> {
-    const { data, error } = await supabase.functions.invoke('onedrive-list', { body: {} });
+  async checkConnection(path?: string): Promise<OneDriveCheckResult> {
+    const { data, error } = await supabase.functions.invoke('onedrive-list', { body: { path } });
     if (error) throw error;
-    return data;
+    return data as OneDriveCheckResult;
   },
 
   async listRootFolder() {
     return this.checkConnection();
   },
 
-  async listFolder(_path: string) {
-    // Real folder traversal not yet implemented — surface expected structure.
-    return this.checkConnection();
+  async listFolder(path: string) {
+    return this.checkConnection(path);
   },
 
   async findExpectedFiles() {
@@ -42,16 +50,10 @@ export const oneDriveService = {
     return expected.map((p) => ({ path: p, found: present.has(p) }));
   },
 
-  async syncSourceFiles() {
-    return { mode: 'mock' as const, message: 'Sync simulated. Files will be copied to source-files bucket once OneDrive auth is fully wired.' };
-  },
-
-  async downloadSourceFile(fileId: string) {
-    return { mode: 'mock' as const, fileId, message: 'Download simulated.' };
-  },
-
-  async syncCover() {
-    return { mode: 'mock' as const, message: 'Cover sync simulated.' };
+  async downloadFile(path: string): Promise<{ mode: string; text?: string; size?: number; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('onedrive-download', { body: { path } });
+    if (error) throw error;
+    return data;
   },
 
   async inspectChromaArchives() {
