@@ -227,7 +227,7 @@ export interface Agent {
   criticality: 'haute' | 'moyenne' | 'basse';
   status: 'ready' | 'simulated' | 'disabled';
   rewriteRights: boolean;
-  permissionLevel: AgentPermissionLevel;
+  permissionLevel?: AgentPermissionLevel;
   futureIndexes: string[];
   lastRun?: string;
 }
