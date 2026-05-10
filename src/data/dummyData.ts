@@ -11,16 +11,14 @@ export interface Connector {
 }
 
 export const connectors: Connector[] = [
-  { id: 'openai', name: 'OpenAI API', status: 'not_connected', description: 'Moteur IA — génération, audit, transcription, réécriture', note: 'Clé API non configurée' },
-  { id: 'supabase-db', name: 'Supabase DB', status: 'not_connected', description: 'Base relationnelle — objets métier, runs, logs, scores', note: 'Projet non lié' },
-  { id: 'supabase-auth', name: 'Supabase Auth', status: 'not_connected', description: 'Authentification utilisateurs', note: 'Non configuré' },
-  { id: 'supabase-storage', name: 'Supabase Storage', status: 'not_connected', description: 'Stockage fichiers, audio, assets', note: 'Non configuré' },
-  { id: 'dropbox', name: 'Dropbox', status: 'not_connected', description: 'Corpus longs — EPUB, PDF, DOCX, archives, bibliothèques', note: 'Future connexion' },
-  { id: 'microsoft', name: 'MS Teams / SharePoint / OneDrive', status: 'not_connected', description: 'Repositories documentaires, corpus monde, références longues', note: 'Future connexion' },
-  { id: 'export-engine', name: 'Export Engine', status: 'simulated', description: 'JSON, Markdown, DOCX, LaTeX, PDF, EPUB', note: 'Moteur simulé' },
-  { id: 'cover-gen', name: 'Cover Generation', status: 'not_connected', description: 'Génération couvertures et assets visuels', note: 'Non branché' },
-  { id: 'audio-transcription', name: 'Audio Transcription', status: 'simulated', description: 'Whisper / transcription vocale', note: 'Simulé' },
-  { id: 'vector-index', name: 'Vector Indexing Pipeline', status: 'simulated', description: 'Indexes vectoriels par finalité', note: 'Pipeline simulé' },
+  { id: 'openai', name: 'OpenAI API', status: 'not_connected', description: 'Couche d\'intelligence — orchestration, transcription Whisper, audit, réécriture', note: 'Connecteur critique — à brancher en priorité' },
+  { id: 'supabase-db', name: 'Supabase DB', status: 'not_connected', description: 'Couche narrative active — objets, runs, scores, journal', note: 'Connecteur critique — colonne vertébrale' },
+  { id: 'supabase-auth', name: 'Supabase Auth', status: 'not_connected', description: 'Authentification et gouvernance des accès', note: 'Lié à Supabase DB' },
+  { id: 'supabase-storage', name: 'Supabase Storage', status: 'not_connected', description: 'Stockage actif — fichiers de travail, audio brut, exports', note: 'Lié à Supabase DB' },
+  { id: 'onedrive', name: 'OneDrive', status: 'not_connected', description: 'Référentiel documentaire long terme — corpus monde, archives, bibliothèques', note: 'Connecteur repository unique' },
+  { id: 'export-engine', name: 'Export Engine', status: 'simulated', description: 'Texte, Markdown, JSON structuré', note: 'Moteur simulé — focus formats texte' },
+  { id: 'audio-transcription', name: 'Whisper / Transcription', status: 'simulated', description: 'Transcription des notes vocales — via OpenAI', note: 'Active dès branchement OpenAI' },
+  { id: 'vector-index', name: 'Pipeline d\'indexation', status: 'simulated', description: 'Indexes vectoriels par finalité — alimentés par OneDrive + Supabase', note: 'Pipeline simulé' },
 ];
 
 // ── Project ──
@@ -198,7 +196,7 @@ export const indexes: VectorIndex[] = [
   { id: 'arc_index', name: 'arc_index', purpose: 'Structure narrative, arcs, beats, révélations', docTypes: 'Architecture, timelines', status: 'simulated', simulatedSize: '~1.2k chunks', simulatedFreshness: '24h', lastUpdate: '2026-04-14', owner: 'Système', futureAgents: ['Audit Timeline', 'Audit Révélations', 'Audit Escalade'] },
   { id: 'science_index', name: 'science_index', purpose: 'Données scientifiques, concepts techniques, cohérence physique', docTypes: 'Bibles science, articles de référence', status: 'simulated', simulatedSize: '~3.1k chunks', simulatedFreshness: '96h', lastUpdate: '2026-04-10', owner: 'Système', futureAgents: ['Audit Densité Scientifique'], warning: 'Non rafraîchi depuis 5 jours' },
   { id: 'style_index', name: 'style_index', purpose: 'Règles de style, voix narrative, registres', docTypes: 'Guides de style, exemples', status: 'simulated', simulatedSize: '~800 chunks', simulatedFreshness: '120h', lastUpdate: '2026-04-09', owner: 'Système', futureAgents: ['Style Pass', 'Réécriture Ciblée'], warning: 'Index non rafraîchi' },
-  { id: 'long_memory_index', name: 'long_memory_index', purpose: 'Mémoire longue — corpus complets, archives', docTypes: 'EPUB, PDF, DOCX complets', status: 'absent', simulatedSize: '—', simulatedFreshness: '—', lastUpdate: '—', owner: 'Dropbox / MS', futureAgents: ['Génération Chapitre'], warning: 'Index absent — source non branchée' },
+  { id: 'long_memory_index', name: 'long_memory_index', purpose: 'Mémoire longue — corpus complets, archives, monde étendu', docTypes: 'EPUB, PDF, DOCX complets', status: 'absent', simulatedSize: '—', simulatedFreshness: '—', lastUpdate: '—', owner: 'OneDrive', futureAgents: ['Génération Chapitre'], warning: 'Index absent — OneDrive non branché' },
   { id: 'draft_index', name: 'draft_index', purpose: 'Brouillons actifs et versions de chapitres', docTypes: 'Brouillons Markdown', status: 'simulated', simulatedSize: '~950 chunks', simulatedFreshness: '12h', lastUpdate: '2026-04-14', owner: 'Système', futureAgents: ['Audit Répétitions', 'Réécriture'] },
   { id: 'editorial_index', name: 'editorial_index', purpose: 'Notes éditoriales, retours, directives', docTypes: 'Notes, commentaires structurés', status: 'empty', simulatedSize: '0', simulatedFreshness: '—', lastUpdate: '—', owner: 'Éditeur', futureAgents: ['Réécriture Ciblée'], warning: 'Index vide' },
   { id: 'audio_memory_index', name: 'audio_memory_index', purpose: 'Transcriptions audio structurées', docTypes: 'Transcriptions, notes vocales', status: 'simulated', simulatedSize: '~420 chunks', simulatedFreshness: '36h', lastUpdate: '2026-04-13', owner: 'Système', futureAgents: ['Vérification Audio'] },
@@ -257,7 +255,7 @@ export interface Asset {
   id: string;
   name: string;
   type: 'PDF' | 'EPUB' | 'DOCX' | 'Markdown' | 'JSON' | 'Image' | 'Audio';
-  source: 'local' | 'Dropbox' | 'OneDrive' | 'generated';
+  source: 'local' | 'OneDrive' | 'generated';
   size: string;
   integrationStatus: 'integrated' | 'pending' | 'failed' | 'simulated';
   indexationStatus: 'indexed' | 'not_indexed' | 'partial' | 'simulated';
@@ -269,7 +267,7 @@ export interface Asset {
 export const assets: Asset[] = [
   { id: 'asset-01', name: 'Bible Physique v2.pdf', type: 'PDF', source: 'local', size: '2.4 MB', integrationStatus: 'simulated', indexationStatus: 'simulated', targetIndex: 'world_index', version: 2, importDate: '2026-04-08' },
   { id: 'asset-02', name: 'Bible Politique v1.docx', type: 'DOCX', source: 'local', size: '1.1 MB', integrationStatus: 'simulated', indexationStatus: 'simulated', targetIndex: 'world_index', version: 1, importDate: '2026-04-05' },
-  { id: 'asset-03', name: 'Corpus Style — Exemples.epub', type: 'EPUB', source: 'Dropbox', size: '4.7 MB', integrationStatus: 'pending', indexationStatus: 'not_indexed', targetIndex: 'style_index', version: 1, importDate: '2026-04-03' },
+  { id: 'asset-03', name: 'Corpus Style — Exemples.epub', type: 'EPUB', source: 'OneDrive', size: '4.7 MB', integrationStatus: 'pending', indexationStatus: 'not_indexed', targetIndex: 'style_index', version: 1, importDate: '2026-04-03' },
   { id: 'asset-04', name: 'Chapitre 8 — Draft v5.md', type: 'Markdown', source: 'local', size: '48 KB', integrationStatus: 'integrated', indexationStatus: 'simulated', targetIndex: 'draft_index', version: 5, importDate: '2026-04-14' },
   { id: 'asset-05', name: 'Notes Monde Étendu.pdf', type: 'PDF', source: 'OneDrive', size: '8.2 MB', integrationStatus: 'pending', indexationStatus: 'not_indexed', targetIndex: 'long_memory_index', version: 1, importDate: '2026-03-28' },
   { id: 'asset-06', name: 'Référence Architecture Stations.json', type: 'JSON', source: 'local', size: '120 KB', integrationStatus: 'simulated', indexationStatus: 'simulated', targetIndex: 'world_index', version: 1, importDate: '2026-04-01' },
