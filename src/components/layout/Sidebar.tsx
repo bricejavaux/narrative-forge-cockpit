@@ -59,12 +59,12 @@ export default function Sidebar() {
         {!collapsed ? (
           <div className="flex flex-col">
             <span className="font-display text-base text-foreground leading-tight" style={{ fontWeight: 500 }}>
-              Heliotrope
+              Les Portes du Monde
             </span>
-            <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Studio narratif</span>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Cockpit narratif</span>
           </div>
         ) : (
-          <span className="font-display text-xl text-foreground">H</span>
+          <span className="font-display text-xl text-foreground">P</span>
         )}
       </div>
 
