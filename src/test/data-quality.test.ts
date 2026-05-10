@@ -14,6 +14,8 @@ describe('data-quality · canon stabilization', () => {
     chapters.forEach((c) => {
       expect(['macro', 'micro', 'mixte']).toContain(c.scale);
     });
+  });
+
 
   it('every critical canon rule has an index', () => {
     canonRules.filter((r) => r.criticality === 'haute').forEach((r) => {
