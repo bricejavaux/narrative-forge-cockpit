@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Mic, Play } from 'lucide-react';
+import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
 const subSections = ['Notes audio', 'Relectures chapitres', 'Commentaires beats', 'Revues cross-chapitres', 'Sessions de lecture', 'Historique vocal', 'Traçabilité'];
 
@@ -14,6 +15,10 @@ const recordVariants = [
 
 export default function AudioPage() {
   const [activeSection, setActiveSection] = useState(subSections[0]);
+  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  useEffect(() => { supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
+  const openaiReady = !!readiness?.openai?.api_key_configured;
+  const audioPipelineReady = !!readiness?.openai?.transcription_pipeline_status && readiness.openai.transcription_pipeline_status !== 'no_key' && readiness.openai.transcription_pipeline_status !== 'pending_audio_pipeline';
 
   return (
     <div className="space-y-6 animate-slide-in">
