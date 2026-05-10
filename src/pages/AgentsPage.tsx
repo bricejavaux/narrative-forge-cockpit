@@ -101,9 +101,19 @@ export default function AgentsPage() {
                 </div>
                 <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
                   <p className="editorial-eyebrow flex items-center gap-1"><Database size={9} /> Modèle</p>
-                  <p className="text-sm font-mono text-foreground mt-0.5">gpt-4o</p>
+                  <p className="text-[11px] font-mono text-muted-foreground mt-0.5">OpenAI — sélection future · non branché</p>
                 </div>
               </div>
+
+              <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                <p className="editorial-eyebrow mb-1">Niveau de permission</p>
+                <p className="text-xs text-foreground">
+                  {agent.permissionLevel === 'read-only' && 'Lecture seule — diagnostic uniquement'}
+                  {agent.permissionLevel === 'recommendation' && 'Recommandation — propose, n\'écrit pas'}
+                  {agent.permissionLevel === 'targeted-rewrite-with-validation' && 'Réécriture ciblée — validation humaine requise'}
+                  {agent.permissionLevel === 'deep-rewrite-with-validation' && 'Réécriture profonde — approbation auteur obligatoire'}
+                  {!agent.permissionLevel && '—'}
+                </p>
 
               <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
                 <div className="rounded-lg border border-border p-2.5">
