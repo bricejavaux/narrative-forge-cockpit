@@ -83,3 +83,22 @@ export async function downloadBinary(path: string): Promise<{
   const buf = new Uint8Array(await res.arrayBuffer());
   return { ok: true, bytes: buf, size: buf.byteLength, contentType: res.headers.get('content-type') ?? undefined };
 }
+
+export async function uploadText(
+  path: string,
+  content: string,
+  contentType = 'text/plain; charset=utf-8',
+): Promise<{ ok: boolean; status?: number; webUrl?: string; id?: string; size?: number; error?: string }> {
+  const headers = { ...authHeaders(), 'Content-Type': contentType } as Record<string, string>;
+  const url = `${GATEWAY}/me/drive/root:/${encodePath(path)}:/content`;
+  const res = await fetch(url, { method: 'PUT', headers, body: content });
+  if (!res.ok) return { ok: false, status: res.status, error: await res.text() };
+  const data = await res.json().catch(() => ({}));
+  return {
+    ok: true,
+    status: res.status,
+    webUrl: data?.webUrl,
+    id: data?.id,
+    size: data?.size ?? content.length,
+  };
+}
