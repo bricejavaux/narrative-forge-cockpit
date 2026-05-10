@@ -114,6 +114,7 @@ export default function AgentsPage() {
                   {agent.permissionLevel === 'deep-rewrite-with-validation' && 'Réécriture profonde — approbation auteur obligatoire'}
                   {!agent.permissionLevel && '—'}
                 </p>
+              </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
                 <div className="rounded-lg border border-border p-2.5">
