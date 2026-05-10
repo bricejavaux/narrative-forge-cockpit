@@ -103,15 +103,20 @@ export default function ConnectionReadinessPanel({ compact = false }: { compact?
           <Row label="Tables créées" ok={data.supabase.tables_created} />
           <Row label="Buckets de stockage" ok={data.supabase.storage_buckets_created} />
           <Row label="Authentification configurée" ok={data.supabase.auth_configured} hint={data.supabase.auth_configured ? '' : 'phase suivante'} />
+          <Row label="Policies RLS" ok={!!data.supabase.rls_policies_configured} hint={data.supabase.rls_policies_configured ? '' : 'RLS activé — policies à écrire'} />
         </Block>
 
-        <Block eyebrow="Intelligence" title="OpenAI / Lovable AI">
-          <Row label="OPENAI_API_KEY configurée" ok={data.openai.api_key_configured} hint={data.openai.api_key_configured ? '' : 'optionnel — fallback Lovable AI'} />
+        <Block eyebrow="Provider runtime" title="OpenAI (runtime application)">
+          <Row label="OPENAI_API_KEY configurée" ok={data.openai.api_key_configured} hint={data.openai.api_key_configured ? (data.openai.model ?? '') : 'requis pour le runtime'} />
+          <Row label="Provider actif = openai" ok={data.openai.provider_active === 'openai'} hint={data.openai.provider_active ?? 'none'} />
           <Row label="Edge Functions déployées" ok={data.openai.edge_functions_deployed} />
-          <Row label="Transcription disponible" ok={data.openai.transcription_available} hint={!data.openai.transcription_available ? 'mock' : ''} />
+          <Row label="Transcription audio" ok={data.openai.transcription_available} hint={data.openai.transcription_pipeline_status ?? (data.openai.api_key_configured ? 'pending pipeline' : 'mock')} />
           <Row label="Structuration disponible" ok={data.openai.structuring_available} hint={!data.openai.structuring_available ? 'mock' : ''} />
           <Row label="Runs d'agents disponibles" ok={data.openai.agent_runs_available} hint={!data.openai.agent_runs_available ? 'dry run' : ''} />
-          <Row label="Lovable AI gateway" ok={data.openai.lovable_ai_gateway_available} />
+          <Row label="Lovable AI gateway" ok={data.openai.lovable_ai_gateway_available} hint="interne Lovable — non runtime" />
+          {data.compliance && (
+            <Row label="Conformité runtime (OpenAI only)" ok={data.compliance.runtime_provider_compliant && !data.compliance.gemini_runtime_detected} hint={data.compliance.gemini_runtime_detected ? 'Gemini détecté' : 'OK'} />
+          )}
         </Block>
 
         <Block eyebrow="Référentiel source" title="OneDrive">
