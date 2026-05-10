@@ -57,7 +57,7 @@ export default function ArchitecturePage() {
                   <td className="py-2 px-3 text-xs text-destructive max-w-[200px] truncate">{ch.mainAlert || '—'}</td>
                   <td className="py-2 px-3 font-mono text-xs">v{ch.version}</td>
                   <td className="py-2 px-3">{ch.hasAudio && <Mic size={12} className="text-rose" />}</td>
-                  <td className="py-2 px-3"><MicButton size="sm" label="" /></td>
+                  <td className="py-2 px-3"><button className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-border bg-card hover:border-rose/40 text-muted-foreground hover:text-foreground transition-colors"><Mic size={11} className="text-rose/70" /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -150,7 +150,7 @@ export default function ArchitecturePage() {
         </div>
       )}
 
-      {!['Chapitres', 'Arcs globaux', 'Révélations'].includes(activeTab) && (
+      <NoteComposer target={`architecture · ${activeTab}`} />
         <div className="cockpit-card p-8 text-center">
           <p className="text-muted-foreground text-sm">Vue "{activeTab}" — simulée</p>
           <p className="text-xs text-muted-foreground mt-2 font-mono">Future connexion requise</p>

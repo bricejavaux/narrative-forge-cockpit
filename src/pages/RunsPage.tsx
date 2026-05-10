@@ -131,7 +131,8 @@ export default function RunsPage() {
 
         {/* Historique runs */}
         <div className="space-y-4">
-          <h2 className="font-display font-semibold text-sm text-foreground">Historique des Runs</h2>
+          <h2 className="editorial-eyebrow">Historique des Runs</h2>
+          <NoteComposer target="run en préparation" compact />
           {runs.map(run => (
             <div key={run.id} className="cockpit-card space-y-2">
               <div className="flex items-center justify-between">
