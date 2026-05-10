@@ -1,14 +1,16 @@
 // deno-lint-ignore-file
-import { corsHeaders, hasLovableAI, json } from '../_shared/cors.ts';
-import { callLovableAI } from '../_shared/lovableAI.ts';
+import { corsHeaders, json } from '../_shared/cors.ts';
+import { callOpenAI, hasOpenAIKey } from '../_shared/openai.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
     const { scope, context } = await req.json().catch(() => ({}));
-    if (!hasLovableAI()) {
+    if (!hasOpenAIKey()) {
       return json({
         mode: 'mock',
+        provider: 'none',
+        reason: 'OPENAI_API_KEY missing — runtime provider not configured',
         scope: scope ?? 'global',
         diagnostic: {
           dimensions: [
@@ -20,15 +22,13 @@ Deno.serve(async (req) => {
         },
       });
     }
-    const r = await callLovableAI({
-      messages: [
-        { role: 'system', content: 'Tu produis un diagnostic éditorial structuré pour le roman "Les Portes du Monde, Tome I". Réponds en JSON {dimensions:[{name,score,risk,recommendation}]} en français.' },
-        { role: 'user', content: `Scope: ${scope ?? 'global'}\nContexte: ${typeof context === 'string' ? context.slice(0, 8000) : ''}` },
-      ],
+    const r = await callOpenAI({
+      system: 'Tu produis un diagnostic éditorial structuré pour le roman "Les Portes du Monde, Tome I". Réponds en JSON {dimensions:[{name,score,risk,recommendation}]} en français.',
+      user: `Scope: ${scope ?? 'global'}\nContexte: ${typeof context === 'string' ? context.slice(0, 8000) : ''}`,
       json: true,
     });
-    if (!r.ok) return json({ mode: 'degraded', error: r.error }, 200);
-    return json({ mode: 'live', model: r.model, scope: scope ?? 'global', diagnostic: r.parsed ?? null });
+    if (!r.ok) return json({ mode: 'degraded', provider: 'openai', error: r.error, status: r.status }, 200);
+    return json({ mode: 'live', provider: 'openai', model: r.model, scope: scope ?? 'global', diagnostic: r.parsed ?? null });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'unknown' }, 500);
   }
