@@ -66,7 +66,29 @@ export default function IndexesPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Taille</span><span className="font-mono text-foreground">{idx.simulatedSize}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Fraîcheur</span><span className="font-mono text-foreground">{idx.simulatedFreshness}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Source</span><span className="text-foreground">{idx.owner}</span></div>
+              {idx.migrationStrategy && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stratégie</span>
+                  <span className="font-mono text-foreground/80">
+                    {idx.migrationStrategy === 'native-supabase' && 'native Supabase'}
+                    {idx.migrationStrategy === 're-vectorize-source' && 're-vectoriser depuis source'}
+                    {idx.migrationStrategy === 'extract-chroma' && 'extraire chunks Chroma'}
+                    {idx.migrationStrategy === 'pending-decision' && 'décision en attente'}
+                  </span>
+                </div>
+              )}
             </div>
+
+            {idx.linkedAssetIds && idx.linkedAssetIds.length > 0 && (
+              <div>
+                <p className="editorial-eyebrow mb-1">Assets liés</p>
+                <div className="flex flex-wrap gap-1">
+                  {idx.linkedAssetIds.map((a) => (
+                    <span key={a} className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono text-muted-foreground">{a}</span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="editorial-eyebrow mb-1">Agents consommateurs</p>
@@ -99,6 +121,28 @@ export default function IndexesPage() {
           </div>
         ))}
       </div>
+
+      {/* Options techniques pour Chroma OneDrive */}
+      <div className="cockpit-card space-y-3">
+        <div>
+          <h3 className="editorial-eyebrow">Archives Chroma OneDrive — options techniques</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Les fichiers <span className="font-mono">follett/chroma.sqlite3</span>, <span className="font-mono">science_portals/chroma.sqlite3</span> et <span className="font-mono">sf_portals_fiction/chroma.sqlite3</span> sont des archives techniques OneDrive — pas des indexes Supabase actifs. Deux trajectoires possibles :
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="rounded-lg border border-border p-3 space-y-1">
+            <p className="font-display text-sm text-foreground">Option A — Re-vectoriser depuis les sources</p>
+            <p className="text-[11px] text-muted-foreground">Repartir des documents originaux (.txt, .pdf, .epub) et reconstruire les indexes natifs Supabase. Garantit cohérence d'embeddings et de chunking.</p>
+          </div>
+          <div className="rounded-lg border border-border p-3 space-y-1">
+            <p className="font-display text-sm text-foreground">Option B — Extraire chunks + embeddings Chroma</p>
+            <p className="text-[11px] text-muted-foreground">Lire les .sqlite3 existants, exporter chunks & vecteurs, ré-injecter dans Supabase. Plus rapide, dépendant du modèle d'origine.</p>
+          </div>
+        </div>
+        <p className="text-[11px] text-amber font-mono">Décision technique à arbitrer avant branchement Supabase.</p>
+      </div>
     </div>
   );
 }
+

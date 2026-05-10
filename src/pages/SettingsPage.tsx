@@ -123,7 +123,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {false && (
+      {activeSection === 'Paramètres narratifs' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="cockpit-card space-y-4">
             <h3 className="editorial-eyebrow flex items-center gap-2"><Sliders size={12} /> Structure & rythme</h3>
@@ -214,7 +214,24 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {!['Connecteurs', 'Paramètres narratifs', 'Gouvernance réécriture', 'Indexes & sync', 'Audio & transcription', 'Diagnostics', 'Exports'].includes(activeSection) && (
+      {activeSection === 'Logs & validation humaine' && (
+        <div className="cockpit-card space-y-1">
+          <h3 className="editorial-eyebrow mb-2">Journalisation & gouvernance humaine</h3>
+          <Toggle label="Journaliser chaque run avec inputs / outputs" value={true} />
+          <Toggle label="Conserver les diffs avant/après réécriture" value={true} />
+          <Toggle label="Validation humaine avant intégration des notes audio" value={true} />
+          <Toggle label="Validation humaine avant publication d'un export" value={true} />
+          <Toggle label="Politique de rétention audio brut — 90 jours" value={true} />
+          <Toggle label="Politique de rafraîchissement des indexes — quotidienne" value={true} />
+          <Toggle label="Priorité d'export : Markdown → JSON → DOCX → EPUB" value={true} />
+        </div>
+      )}
+
+      {![
+        'Connecteurs', 'Readiness Supabase / OpenAI / OneDrive', 'Paramètres narratifs',
+        'Gouvernance réécriture', 'Indexes & sync', 'Audio & transcription',
+        'Diagnostics', 'Exports', 'Logs & validation humaine',
+      ].includes(activeSection) && (
         <div className="cockpit-card p-10 text-center">
           <p className="text-muted-foreground text-sm">Section "{activeSection}" — simulée</p>
         </div>

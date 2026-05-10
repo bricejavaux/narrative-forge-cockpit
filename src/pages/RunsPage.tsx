@@ -2,12 +2,23 @@ import { useState } from 'react';
 import { runs, agents, chapters } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
-import { Play, Save, Download, ExternalLink, AlertTriangle, Zap } from 'lucide-react';
+import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 
-const modes = ['SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome', 'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final', 'Vérification cross-chapitres', 'Vérification notes audio'];
+const modes = ['Dry run (simulation seule)', 'SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome', 'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final', 'Vérification cross-chapitres', 'Vérification notes audio'];
+
+const checklist = [
+  { label: 'OpenAI disponible', ok: false },
+  { label: 'Supabase disponible', ok: false },
+  { label: 'OneDrive disponible', ok: false },
+  { label: 'Indexes requis disponibles', ok: true, note: 'simulés' },
+  { label: 'Notes audio non traitées revues', ok: false, note: '9 ouvertes' },
+  { label: 'Objets cibles sélectionnés', ok: true },
+  { label: 'Format de sortie sélectionné', ok: true },
+];
 
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState(modes[0]);
+  const ready = checklist.every((c) => c.ok);
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -84,18 +95,52 @@ export default function RunsPage() {
             </div>
           </div>
 
-          {/* Warnings */}
-          <div className="cockpit-card border-amber/20">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle size={14} className="text-amber" />
-              <span className="text-xs text-amber font-display font-semibold uppercase">Warnings pré-run</span>
+          {/* Pre-run checklist */}
+          <div className="cockpit-card space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="editorial-eyebrow">Checklist pré-run</h3>
+              <span className={`text-[11px] font-mono ${ready ? 'text-emerald-600' : 'text-amber'}`}>
+                {ready ? 'prêt' : 'non prêt — Lancer désactivé'}
+              </span>
             </div>
-            <ul className="space-y-1 text-xs text-muted-foreground">
-              <li>⚠ OpenAI API non branchée — exécution impossible</li>
-              <li>⚠ Supabase non branché — aucune persistance</li>
-              <li>⚠ Indexes simulés — résultats non fiables</li>
-              <li>⚠ 9 notes audio non traitées</li>
+            <ul className="text-xs space-y-1">
+              {checklist.map((c) => (
+                <li key={c.label} className="flex items-center gap-2">
+                  {c.ok
+                    ? <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                    : <XCircle size={12} className="text-rose shrink-0" />}
+                  <span className={c.ok ? 'text-foreground' : 'text-muted-foreground'}>{c.label}</span>
+                  {c.note && <span className="text-[10px] font-mono text-muted-foreground">· {c.note}</span>}
+                </li>
+              ))}
             </ul>
+          </div>
+
+          {/* Future payload simulé */}
+          <div className="cockpit-card space-y-3">
+            <h3 className="editorial-eyebrow flex items-center gap-2"><Database size={11} /> Payload futur — simulé</h3>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <p className="text-muted-foreground mb-1">Objets envoyés</p>
+                <p className="font-mono text-foreground/80">3 chapitres · 2 personnages · 1 arc</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">Indexes consultés</p>
+                <p className="font-mono text-primary">world_index · arc_index · style_index</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">Agents appelés</p>
+                <p className="font-mono text-foreground/80">audit_hierarchie_lagrange_walvis · audit_phrase_couteau</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">Outputs attendus</p>
+                <p className="font-mono text-foreground/80">findings + diff + score révisé</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-muted-foreground mb-1">Tables Supabase futures touchées</p>
+                <p className="font-mono text-accent">runs · run_findings · diagnostics_scores · audit_logs</p>
+              </div>
+            </div>
           </div>
 
           {/* Simulation */}
@@ -110,22 +155,30 @@ export default function RunsPage() {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/30 text-primary text-sm font-display hover:bg-primary/20 transition-colors cursor-not-allowed opacity-70">
-              <Zap size={14} /> Simuler
+          <div className="flex gap-3 flex-wrap">
+            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/30 text-primary text-sm font-display hover:bg-primary/20 transition-colors">
+              <Zap size={14} /> Simuler (dry run)
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-display hover:bg-primary/90 transition-colors cursor-not-allowed opacity-70">
+            <button
+              disabled
+              title="OpenAI et Supabase non branchés"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-display cursor-not-allowed opacity-50"
+            >
               <Play size={14} /> Lancer le Run
             </button>
-            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors cursor-not-allowed opacity-70">
+            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
               <Save size={14} /> Sauver preset
             </button>
-            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors cursor-not-allowed opacity-70">
+            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
               <Download size={14} /> Exporter config
             </button>
-            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors cursor-not-allowed opacity-70">
+            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
               <ExternalLink size={14} /> Dernier résultat
             </button>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-amber">
+            <AlertTriangle size={11} />
+            « Lancer le Run » désactivé tant que OpenAI et Supabase ne sont pas branchés. Mode par défaut : dry run.
           </div>
         </div>
 
