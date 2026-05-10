@@ -7,7 +7,7 @@ import NoteComposer from '@/components/shared/NoteComposer';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
 import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle } from 'lucide-react';
 
-const subViews = ['Score global', 'Par chapitre', 'Par arc', 'Par personnage', 'Répétitions', 'Révélations', 'Escalade', 'Charge cognitive', 'Densité scientifique', 'Avant/après réécriture', 'Audio review coverage'];
+const subViews = ['Score global', 'Par chapitre', 'Par arc', 'Par personnage', 'Hiérarchie L4 / Walvis Bay', 'Alternance macro/micro', 'Détail par scène', 'Coût par activation', 'Phrase-couteau', 'Trace non-humanisée', 'Brice — ingénieur → gardien', 'Audio review coverage'];
 
 const chartGrid = 'hsl(220 14% 89%)';
 const chartText = 'hsl(220 10% 45%)';
