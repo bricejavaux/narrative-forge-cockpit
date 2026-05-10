@@ -150,12 +150,14 @@ export default function ArchitecturePage() {
         </div>
       )}
 
-      <NoteComposer target={`architecture · ${activeTab}`} />
+      {!['Chapitres', 'Arcs globaux', 'Révélations'].includes(activeTab) && (
         <div className="cockpit-card p-8 text-center">
           <p className="text-muted-foreground text-sm">Vue "{activeTab}" — simulée</p>
           <p className="text-xs text-muted-foreground mt-2 font-mono">Future connexion requise</p>
         </div>
       )}
+
+      <NoteComposer target={`architecture · ${activeTab}`} />
     </div>
   );
 }
