@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { runs, agents, chapters } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
+import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, ExternalLink, AlertTriangle, Zap } from 'lucide-react';
 
 const modes = ['SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome', 'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final', 'Vérification cross-chapitres', 'Vérification notes audio'];
@@ -10,7 +11,10 @@ export default function RunsPage() {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <h1 className="text-2xl font-display font-bold text-foreground">Run Designer</h1>
+      <div>
+        <p className="editorial-eyebrow">Orchestration</p>
+        <h1 className="text-3xl editorial-heading text-foreground mt-1">Run Designer</h1>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Configuration */}

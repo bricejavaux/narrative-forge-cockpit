@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { chapters, arcs } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
-import MicButton from '@/components/shared/MicButton';
-import { Mic, AlertTriangle } from 'lucide-react';
+import NoteComposer from '@/components/shared/NoteComposer';
+import { Mic } from 'lucide-react';
 
 const tabs = ['Arcs globaux', 'Chapitres', 'Scènes', 'Beats', 'Timeline réelle', 'Ordre du récit', 'Révélations', 'Payoffs', 'Conséquences'];
 
@@ -12,9 +12,9 @@ export default function ArchitecturePage() {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-display font-bold text-foreground">Architecture Tome</h1>
-        <MicButton label="Note sur l'architecture" />
+      <div>
+        <p className="editorial-eyebrow">Pilotage narratif</p>
+        <h1 className="text-3xl editorial-heading text-foreground mt-1">Architecture Tome</h1>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 border-b border-border">
