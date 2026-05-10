@@ -41,6 +41,13 @@ export type ConnectionReadiness = {
     json_export_available: boolean;
     pdf_epub_future: boolean;
   };
+  compliance?: {
+    runtime_provider_compliant: boolean;
+    gemini_runtime_detected: boolean;
+    runtime_provider_expected: string;
+    runtime_provider_current: string;
+    frontend_openai_key_detected: boolean;
+  };
 };
 
 export const supabaseService = {
