@@ -119,6 +119,7 @@ export default function DiagnosticsPage() {
                 <ArrowRight size={12} /> Ouvrir les chapitres à risque
               </button>
               <MicButton label="Relecture vocale du diagnostic" size="sm" />
+            </div>
           </div>
 
           {/* Transverse note composer */}
