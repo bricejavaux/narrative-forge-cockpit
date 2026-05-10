@@ -31,9 +31,21 @@ export const importService = {
     return data ?? [];
   },
 
-  async validate(_importId: string) {
-    // Persistence is deferred — once approved by the user, the next phase will
-    // write parsed objects into canon_objects / characters with reconcile diffs.
-    return { ok: true, message: 'Validation simulée — la persistance Supabase sera activée à la prochaine phase.' };
+  async persist(target: ImportTarget, extracted: any): Promise<{
+    mode?: string;
+    target?: ImportTarget;
+    job_id?: string;
+    inserted?: number;
+    updated?: number;
+    skipped?: number;
+    errors?: string[];
+    details?: Array<{ category?: string; name?: string; title?: string; action: 'insert' | 'update' | 'skip' }>;
+    error?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('import-persist', {
+      body: { target, extracted, human_validated: true },
+    });
+    if (error) throw error;
+    return data;
   },
 };
