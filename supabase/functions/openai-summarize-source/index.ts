@@ -5,7 +5,7 @@ import { callOpenAI, hasOpenAIKey } from '../_shared/openai.ts';
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { source_file_id, text, model } = await req.json().catch(() => ({}));
+    const { source_file_id, text, model, temperature, maxOutputTokens, reasoningEffort } = await req.json().catch(() => ({}));
     if (!hasOpenAIKey() || !text) {
       return json({
         mode: 'mock',
@@ -17,6 +17,9 @@ Deno.serve(async (req) => {
     }
     const r = await callOpenAI({
       model,
+      temperature,
+      maxOutputTokens,
+      reasoningEffort,
       system: 'Tu résumes un document de travail éditorial en français, en 6 à 10 phrases denses, sans embellir.',
       user: String(text).slice(0, 80000),
     });

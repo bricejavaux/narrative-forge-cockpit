@@ -5,7 +5,7 @@ import { callOpenAI, hasOpenAIKey } from '../_shared/openai.ts';
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { scope, context, model } = await req.json().catch(() => ({}));
+    const { scope, context, model, temperature, maxOutputTokens, reasoningEffort } = await req.json().catch(() => ({}));
     if (!hasOpenAIKey()) {
       return json({
         mode: 'mock',
@@ -24,6 +24,9 @@ Deno.serve(async (req) => {
     }
     const r = await callOpenAI({
       model,
+      temperature,
+      maxOutputTokens,
+      reasoningEffort,
       system: 'Tu produis un diagnostic éditorial structuré pour le roman "Les Portes du Monde, Tome I". Réponds en JSON {dimensions:[{name,score,risk,recommendation}]} en français.',
       user: `Scope: ${scope ?? 'global'}\nContexte: ${typeof context === 'string' ? context.slice(0, 8000) : ''}`,
       json: true,

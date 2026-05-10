@@ -3,7 +3,7 @@ import { agents } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2 } from 'lucide-react';
-import { OPENAI_MODELS, defaultModelForCategory, defaultProfileForCategory, modelById } from '@/lib/openaiModels';
+import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID, defaultModelForCategory, defaultProfileForCategory, modelById } from '@/lib/openaiModels';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { openaiService } from '@/services/openaiService';
 
@@ -58,7 +58,7 @@ export default function AgentsPage() {
     if (!agent) return;
     setRunning(true); setLastRun(null);
     try {
-      const res = await openaiService.runAgent(agent.id, { objective: agent.objective }, currentModel);
+      const res = await openaiService.runAgent(agent.id, { objective: agent.objective }, { model: currentModel, qualityProfile: profile });
       setLastRun(res);
     } catch (e) {
       setLastRun({ error: e instanceof Error ? e.message : 'unknown' });
@@ -151,14 +151,31 @@ export default function AgentsPage() {
                 <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
                   <p className="editorial-eyebrow flex items-center gap-1"><Database size={9} /> Modèle OpenAI</p>
                   <select
-                    value={currentModel}
-                    onChange={(e) => setModel(agent.id, e.target.value)}
+                    value={OPENAI_MODELS.some((m) => m.id === currentModel) ? currentModel : CUSTOM_MODEL_OPTION_ID}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === CUSTOM_MODEL_OPTION_ID) setModel(agent.id, '');
+                      else setModel(agent.id, v);
+                    }}
                     className="mt-0.5 w-full bg-card border border-border rounded px-1.5 py-0.5 text-[11px] font-mono text-foreground"
                   >
                     {OPENAI_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>{m.label} · {m.tier}</option>
+                      <option key={m.id} value={m.id}>{m.label} · {m.tier}{m.availability === 'configurable' ? ' · configurable' : ''}</option>
                     ))}
+                    <option value={CUSTOM_MODEL_OPTION_ID}>Modèle personnalisé…</option>
                   </select>
+                  {!OPENAI_MODELS.some((m) => m.id === currentModel) && (
+                    <input
+                      type="text"
+                      placeholder="ex: gpt-5.5, my-org/model"
+                      value={currentModel}
+                      onChange={(e) => setModel(agent.id, e.target.value)}
+                      className="mt-1 w-full bg-card border border-border rounded px-1.5 py-0.5 text-[11px] font-mono text-foreground"
+                    />
+                  )}
+                  {modelMeta?.availability === 'configurable' && (
+                    <p className="mt-1 text-[10px] text-amber-600">Disponibilité non garantie pour cette clé API.</p>
+                  )}
                 </div>
               </div>
 
@@ -195,10 +212,18 @@ export default function AgentsPage() {
               </div>
 
               {lastRun && (
-                <details className="mt-1">
-                  <summary className="text-[11px] text-muted-foreground cursor-pointer">Dernier appel — {lastRun.mode ?? 'error'} {lastRun.model ? `· ${lastRun.model}` : ''}</summary>
-                  <pre className="text-[10px] font-mono bg-muted/40 p-2 rounded mt-1 overflow-auto max-h-48">{JSON.stringify(lastRun, null, 2)}</pre>
-                </details>
+                <div className="mt-1 space-y-1">
+                  {lastRun.model_unavailable && (
+                    <div className="flex items-start gap-2 rounded-md border border-rose-500/30 bg-rose-500/5 p-2 text-[11px] text-rose-600">
+                      <AlertTriangle size={11} className="mt-0.5" />
+                      Modèle indisponible pour cette clé API. Choisissez un autre modèle ou vérifiez l'accès à votre compte OpenAI.
+                    </div>
+                  )}
+                  <details>
+                    <summary className="text-[11px] text-muted-foreground cursor-pointer">Dernier appel — {lastRun.mode ?? 'error'} {lastRun.model ? `· ${lastRun.model}` : ''}</summary>
+                    <pre className="text-[10px] font-mono bg-muted/40 p-2 rounded mt-1 overflow-auto max-h-48">{JSON.stringify(lastRun, null, 2)}</pre>
+                  </details>
+                </div>
               )}
 
 
