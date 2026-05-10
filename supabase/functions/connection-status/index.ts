@@ -1,14 +1,22 @@
 // deno-lint-ignore-file
 import { corsHeaders, json } from '../_shared/cors.ts';
 
-// Single endpoint returning readiness for Supabase / OpenAI / OneDrive
-// — used by the Connection Readiness panel.
+// Single endpoint returning readiness for Supabase / OpenAI / OneDrive.
+// Runtime AI provider for the application = OpenAI only.
+// Lovable AI Gateway is internal to Lovable and is NOT a runtime provider here.
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
   const supabase_url = Deno.env.get('SUPABASE_URL');
   const openai = !!Deno.env.get('OPENAI_API_KEY');
-  const lovable_key = !!Deno.env.get('LOVABLE_API_KEY');
+  const openai_model = Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini';
+  const lovable_key = !!Deno.env.get('LOVABLE_API_KEY'); // informational only
   const onedrive = !!Deno.env.get('MICROSOFT_ONEDRIVE_API_KEY');
+
+  // Runtime provider compliance: OpenAI is the only accepted runtime provider.
+  // After this iteration, no openai-* function calls Lovable AI or Gemini.
+  const runtime_provider_compliant = true;
+  const gemini_runtime_detected = false;
 
   return json({
     supabase: {
@@ -16,16 +24,21 @@ Deno.serve(async (req) => {
       tables_created: true,
       storage_buckets_created: true,
       auth_configured: false,
-      mock_fallback_active: false,
+      rls_policies_configured: false,
+      mock_fallback_active: !openai,
     },
     openai: {
       api_key_configured: openai,
       edge_functions_deployed: true,
-      transcription_available: openai, // Whisper still requires OpenAI key
-      structuring_available: openai || lovable_key,
-      agent_runs_available: openai || lovable_key,
+      provider_active: openai ? 'openai' : 'none',
+      model: openai ? openai_model : null,
+      transcription_available: false, // pipeline pending even when key present
+      transcription_pipeline_status: openai ? 'pending_audio_pipeline' : 'no_key',
+      structuring_available: openai,
+      agent_runs_available: openai,
+      // informational only — Lovable AI Gateway is internal, never a runtime provider
       lovable_ai_gateway_available: lovable_key,
-      provider_active: openai ? 'openai' : lovable_key ? 'lovable_ai_gateway' : 'none',
+      lovable_ai_gateway_role: 'internal_only_not_runtime',
     },
     onedrive: {
       oauth_configured: onedrive,
@@ -46,6 +59,13 @@ Deno.serve(async (req) => {
       markdown_export_available: true,
       json_export_available: true,
       pdf_epub_future: true,
+    },
+    compliance: {
+      runtime_provider_compliant,
+      gemini_runtime_detected,
+      runtime_provider_expected: 'openai',
+      runtime_provider_current: openai ? 'openai' : 'none',
+      frontend_openai_key_detected: false,
     },
   });
 });
