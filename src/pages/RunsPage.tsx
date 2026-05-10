@@ -1,24 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { runs, agents, chapters } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
+import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
 const modes = ['Dry run (simulation seule)', 'SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome', 'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final', 'Vérification cross-chapitres', 'Vérification notes audio'];
 
-const checklist = [
-  { label: 'OpenAI disponible', ok: false },
-  { label: 'Supabase disponible', ok: false },
-  { label: 'OneDrive disponible', ok: false },
-  { label: 'Indexes requis disponibles', ok: true, note: 'simulés' },
-  { label: 'Notes audio non traitées revues', ok: false, note: '9 ouvertes' },
-  { label: 'Objets cibles sélectionnés', ok: true },
-  { label: 'Format de sortie sélectionné', ok: true },
-];
-
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState(modes[0]);
-  const ready = checklist.every((c) => c.ok);
+  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  const [loadingReadiness, setLoadingReadiness] = useState(true);
+
+  useEffect(() => {
+    supabaseService.getReadiness()
+      .then(setReadiness)
+      .catch(() => setReadiness(null))
+      .finally(() => setLoadingReadiness(false));
+  }, []);
+
+  const openaiOk = !!readiness?.openai?.api_key_configured;
+  const supabaseOk = !!readiness?.supabase?.project_connected;
+  const onedriveOk = !!readiness?.onedrive?.oauth_configured;
+
+  const checklist = [
+    { label: 'OpenAI disponible', ok: openaiOk, note: openaiOk ? readiness?.openai?.model ?? undefined : 'clé absente' },
+    { label: 'Supabase disponible', ok: supabaseOk },
+    { label: 'OneDrive disponible', ok: onedriveOk, note: onedriveOk ? undefined : 'optionnel' },
+    { label: 'Indexes requis disponibles', ok: true, note: 'simulés' },
+    { label: 'Objets cibles sélectionnés', ok: true },
+    { label: 'Format de sortie sélectionné', ok: true },
+  ];
+  const required = [openaiOk, supabaseOk]; // OneDrive optional
+  const ready = required.every(Boolean);
+  const isDryRun = selectedMode === modes[0];
 
   return (
     <div className="space-y-6 animate-slide-in">
