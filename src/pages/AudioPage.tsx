@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
-import { Mic, Play, Pause, FileText, Clock, User } from 'lucide-react';
+import NoteComposer from '@/components/shared/NoteComposer';
+import { Mic, Play } from 'lucide-react';
 
 const subSections = ['Notes audio', 'Relectures chapitres', 'Commentaires beats', 'Revues cross-chapitres', 'Sessions de lecture', 'Historique vocal', 'Traçabilité'];
 
@@ -16,11 +17,18 @@ export default function AudioPage() {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-display font-bold text-foreground">Audio & Reviews</h1>
+      <div className="flex items-baseline justify-between">
+        <div>
+          <p className="editorial-eyebrow">Intelligence</p>
+          <h1 className="text-3xl editorial-heading text-foreground mt-1">Audio & Reviews</h1>
+          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+            Vue transverse des notes vocales et lectures commentées. Le composer audio/texte
+            apparaît également dans chaque page (canon, personnages, chapitres, agents, runs, diagnostics).
+          </p>
+        </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-rose/30 bg-rose/5 text-rose text-xs font-mono">
-          <Mic size={12} className="animate-pulse-glow" />
-          Audio omniprésent — simulé
+          <Mic size={12} />
+          Whisper simulé
         </div>
       </div>
 
@@ -35,11 +43,13 @@ export default function AudioPage() {
 
       {activeSection === 'Notes audio' && (
         <div className="space-y-4">
-          {/* Big record button */}
-          <div className="cockpit-card border-rose/20 cockpit-glow-violet">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display font-semibold text-foreground">Enregistrer une note audio</h2>
-              <span className="text-[10px] font-mono text-muted-foreground">Simulé — Whisper non connecté</span>
+          {/* Unified composer */}
+          <NoteComposer target="nouvelle note transverse" />
+
+          <div className="cockpit-card">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="editorial-eyebrow">Cibles rapides</h3>
+              <span className="text-[10px] font-mono text-muted-foreground">Simulé</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {recordVariants.map(v => (
