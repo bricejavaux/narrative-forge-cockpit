@@ -21,10 +21,11 @@ Deno.serve(async (req) => {
     openai: {
       api_key_configured: openai,
       edge_functions_deployed: true,
-      transcription_available: openai,
-      structuring_available: openai,
-      agent_runs_available: openai,
+      transcription_available: openai, // Whisper still requires OpenAI key
+      structuring_available: openai || lovable_key,
+      agent_runs_available: openai || lovable_key,
       lovable_ai_gateway_available: lovable_key,
+      provider_active: openai ? 'openai' : lovable_key ? 'lovable_ai_gateway' : 'none',
     },
     onedrive: {
       oauth_configured: onedrive,
