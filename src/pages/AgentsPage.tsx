@@ -29,6 +29,44 @@ export default function AgentsPage() {
   const filtered = filter === 'Tous' ? agents : agents.filter((a) => a.category === filter);
   const agent = agents.find((a) => a.id === selectedAgent);
 
+  // Readiness (live / mock)
+  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  useEffect(() => {
+    supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
+  }, []);
+  const openaiReady = !!readiness?.openai?.api_key_configured;
+
+  // Per-agent model selection (persisted in localStorage)
+  const [modelByAgent, setModelByAgent] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('agent_model_map') ?? '{}'); } catch { return {}; }
+  });
+  const currentModel = useMemo(() => {
+    if (!agent) return '';
+    return modelByAgent[agent.id] || agent.defaultModel || defaultModelForCategory(agent.category);
+  }, [agent, modelByAgent]);
+  const setModel = (id: string, value: string) => {
+    const next = { ...modelByAgent, [id]: value };
+    setModelByAgent(next);
+    localStorage.setItem('agent_model_map', JSON.stringify(next));
+  };
+  const modelMeta = modelById(currentModel);
+  const profile = agent?.modelProfile || (agent ? defaultProfileForCategory(agent.category) : undefined);
+
+  const [running, setRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<any>(null);
+  const launchAgent = async () => {
+    if (!agent) return;
+    setRunning(true); setLastRun(null);
+    try {
+      const res = await openaiService.runAgent(agent.id, { objective: agent.objective }, currentModel);
+      setLastRun(res);
+    } catch (e) {
+      setLastRun({ error: e instanceof Error ? e.message : 'unknown' });
+    } finally {
+      setRunning(false);
+    }
+  };
+
   return (
     <div className="animate-slide-in space-y-6">
       <div>
@@ -38,6 +76,14 @@ export default function AgentsPage() {
           Chaque agent est un module d'intelligence orchestré par OpenAI. Inspectez son objectif,
           ses indexes consommés, sa mémoire, et ajustez son comportement par texte ou voix.
         </p>
+        <div className="mt-2 flex items-center gap-2 text-[11px]">
+          <span className={`px-2 py-0.5 rounded-full border font-mono ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+            {openaiReady ? 'OpenAI : clé détectée — exécution live possible' : 'OpenAI : clé absente — mode mock'}
+          </span>
+          {readiness?.openai?.model && (
+            <span className="text-muted-foreground font-mono">défaut Edge: {readiness.openai.model}</span>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap">
