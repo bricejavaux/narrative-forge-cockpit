@@ -175,11 +175,11 @@ export default function RunsPage() {
               <Zap size={14} /> Simuler (dry run)
             </button>
             <button
-              disabled
-              title="OpenAI et Supabase non branchés"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-display cursor-not-allowed opacity-50"
+              disabled={!ready || isDryRun}
+              title={!ready ? 'OpenAI ou Supabase non branchés' : isDryRun ? 'Mode Dry Run sélectionné — change de mode pour lancer en live' : 'Lancer en live'}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-display ${ready && !isDryRun ? 'bg-primary text-primary-foreground hover:opacity-90 cursor-pointer' : 'bg-primary text-primary-foreground opacity-50 cursor-not-allowed'}`}
             >
-              <Play size={14} /> Lancer le Run
+              <Play size={14} /> Lancer le Run {!isDryRun && ready && '(live)'}
             </button>
             <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
               <Save size={14} /> Sauver preset
@@ -191,9 +191,13 @@ export default function RunsPage() {
               <ExternalLink size={14} /> Dernier résultat
             </button>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-amber">
-            <AlertTriangle size={11} />
-            « Lancer le Run » désactivé tant que OpenAI et Supabase ne sont pas branchés. Mode par défaut : dry run.
+          <div className={`flex items-center gap-2 text-[11px] ${ready ? 'text-emerald-600' : 'text-amber'}`}>
+            {ready ? <CheckCircle2 size={11} /> : <AlertTriangle size={11} />}
+            {ready
+              ? (isDryRun
+                ? 'Dry Run actif — aucun appel OpenAI ne sera effectué.'
+                : `Live prêt — provider OpenAI (${readiness?.openai?.model ?? 'défaut'}).`)
+              : '« Lancer le Run » désactivé tant que OpenAI et Supabase ne sont pas branchés.'}
           </div>
         </div>
 
