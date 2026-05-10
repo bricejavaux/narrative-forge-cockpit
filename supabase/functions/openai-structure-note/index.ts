@@ -5,7 +5,7 @@ import { callOpenAI, hasOpenAIKey } from '../_shared/openai.ts';
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { text, target_type, target_id } = await req.json().catch(() => ({}));
+    const { text, target_type, target_id, model } = await req.json().catch(() => ({}));
     if (!hasOpenAIKey() || !text) {
       return json({
         mode: 'mock',
@@ -21,6 +21,7 @@ Deno.serve(async (req) => {
       });
     }
     const r = await callOpenAI({
+      model,
       system: 'Tu structures une note de l\'auteur. Retourne un JSON {intent, summary, proposed_actions[]} en français.',
       user: String(text).slice(0, 8000),
       json: true,
