@@ -134,11 +134,32 @@ export default function DiagnosticsPage() {
               <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
                 <Wand2 size={12} /> Générer les recommandations
               </button>
+              <button
+                onClick={runLiveDiagnostic}
+                disabled={diagLoading || !openaiReady}
+                title={openaiReady ? 'Appel live OpenAI' : 'OpenAI non disponible — bouton désactivé'}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg ${openaiReady ? 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20' : 'border border-border text-muted-foreground opacity-60 cursor-not-allowed'}`}
+              >
+                {diagLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                {openaiReady ? 'Générer un diagnostic live' : 'Diagnostic mock (OpenAI absent)'}
+              </button>
               <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowRight size={12} /> Ouvrir les chapitres à risque
               </button>
               <MicButton label="Relecture vocale du diagnostic" size="sm" />
             </div>
+            {liveDiag && (
+              <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2.5">
+                <div className="flex items-center gap-2 mb-1 text-[11px] font-mono">
+                  <span className={`px-1.5 py-0.5 rounded border ${liveDiag.mode === 'live' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+                    {liveDiag.mode ?? 'error'}
+                  </span>
+                  {liveDiag.model && <span className="text-muted-foreground">{liveDiag.model}</span>}
+                  {liveDiag.error && <span className="text-rose-600">{liveDiag.error}</span>}
+                </div>
+                <pre className="text-[10px] font-mono whitespace-pre-wrap max-h-64 overflow-auto">{JSON.stringify(liveDiag.diagnostic ?? liveDiag, null, 2)}</pre>
+              </div>
+            )}
           </div>
 
           {/* Transverse note composer */}
