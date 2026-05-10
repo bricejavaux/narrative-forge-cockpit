@@ -58,7 +58,7 @@ export default function AgentsPage() {
     if (!agent) return;
     setRunning(true); setLastRun(null);
     try {
-      const res = await openaiService.runAgent(agent.id, { objective: agent.objective }, currentModel);
+      const res = await openaiService.runAgent(agent.id, { objective: agent.objective }, { model: currentModel, qualityProfile: profile });
       setLastRun(res);
     } catch (e) {
       setLastRun({ error: e instanceof Error ? e.message : 'unknown' });
