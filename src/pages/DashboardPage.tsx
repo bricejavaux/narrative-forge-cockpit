@@ -4,6 +4,8 @@ import {
 } from 'lucide-react';
 import WarningBanner from '@/components/shared/WarningBanner';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
+import ImportReconcilePanel from '@/components/shared/ImportReconcilePanel';
+import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
 import KpiCard from '@/components/shared/KpiCard';
 import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -33,6 +35,11 @@ export default function DashboardPage() {
       <WarningBanner warnings={criticalWarnings} />
 
       <ConnectionReadinessPanel compact />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <OneDriveRepositoryPanel />
+        <ImportReconcilePanel />
+      </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
