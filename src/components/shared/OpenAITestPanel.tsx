@@ -41,10 +41,9 @@ type Result = {
 
 const MODEL_OPTIONS = [
   { value: '', label: 'Défaut Edge Function (OPENAI_MODEL)' },
+  { value: 'gpt-4.1-nano', label: 'gpt-4.1-nano' },
   { value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' },
   { value: 'gpt-4.1', label: 'gpt-4.1' },
-  { value: 'gpt-4o-mini', label: 'gpt-4o-mini' },
-  { value: 'gpt-4o', label: 'gpt-4o' },
   { value: 'o4-mini', label: 'o4-mini' },
   { value: '__custom__', label: 'Personnalisé…' },
 ];
