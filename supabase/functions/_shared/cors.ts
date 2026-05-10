@@ -14,3 +14,11 @@ export function json(body: unknown, status = 200) {
 export function hasOpenAI(): boolean {
   return !!Deno.env.get('OPENAI_API_KEY');
 }
+
+export function hasLovableAI(): boolean {
+  return !!Deno.env.get('LOVABLE_API_KEY');
+}
+
+export function hasOneDrive(): boolean {
+  return !!Deno.env.get('LOVABLE_API_KEY') && !!Deno.env.get('MICROSOFT_ONEDRIVE_API_KEY');
+}
