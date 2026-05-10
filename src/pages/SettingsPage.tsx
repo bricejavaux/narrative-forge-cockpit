@@ -34,14 +34,14 @@ function Toggle({ label, value, hint }: { label: string; value: boolean; hint?: 
 
 const sections = [
   'Connecteurs',
+  'Readiness Supabase / OpenAI / OneDrive',
   'Paramètres narratifs',
-  'Paramètres IA',
   'Gouvernance réécriture',
   'Indexes & sync',
   'Audio & transcription',
   'Diagnostics',
   'Exports',
-  'Auth & accès',
+  'Logs & validation humaine',
 ];
 
 export default function SettingsPage() {
