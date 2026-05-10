@@ -113,9 +113,9 @@ export default function RunsPage() {
           {/* Pre-run checklist */}
           <div className="cockpit-card space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="editorial-eyebrow">Checklist pré-run</h3>
+              <h3 className="editorial-eyebrow">Checklist pré-run {loadingReadiness && <span className="text-[10px] text-muted-foreground">· vérification…</span>}</h3>
               <span className={`text-[11px] font-mono ${ready ? 'text-emerald-600' : 'text-amber'}`}>
-                {ready ? 'prêt' : 'non prêt — Lancer désactivé'}
+                {ready ? (isDryRun ? 'prêt (dry run)' : 'prêt (live)') : 'non prêt — Lancer désactivé'}
               </span>
             </div>
             <ul className="text-xs space-y-1">
