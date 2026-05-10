@@ -5,7 +5,7 @@ import { callOpenAI, hasOpenAIKey } from '../_shared/openai.ts';
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { target_type, target_id, instruction, current_text } = await req.json().catch(() => ({}));
+    const { target_type, target_id, instruction, current_text, model } = await req.json().catch(() => ({}));
     if (!hasOpenAIKey() || !instruction) {
       return json({
         mode: 'mock',
@@ -18,6 +18,7 @@ Deno.serve(async (req) => {
       });
     }
     const r = await callOpenAI({
+      model,
       system: 'Tu proposes une réécriture courte, fidèle au canon "Les Portes du Monde". Style sobre, pas de surcharge. Retourne JSON {proposal, rationale}.',
       user: `Instruction: ${instruction}\n\nTexte actuel:\n${String(current_text ?? '').slice(0, 8000)}`,
       json: true,
