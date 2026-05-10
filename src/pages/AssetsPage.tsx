@@ -1,20 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { assets, connectors } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { Cloud, ArrowRight, RefreshCcw, Database, CheckCircle2, Loader2 } from 'lucide-react';
+import { Cloud, ArrowRight, RefreshCcw, Database, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
+import { oneDriveService } from '@/services/oneDriveService';
 
 const sections = ['Tous les assets', 'Référentiel OneDrive', 'Pipeline d\'ingestion'];
 
 export default function AssetsPage() {
   const [activeSection, setActiveSection] = useState(sections[0]);
   const [syncing, setSyncing] = useState(false);
+  const [driveMode, setDriveMode] = useState<'mock' | 'live' | 'degraded' | 'unknown'>('unknown');
+  const [driveError, setDriveError] = useState<string | undefined>();
+  const [expectedFiles, setExpectedFiles] = useState<Array<{ path: string; found: boolean }>>([]);
 
   const onedrive = connectors.find((c) => c.id === 'onedrive')!;
 
-  const handleSync = () => {
+  const handleSync = async () => {
     setSyncing(true);
-    setTimeout(() => setSyncing(false), 1800);
+    try {
+      const r = await oneDriveService.checkConnection();
+      setDriveMode((r.mode as any) ?? 'unknown');
+      setDriveError(r.drive_error);
+      const ef = await oneDriveService.findExpectedFiles();
+      setExpectedFiles(ef);
+    } catch (e) {
+      setDriveMode('degraded');
+      setDriveError(e instanceof Error ? e.message : 'unknown');
+    } finally {
+      setSyncing(false);
+    }
   };
+
+  useEffect(() => { handleSync(); /* eslint-disable-next-line */ }, []);
 
   return (
     <div className="space-y-6 animate-slide-in">
