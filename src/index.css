@@ -129,8 +129,8 @@
     box-shadow: 0 0 0 3px hsl(var(--violet) / 0.06);
   }
 
-  .status-connected   { @apply text-emerald bg-emerald/8 border-emerald/25; }
-  .status-disconnected{ @apply text-destructive bg-destructive/8 border-destructive/25; }
+  .status-connected   { @apply text-emerald bg-emerald/10 border-emerald/25; }
+  .status-disconnected{ @apply text-destructive bg-destructive/10 border-destructive/25; }
   .status-simulated   { @apply text-amber bg-amber/10 border-amber/30; }
   .status-warning     { @apply text-amber; }
   .status-critical    { @apply text-destructive; }
