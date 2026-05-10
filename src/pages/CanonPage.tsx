@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { canonRules, characters, chapters, arcs, audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
+import ObjectProvenance from '@/components/shared/ObjectProvenance';
 import {
   ChevronRight, ChevronDown, BookOpen, Globe, Shield, AlertOctagon, Building2,
   Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic, Database
@@ -151,6 +152,22 @@ export default function CanonPage() {
                     v{rule.version}
                   </span>
                 </div>
+
+                <ObjectProvenance
+                  provenance={{
+                    sourceFile: 'Documents/Projet Roman/Les_Arches/01_sources/articulation.txt',
+                    activeRecord: `canon_objects · ${rule.id}`,
+                    lastModified: rule.lastUpdate,
+                    version: rule.version,
+                    validationStatus: rule.status === 'active' ? 'validated' : (rule.status as any),
+                    needsIndexRefresh: false,
+                    needsReview: rule.status !== 'active',
+                  }}
+                  onAddTextNote={() => {}}
+                  onAddAudioNote={() => {}}
+                  onSave={() => {}}
+                  disabled
+                />
 
                 <div className="soft-divider" />
 

@@ -4,6 +4,7 @@ import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
 import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
 import OpenAITestPanel from '@/components/shared/OpenAITestPanel';
+import DataFlowDoctrineBanner from '@/components/shared/DataFlowDoctrineBanner';
 import { getRuntimeMode, setRuntimeMode, type RuntimeMode } from '@/lib/runtimeMode';
 import { Sliders, Mic } from 'lucide-react';
 
@@ -117,6 +118,7 @@ export default function SettingsPage() {
       {activeSection === 'Readiness Supabase / OpenAI / OneDrive' && (
         <div className="space-y-5">
           <RuntimeModeSwitch />
+          <DataFlowDoctrineBanner />
           <div className="cockpit-card space-y-2">
             <p className="editorial-eyebrow">Runtime AI Provider</p>
             <h3 className="text-base editorial-heading text-foreground">OpenAI via Supabase Edge Functions</h3>

@@ -6,6 +6,7 @@ import WarningBanner from '@/components/shared/WarningBanner';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
 import ImportReconcilePanel from '@/components/shared/ImportReconcilePanel';
 import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
+import DataFlowDoctrineBanner from '@/components/shared/DataFlowDoctrineBanner';
 import KpiCard from '@/components/shared/KpiCard';
 import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -33,6 +34,8 @@ export default function DashboardPage() {
       </div>
 
       <WarningBanner warnings={criticalWarnings} />
+
+      <DataFlowDoctrineBanner compact />
 
       <ConnectionReadinessPanel compact />
 
