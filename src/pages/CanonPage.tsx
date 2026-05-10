@@ -153,6 +153,22 @@ export default function CanonPage() {
                   </span>
                 </div>
 
+                <ObjectProvenance
+                  provenance={{
+                    sourceFile: 'Documents/Projet Roman/Les_Arches/01_sources/articulation.txt',
+                    activeRecord: `canon_objects · ${rule.id}`,
+                    lastModified: rule.lastUpdate,
+                    version: rule.version,
+                    validationStatus: rule.status === 'active' ? 'validated' : (rule.status as any),
+                    needsIndexRefresh: false,
+                    needsReview: rule.status !== 'active',
+                  }}
+                  onAddTextNote={() => {}}
+                  onAddAudioNote={() => {}}
+                  onSave={() => {}}
+                  disabled
+                />
+
                 <div className="soft-divider" />
 
                 <div className="space-y-4 text-sm">
