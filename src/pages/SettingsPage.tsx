@@ -118,6 +118,7 @@ export default function SettingsPage() {
       {activeSection === 'Readiness Supabase / OpenAI / OneDrive' && (
         <div className="space-y-5">
           <RuntimeModeSwitch />
+          <DataFlowDoctrineBanner />
           <div className="cockpit-card space-y-2">
             <p className="editorial-eyebrow">Runtime AI Provider</p>
             <h3 className="text-base editorial-heading text-foreground">OpenAI via Supabase Edge Functions</h3>
