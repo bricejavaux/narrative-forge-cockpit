@@ -80,8 +80,11 @@ function CharacterDiff({ extracted }: { extracted: any }) {
   );
 }
 
+type PersistResult = Awaited<ReturnType<typeof importService.persist>>;
+
 export default function ImportReconcilePanel() {
   const [busy, setBusy] = useState<ImportTarget | null>(null);
+  const [persisting, setPersisting] = useState<ImportTarget | null>(null);
   const [previews, setPreviews] = useState<Record<ImportTarget, ImportPreview | null>>({
     articulation: null,
     personnages: null,
@@ -90,10 +93,15 @@ export default function ImportReconcilePanel() {
     articulation: null,
     personnages: null,
   });
+  const [persisted, setPersisted] = useState<Record<ImportTarget, PersistResult | null>>({
+    articulation: null,
+    personnages: null,
+  });
 
   const run = async (target: ImportTarget) => {
     setBusy(target);
     setErrors((e) => ({ ...e, [target]: null }));
+    setPersisted((s) => ({ ...s, [target]: null }));
     try {
       const p = await importService.previewImport(target);
       setPreviews((s) => ({ ...s, [target]: p }));
@@ -104,14 +112,31 @@ export default function ImportReconcilePanel() {
     }
   };
 
+  const persist = async (target: ImportTarget) => {
+    const preview = previews[target];
+    if (!preview?.extracted) return;
+    const label = target === 'articulation' ? 'le canon' : 'les personnages';
+    if (!window.confirm(`Persister ${label} dans Supabase ?\n\nLes objets seront marqués "needs_review = true" et "validation_status = pending".`)) return;
+    setPersisting(target);
+    setErrors((s) => ({ ...s, [target]: null }));
+    try {
+      const r = await importService.persist(target, preview.extracted);
+      setPersisted((s) => ({ ...s, [target]: r }));
+    } catch (e) {
+      setErrors((s) => ({ ...s, [target]: e instanceof Error ? e.message : 'erreur' }));
+    } finally {
+      setPersisting(null);
+    }
+  };
+
   return (
     <div className="rounded-lg border border-border/60 bg-card/40 p-4 space-y-4">
       <div className="flex items-start justify-between">
         <div>
           <p className="editorial-eyebrow">Import & Réconciliation</p>
-          <h3 className="text-lg editorial-heading text-foreground">OneDrive → Lovable AI → Preview</h3>
+          <h3 className="text-lg editorial-heading text-foreground">OneDrive → Lovable AI → Supabase</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Téléchargement réel + extraction structurée. La persistance Supabase reste à valider à la prochaine phase.
+            Téléchargement réel, extraction structurée, puis persistance encadrée par validation humaine.
           </p>
         </div>
       </div>
@@ -122,6 +147,8 @@ export default function ImportReconcilePanel() {
           const err = errors[t.id];
           const Icon = t.icon;
           const isBusy = busy === t.id;
+          const isPersisting = persisting === t.id;
+          const result = persisted[t.id];
           return (
             <div key={t.id} className="rounded-md border border-border/40 p-3 space-y-3">
               <div className="flex items-center justify-between">
@@ -131,7 +158,7 @@ export default function ImportReconcilePanel() {
                 </div>
                 <button
                   onClick={() => run(t.id)}
-                  disabled={isBusy}
+                  disabled={isBusy || isPersisting}
                   className="text-xs flex items-center gap-1 px-2 py-1 rounded border border-border/60 hover:bg-secondary/40 disabled:opacity-50"
                 >
                   {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : preview ? <RefreshCw className="w-3 h-3" /> : <Download className="w-3 h-3" />}
@@ -177,13 +204,31 @@ export default function ImportReconcilePanel() {
                     <pre className="text-[10px] bg-secondary/30 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap">{preview.raw_preview}</pre>
                   )}
 
-                  <button
-                    disabled
-                    className="text-[11px] px-2 py-1 rounded border border-border/40 text-muted-foreground italic w-full"
-                    title="Persistance Supabase activée à la prochaine phase"
-                  >
-                    Persister dans Supabase (étape suivante)
-                  </button>
+                  {result ? (
+                    <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 text-[11px] space-y-1">
+                      <div className="flex items-center gap-1 text-emerald-700">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span className="font-medium">Persisté dans Supabase</span>
+                      </div>
+                      <div className="font-mono text-foreground">
+                        {result.inserted ?? 0} ajouts · {result.updated ?? 0} mises à jour · {result.skipped ?? 0} ignorés
+                      </div>
+                      {result.errors && result.errors.length > 0 && (
+                        <div className="text-amber-700">{result.errors.length} erreur(s)</div>
+                      )}
+                      {result.job_id && <div className="text-muted-foreground">job · {result.job_id.slice(0, 8)}</div>}
+                      <p className="text-muted-foreground italic">Objets marqués needs_review = true.</p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => persist(t.id)}
+                      disabled={!preview.extracted || isPersisting || preview.mode !== 'live'}
+                      className="text-[11px] flex items-center justify-center gap-1 px-2 py-1.5 rounded border border-primary/40 bg-primary/5 hover:bg-primary/10 text-foreground disabled:opacity-50 w-full"
+                    >
+                      {isPersisting ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                      Valider & persister dans Supabase
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -192,8 +237,8 @@ export default function ImportReconcilePanel() {
       </div>
 
       <p className="text-[11px] text-muted-foreground italic">
-        Aucune écriture base. Cette preview compare l'extraction IA au canon courant (dummy) — éléments existants vs nouveaux —
-        avant la persistance encadrée par validation humaine.
+        L'écriture nécessite une validation humaine explicite. Chaque persistance crée une entrée dans <span className="font-mono">import_jobs</span>,
+        marque les objets <span className="font-mono">needs_review = true</span> et trace l'opération dans <span className="font-mono">logs</span>.
       </p>
     </div>
   );
