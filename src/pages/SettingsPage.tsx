@@ -3,6 +3,7 @@ import { connectors } from '@/data/dummyData';
 import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
 import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
+import OpenAITestPanel from '@/components/shared/OpenAITestPanel';
 import { getRuntimeMode, setRuntimeMode, type RuntimeMode } from '@/lib/runtimeMode';
 import { Sliders, Mic } from 'lucide-react';
 
@@ -128,6 +129,7 @@ export default function SettingsPage() {
             </ul>
           </div>
           <ConnectionReadinessPanel />
+          <OpenAITestPanel />
           <OneDriveRepositoryPanel />
         </div>
       )}
