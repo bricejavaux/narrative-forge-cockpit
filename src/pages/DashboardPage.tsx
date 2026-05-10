@@ -14,9 +14,10 @@ import { project, connectors, chapters, arcs, recentActivity, audioNotes, runs }
 
 const criticalWarnings = [
   { text: 'OneDrive — connecté en lecture. Téléchargement réel des sources actif.', severity: 'info' as const },
-  { text: 'Lovable AI Gateway — actif (Gemini). Extraction canon/personnages et diagnostics fonctionnels.', severity: 'info' as const },
-  { text: 'Whisper / transcription audio — encore simulée (clé OpenAI requise).', severity: 'warning' as const },
-  { text: 'Persistance Supabase — preview uniquement. Validation humaine avant écriture.', severity: 'warning' as const },
+  { text: 'Provider IA runtime attendu : OpenAI via Supabase Edge Functions. Lovable AI Gateway n’est PAS le provider runtime de l’application.', severity: 'info' as const },
+  { text: 'OPENAI_API_KEY — à configurer en secret Edge Function pour activer extraction, structuration et diagnostics OpenAI.', severity: 'warning' as const },
+  { text: 'Transcription audio (Whisper) — pipeline audio non câblé : pending tant que l’upload/download n’est pas implémenté.', severity: 'warning' as const },
+  { text: 'Persistance Supabase — RLS activé sans policies. Écritures via Edge Functions uniquement, lectures en mock/fallback.', severity: 'warning' as const },
   { text: 'Indexes vectoriels — pgvector pas encore activé. Archives Chroma en attente.', severity: 'warning' as const },
 ];
 
