@@ -21,6 +21,21 @@ const colorRose = 'hsl(350 30% 62%)';
 export default function DiagnosticsPage() {
   const [activeView, setActiveView] = useState(subViews[0]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [liveDiag, setLiveDiag] = useState<any>(null);
+  useEffect(() => { supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
+  const openaiReady = !!readiness?.openai?.api_key_configured;
+
+  const runLiveDiagnostic = async () => {
+    setDiagLoading(true); setLiveDiag(null);
+    try {
+      const res = await openaiService.generateDiagnostic('global');
+      setLiveDiag(res);
+    } catch (e) {
+      setLiveDiag({ error: e instanceof Error ? e.message : 'unknown' });
+    } finally { setDiagLoading(false); }
+  };
 
   const chapterData = chapters.map((ch) => ({
     name: `Ch.${ch.number}`,
