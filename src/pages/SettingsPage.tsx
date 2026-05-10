@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { connectors } from '@/data/dummyData';
 import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
+import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
+import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
+import { getRuntimeMode, setRuntimeMode, type RuntimeMode } from '@/lib/runtimeMode';
 import { Sliders, Mic } from 'lucide-react';
 
 function NarrativeSlider({ label, value, min = 0, max = 100 }: { label: string; value: number; min?: number; max?: number }) {
@@ -83,43 +86,10 @@ export default function SettingsPage() {
       )}
 
       {activeSection === 'Readiness Supabase / OpenAI / OneDrive' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="cockpit-card space-y-2">
-            <h3 className="editorial-eyebrow text-primary">Supabase — couche active</h3>
-            <p className="text-xs text-foreground/80 leading-relaxed">
-              Hébergera les données narratives structurées : chapitres, personnages, arcs, canon,
-              runs, scores, journal, transcriptions audio, indexes vectoriels par finalité.
-            </p>
-            <ul className="text-[11px] text-muted-foreground space-y-1 pt-2 border-t border-border">
-              <li>· Tables prêtes (simulé)</li>
-              <li>· RLS prévue par projet/auteur</li>
-              <li>· Vecteurs séparés par usage</li>
-            </ul>
-          </div>
-          <div className="cockpit-card space-y-2">
-            <h3 className="editorial-eyebrow text-accent">OneDrive — sources & archives</h3>
-            <p className="text-xs text-foreground/80 leading-relaxed">
-              Référentiel documentaire long terme : articulation.txt, personnages.txt, cover.jpg,
-              archives Chroma héritées (follett, science_portals, sf_portals_fiction), EPUB/PDF.
-            </p>
-            <ul className="text-[11px] text-muted-foreground space-y-1 pt-2 border-t border-border">
-              <li>· Chroma = archive, pas index actif</li>
-              <li>· Migration ou re-vectorisation à arbitrer</li>
-              <li>· Sync planifié post-connexion</li>
-            </ul>
-          </div>
-          <div className="cockpit-card space-y-2">
-            <h3 className="editorial-eyebrow text-rose">OpenAI — intelligence</h3>
-            <p className="text-xs text-foreground/80 leading-relaxed">
-              Transcription Whisper, structuration, audit, génération, réécriture. Toujours sous
-              validation humaine. Journalisation complète des diffs.
-            </p>
-            <ul className="text-[11px] text-muted-foreground space-y-1 pt-2 border-t border-border">
-              <li>· Modèles ciblés par agent</li>
-              <li>· Coût simulé / réel suivi</li>
-              <li>· Réécriture profonde : approbation requise</li>
-            </ul>
-          </div>
+        <div className="space-y-5">
+          <RuntimeModeSwitch />
+          <ConnectionReadinessPanel />
+          <OneDriveRepositoryPanel />
         </div>
       )}
 
