@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { chapters, arcs, characters, audioNotes } from '@/data/dummyData';
 import ScoreBar from '@/components/shared/ScoreBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
-import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle } from 'lucide-react';
+import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap } from 'lucide-react';
+import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import { openaiService } from '@/services/openaiService';
 
 const subViews = ['Score global', 'Par chapitre', 'Par arc', 'Par personnage', 'Hiérarchie L4 / Walvis Bay', 'Alternance macro/micro', 'Détail par scène', 'Coût par activation', 'Phrase-couteau', 'Trace non-humanisée', 'Brice — ingénieur → gardien', 'Audio review coverage'];
 
