@@ -121,6 +121,28 @@ export default function IndexesPage() {
           </div>
         ))}
       </div>
+
+      {/* Options techniques pour Chroma OneDrive */}
+      <div className="cockpit-card space-y-3">
+        <div>
+          <h3 className="editorial-eyebrow">Archives Chroma OneDrive — options techniques</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Les fichiers <span className="font-mono">follett/chroma.sqlite3</span>, <span className="font-mono">science_portals/chroma.sqlite3</span> et <span className="font-mono">sf_portals_fiction/chroma.sqlite3</span> sont des archives techniques OneDrive — pas des indexes Supabase actifs. Deux trajectoires possibles :
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="rounded-lg border border-border p-3 space-y-1">
+            <p className="font-display text-sm text-foreground">Option A — Re-vectoriser depuis les sources</p>
+            <p className="text-[11px] text-muted-foreground">Repartir des documents originaux (.txt, .pdf, .epub) et reconstruire les indexes natifs Supabase. Garantit cohérence d'embeddings et de chunking.</p>
+          </div>
+          <div className="rounded-lg border border-border p-3 space-y-1">
+            <p className="font-display text-sm text-foreground">Option B — Extraire chunks + embeddings Chroma</p>
+            <p className="text-[11px] text-muted-foreground">Lire les .sqlite3 existants, exporter chunks & vecteurs, ré-injecter dans Supabase. Plus rapide, dépendant du modèle d'origine.</p>
+          </div>
+        </div>
+        <p className="text-[11px] text-amber font-mono">Décision technique à arbitrer avant branchement Supabase.</p>
+      </div>
     </div>
   );
 }
+
