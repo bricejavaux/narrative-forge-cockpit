@@ -66,7 +66,29 @@ export default function IndexesPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Taille</span><span className="font-mono text-foreground">{idx.simulatedSize}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Fraîcheur</span><span className="font-mono text-foreground">{idx.simulatedFreshness}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Source</span><span className="text-foreground">{idx.owner}</span></div>
+              {idx.migrationStrategy && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stratégie</span>
+                  <span className="font-mono text-foreground/80">
+                    {idx.migrationStrategy === 'native-supabase' && 'native Supabase'}
+                    {idx.migrationStrategy === 're-vectorize-source' && 're-vectoriser depuis source'}
+                    {idx.migrationStrategy === 'extract-chroma' && 'extraire chunks Chroma'}
+                    {idx.migrationStrategy === 'pending-decision' && 'décision en attente'}
+                  </span>
+                </div>
+              )}
             </div>
+
+            {idx.linkedAssetIds && idx.linkedAssetIds.length > 0 && (
+              <div>
+                <p className="editorial-eyebrow mb-1">Assets liés</p>
+                <div className="flex flex-wrap gap-1">
+                  {idx.linkedAssetIds.map((a) => (
+                    <span key={a} className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono text-muted-foreground">{a}</span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="editorial-eyebrow mb-1">Agents consommateurs</p>
