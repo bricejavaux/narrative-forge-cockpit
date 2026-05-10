@@ -2,12 +2,23 @@ import { useState } from 'react';
 import { runs, agents, chapters } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
-import { Play, Save, Download, ExternalLink, AlertTriangle, Zap } from 'lucide-react';
+import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 
-const modes = ['SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome', 'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final', 'Vérification cross-chapitres', 'Vérification notes audio'];
+const modes = ['Dry run (simulation seule)', 'SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome', 'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final', 'Vérification cross-chapitres', 'Vérification notes audio'];
+
+const checklist = [
+  { label: 'OpenAI disponible', ok: false },
+  { label: 'Supabase disponible', ok: false },
+  { label: 'OneDrive disponible', ok: false },
+  { label: 'Indexes requis disponibles', ok: true, note: 'simulés' },
+  { label: 'Notes audio non traitées revues', ok: false, note: '9 ouvertes' },
+  { label: 'Objets cibles sélectionnés', ok: true },
+  { label: 'Format de sortie sélectionné', ok: true },
+];
 
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState(modes[0]);
+  const ready = checklist.every((c) => c.ok);
 
   return (
     <div className="space-y-6 animate-slide-in">
