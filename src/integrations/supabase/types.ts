@@ -1057,45 +1057,116 @@ export type Database = {
           },
         ]
       }
+      import_job_items: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          extracted_payload: Json
+          id: string
+          import_job_id: string | null
+          object_type: string
+          proposed_action: string
+          status: string
+          target_record_id: string | null
+          target_table: string | null
+          updated_at: string
+          validation_notes: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          extracted_payload?: Json
+          id?: string
+          import_job_id?: string | null
+          object_type: string
+          proposed_action?: string
+          status?: string
+          target_record_id?: string | null
+          target_table?: string | null
+          updated_at?: string
+          validation_notes?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          extracted_payload?: Json
+          id?: string
+          import_job_id?: string | null
+          object_type?: string
+          proposed_action?: string
+          status?: string
+          target_record_id?: string | null
+          target_table?: string | null
+          updated_at?: string
+          validation_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_job_items_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_jobs: {
         Row: {
           created_at: string
           error: string | null
+          extraction_provider: string | null
           finished_at: string | null
           id: string
           import_id: string | null
+          import_type: string | null
           input: Json
+          mode: string | null
           output: Json
+          result_summary: Json
+          source_file_id: string | null
           started_at: string | null
           status: string
           step: string
           updated_at: string
+          warnings: Json
         }
         Insert: {
           created_at?: string
           error?: string | null
+          extraction_provider?: string | null
           finished_at?: string | null
           id?: string
           import_id?: string | null
+          import_type?: string | null
           input?: Json
+          mode?: string | null
           output?: Json
+          result_summary?: Json
+          source_file_id?: string | null
           started_at?: string | null
           status?: string
           step: string
           updated_at?: string
+          warnings?: Json
         }
         Update: {
           created_at?: string
           error?: string | null
+          extraction_provider?: string | null
           finished_at?: string | null
           id?: string
           import_id?: string | null
+          import_type?: string | null
           input?: Json
+          mode?: string | null
           output?: Json
+          result_summary?: Json
+          source_file_id?: string | null
           started_at?: string | null
           status?: string
           step?: string
           updated_at?: string
+          warnings?: Json
         }
         Relationships: [
           {
@@ -1763,42 +1834,51 @@ export type Database = {
       source_files: {
         Row: {
           created_at: string
+          hash: string | null
           id: string
           last_sync: string | null
           metadata: Json
           mime_type: string | null
           name: string
           remote_path: string
+          repository: string | null
           repository_id: string | null
           size: number | null
+          source_type: string | null
           status: string
           storage_path: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          hash?: string | null
           id?: string
           last_sync?: string | null
           metadata?: Json
           mime_type?: string | null
           name: string
           remote_path: string
+          repository?: string | null
           repository_id?: string | null
           size?: number | null
+          source_type?: string | null
           status?: string
           storage_path?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          hash?: string | null
           id?: string
           last_sync?: string | null
           metadata?: Json
           mime_type?: string | null
           name?: string
           remote_path?: string
+          repository?: string | null
           repository_id?: string | null
           size?: number | null
+          source_type?: string | null
           status?: string
           storage_path?: string | null
           updated_at?: string
@@ -1952,6 +2032,131 @@ export type Database = {
           target_id?: string | null
           target_type?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      vector_source_chunks: {
+        Row: {
+          chunk_id: string | null
+          chunk_number: number | null
+          corpus: string | null
+          created_at: string
+          id: string
+          ingestion_status: string
+          metadata: Json
+          package_id: string | null
+          rights: string | null
+          source_file: string | null
+          source_id: string | null
+          target_index: string | null
+          text_excerpt: string | null
+          usage: string | null
+        }
+        Insert: {
+          chunk_id?: string | null
+          chunk_number?: number | null
+          corpus?: string | null
+          created_at?: string
+          id?: string
+          ingestion_status?: string
+          metadata?: Json
+          package_id?: string | null
+          rights?: string | null
+          source_file?: string | null
+          source_id?: string | null
+          target_index?: string | null
+          text_excerpt?: string | null
+          usage?: string | null
+        }
+        Update: {
+          chunk_id?: string | null
+          chunk_number?: number | null
+          corpus?: string | null
+          created_at?: string
+          id?: string
+          ingestion_status?: string
+          metadata?: Json
+          package_id?: string | null
+          rights?: string | null
+          source_file?: string | null
+          source_id?: string | null
+          target_index?: string | null
+          text_excerpt?: string | null
+          usage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vector_source_chunks_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "vector_source_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vector_source_packages: {
+        Row: {
+          chunk_strategy: string | null
+          chunks_path: string | null
+          corpus_name: string
+          created_at: string
+          embeddings_created: boolean
+          id: string
+          ingestion_status: string
+          inventory_path: string | null
+          last_generated: string | null
+          manifest_path: string | null
+          metadata: Json
+          onedrive_path: string | null
+          produced_chunk_count: number | null
+          project_id: string | null
+          rights: string | null
+          source_file_count: number | null
+          target_index: string | null
+          updated_at: string
+          usage: string | null
+        }
+        Insert: {
+          chunk_strategy?: string | null
+          chunks_path?: string | null
+          corpus_name: string
+          created_at?: string
+          embeddings_created?: boolean
+          id?: string
+          ingestion_status?: string
+          inventory_path?: string | null
+          last_generated?: string | null
+          manifest_path?: string | null
+          metadata?: Json
+          onedrive_path?: string | null
+          produced_chunk_count?: number | null
+          project_id?: string | null
+          rights?: string | null
+          source_file_count?: number | null
+          target_index?: string | null
+          updated_at?: string
+          usage?: string | null
+        }
+        Update: {
+          chunk_strategy?: string | null
+          chunks_path?: string | null
+          corpus_name?: string
+          created_at?: string
+          embeddings_created?: boolean
+          id?: string
+          ingestion_status?: string
+          inventory_path?: string | null
+          last_generated?: string | null
+          manifest_path?: string | null
+          metadata?: Json
+          onedrive_path?: string | null
+          produced_chunk_count?: number | null
+          project_id?: string | null
+          rights?: string | null
+          source_file_count?: number | null
+          target_index?: string | null
+          updated_at?: string
+          usage?: string | null
         }
         Relationships: []
       }
