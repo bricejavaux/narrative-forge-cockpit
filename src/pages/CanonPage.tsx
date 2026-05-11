@@ -3,6 +3,7 @@ import { canonRules, characters, chapters, arcs, audioNotes } from '@/data/dummy
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ObjectProvenance from '@/components/shared/ObjectProvenance';
+import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
 import {
   ChevronRight, ChevronDown, BookOpen, Globe, Shield, AlertOctagon, Building2,
   Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic, Database
