@@ -244,38 +244,59 @@ export default function AgentsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
-                  <p className="editorial-eyebrow mb-1">Profil qualité</p>
-                  <p className="font-mono text-foreground">{profile}</p>
-                </div>
-                <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
-                  <p className="editorial-eyebrow mb-1">Adéquation</p>
-                  <p className="text-foreground/80">
-                    {profile && modelMeta?.suitableFor?.includes(profile)
-                      ? `${modelMeta.label} adapté à ${profile}.`
-                      : `${modelMeta?.label ?? currentModel} possible mais non optimal pour ${profile ?? 'ce profil'}.`}
-                  </p>
-                </div>
-              </div>
+              {(() => {
+                const rec = recommendationsFor(agent.category);
+                const Pill = ({ id, label }: { id: string; label: string }) => {
+                  const isSel = currentModel === id;
+                  const meta = modelById(id);
+                  return (
+                    <button
+                      onClick={() => setModel(agent.id, id)}
+                      className={`text-left rounded-md border px-2 py-1.5 text-[11px] transition-colors ${isSel ? 'border-primary/50 bg-primary/10 text-primary' : 'border-border hover:border-primary/30 text-foreground/80'}`}
+                      title={meta?.note}
+                    >
+                      <div className="font-mono">{label}: {id}</div>
+                      <div className="text-[10px] text-muted-foreground">{meta?.costEstimate} · {meta?.latencyEstimate}{meta?.availability === 'configurable' ? ' · configurable' : ''}</div>
+                    </button>
+                  );
+                };
+                return (
+                  <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                    <p className="editorial-eyebrow mb-1">Modèles recommandés · profil <span className="font-mono">{profile}</span></p>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5">
+                      <Pill id={rec.fast} label="fast" />
+                      <Pill id={rec.balanced} label="balanced" />
+                      <Pill id={rec.premium} label="premium" />
+                      {rec.reasoning && <Pill id={rec.reasoning} label="reasoning" />}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      Critères : coût · latence · besoin de raisonnement · contexte long · qualité créative · fiabilité JSON.
+                      {modelMeta?.availability === 'configurable' && ' Le modèle sélectionné est configurable — disponibilité non garantie selon votre compte OpenAI.'}
+                    </p>
+                  </div>
+                );
+              })()}
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
                 <button
                   onClick={launchAgent}
                   disabled={running}
                   className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
                 >
                   {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                  {openaiReady ? 'Exécuter (live OpenAI)' : 'Exécuter (mock)'}
+                  {openaiReady ? 'Exécuter test live OpenAI' : 'Tester agent — stub'}
                 </button>
-                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
-                  {openaiReady ? 'mode : live' : 'mode : mock'}
-                </span>
                 <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
-                  runtime : {openaiReady ? 'live_test_available' : 'mock'}
+                  runtime : {openaiReady ? 'live OpenAI test' : 'stubbed orchestration'}
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/30">
-                  persistence : {agent.rewriteRights ? 'writes_pending_validation' : 'suggestions_only'}
+                  vector context pending
+                </span>
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${agent.rewriteRights ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
+                  {agent.rewriteRights ? 'writes pending validation' : 'suggestions only'}
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">
+                  no persistence yet
                 </span>
               </div>
 
