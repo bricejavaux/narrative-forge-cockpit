@@ -9,6 +9,12 @@ export type ConnectionReadiness = {
     rls_policies_configured?: boolean;
     mock_fallback_active: boolean;
   };
+  storage?: {
+    source_files_bucket_exists?: boolean;
+    audio_bucket_exists?: boolean;
+    covers_bucket_exists?: boolean;
+    exports_bucket_exists?: boolean;
+  };
   openai: {
     api_key_configured: boolean;
     edge_functions_deployed: boolean;
@@ -20,6 +26,13 @@ export type ConnectionReadiness = {
     agent_runs_available: boolean;
     lovable_ai_gateway_available: boolean;
     lovable_ai_gateway_role?: string;
+  };
+  audio?: {
+    upload_available?: boolean;
+    file_download_available?: boolean;
+    openai_transcription_available?: boolean;
+    transcript_persistence_available?: boolean;
+    pipeline_status?: string;
   };
   onedrive: {
     oauth_configured: boolean;
@@ -39,6 +52,8 @@ export type ConnectionReadiness = {
     text_export_available: boolean;
     markdown_export_available: boolean;
     json_export_available: boolean;
+    onedrive_upload_available?: boolean;
+    supabase_export_persistence_available?: boolean;
     pdf_epub_future: boolean;
   };
   compliance?: {
@@ -48,6 +63,7 @@ export type ConnectionReadiness = {
     runtime_provider_current: string;
     frontend_openai_key_detected: boolean;
   };
+  checked_at?: string;
 };
 
 export type ActiveCanonObject = {
