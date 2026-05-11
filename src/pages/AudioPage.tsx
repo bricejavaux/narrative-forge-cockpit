@@ -107,7 +107,7 @@ export default function AudioPage() {
 
           {/* Audio card detail */}
           <div className="cockpit-card space-y-3">
-            <h3 className="text-sm font-display font-semibold text-foreground">Détail note audio (simulé)</h3>
+            <h3 className="text-sm font-display font-semibold text-foreground">Détail note audio — <span className="font-mono text-xs text-muted-foreground">exemple démo</span></h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-xs text-muted-foreground uppercase">Audio brut</span>
