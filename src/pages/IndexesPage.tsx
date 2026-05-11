@@ -43,6 +43,9 @@ export default function IndexesPage() {
         <VectorPackagesPanel />
       </div>
 
+      <VectorIngestionPanel />
+      </div>
+
       {/* Queue */}
       <div className="cockpit-card">
         <div className="flex items-center justify-between mb-3">
