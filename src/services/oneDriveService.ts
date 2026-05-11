@@ -56,6 +56,16 @@ export const oneDriveService = {
     return data;
   },
 
+  async readJsonFile<T = unknown>(path: string): Promise<{ mode: string; data?: T; error?: string }> {
+    const r = await this.downloadFile(path);
+    if (!r.text) return { mode: r.mode, error: r.error ?? 'no_text' };
+    try {
+      return { mode: r.mode, data: JSON.parse(r.text) as T };
+    } catch (e) {
+      return { mode: r.mode, error: e instanceof Error ? e.message : 'parse_error' };
+    }
+  },
+
   async inspectChromaArchives() {
     return {
       mode: 'mock' as const,
