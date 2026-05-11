@@ -3,7 +3,7 @@ import { corsHeaders, hasOneDrive, json } from '../_shared/cors.ts';
 import { listFolder } from '../_shared/onedrive.ts';
 
 const ROOT = 'Documents/Projet Roman/Les_Arches';
-const SUBFOLDERS = ['01_sources', '02_canon_actif', '03_chroma_archives', '04_exports', '05_covers'];
+const SUBFOLDERS = ['01_sources', '02_canon_actif', '03_chroma_archives', '04_exports', '05_covers', '06_vector_sources'];
 
 const EXPECTED_STRUCTURE = {
   root: ROOT,
@@ -13,6 +13,7 @@ const EXPECTED_STRUCTURE = {
     { path: '03_chroma_archives', files: [], subfolders: ['follett', 'science_portals', 'sf_portals_fiction'] },
     { path: '04_exports', files: [] },
     { path: '05_covers', files: ['cover.jpg'] },
+    { path: '06_vector_sources', files: [], subfolders: ['follett', 'sf_portals_fiction', 'science_portals'] },
   ],
 };
 
