@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   BarChart3, BookOpen, AlertTriangle, Plug, Play, TrendingDown,
   FileText, Mic, Download, Upload, DollarSign, Clock, Activity, Zap
@@ -12,19 +13,45 @@ import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import { project, connectors, chapters, arcs, recentActivity, audioNotes, runs } from '@/data/dummyData';
+import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
-const criticalWarnings = [
-  { text: 'OneDrive — connecté en lecture. Téléchargement réel des sources actif.', severity: 'info' as const },
-  { text: 'Provider IA runtime attendu : OpenAI via Supabase Edge Functions. Lovable AI Gateway n’est PAS le provider runtime de l’application.', severity: 'info' as const },
-  { text: 'OPENAI_API_KEY — à configurer en secret Edge Function pour activer extraction, structuration et diagnostics OpenAI.', severity: 'warning' as const },
-  { text: 'Transcription audio (Whisper) — pipeline audio non câblé : pending tant que l’upload/download n’est pas implémenté.', severity: 'warning' as const },
-  { text: 'Persistance Supabase — RLS activé sans policies. Écritures via Edge Functions uniquement, lectures en mock/fallback.', severity: 'warning' as const },
-  { text: 'Indexes vectoriels — pgvector pas encore activé. Archives Chroma en attente.', severity: 'warning' as const },
-];
+function buildWarnings(r: ConnectionReadiness | null) {
+  const w: Array<{ text: string; severity: 'info' | 'warning' | 'critical' }> = [];
+  if (!r) return w;
+  if (r.onedrive.oauth_configured) {
+    w.push({ text: 'OneDrive — connecté en lecture. Téléchargement réel des sources actif.', severity: 'info' });
+  } else {
+    w.push({ text: 'OneDrive non branché — sources en mode mock/fallback.', severity: 'warning' });
+  }
+  if (r.openai.api_key_configured) {
+    w.push({ text: `OpenAI runtime live — model: ${r.openai.model ?? 'défaut'}.`, severity: 'info' });
+  } else {
+    w.push({ text: 'OPENAI_API_KEY — à configurer en secret Edge Function pour activer extraction, structuration et diagnostics.', severity: 'warning' });
+  }
+  if (r.supabase.project_connected && r.supabase.tables_created) {
+    w.push({ text: 'Supabase actif — tables créées. Écritures sensibles via Edge Functions (service role).', severity: 'info' });
+  }
+  if (!r.supabase.rls_policies_configured) {
+    w.push({ text: 'RLS activé sans policies frontend — lectures/écritures directes limitées, sensible passe par Edge Functions.', severity: 'warning' });
+  }
+  if (!r.indexes.pgvector_ready) {
+    w.push({ text: 'pgvector — pending. Paquets vectoriels OneDrive prêts, ingestion non activée.', severity: 'warning' });
+  }
+  if (!r.openai.transcription_available) {
+    w.push({ text: 'Pipeline audio (Whisper) — pending tant que l\'upload/download audio n\'est pas câblé.', severity: 'warning' });
+  }
+  return w;
+}
 
 export default function DashboardPage() {
+  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  useEffect(() => {
+    supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
+  }, []);
+
   const weakChapters = chapters.filter(c => c.score < 60);
   const riskArcs = arcs.filter(a => a.status === 'warning' || a.status === 'critical');
+  const criticalWarnings = buildWarnings(readiness);
 
   return (
     <div className="space-y-6 animate-slide-in">

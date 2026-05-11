@@ -93,6 +93,24 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      <div className="rounded-lg border border-amber/40 bg-amber/5 p-4 text-xs space-y-1.5">
+        <p className="font-display text-sm text-amber">Sécurité — secrets &amp; RLS</p>
+        <p className="text-foreground/85">
+          Les secrets (<span className="font-mono">OPENAI_API_KEY</span>,{' '}
+          <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span>,{' '}
+          <span className="font-mono">MICROSOFT_ONEDRIVE_API_KEY</span>,{' '}
+          <span className="font-mono">LOVABLE_API_KEY</span>) ne doivent être configurés qu'en{' '}
+          <span className="text-foreground font-medium">secrets Edge Function / Lovable Cloud</span>.
+          Ne jamais committer de <span className="font-mono">.env</span> contenant des valeurs réelles.
+          Utiliser <span className="font-mono">.env.example</span> avec placeholders.
+        </p>
+        <p className="text-foreground/85">
+          <span className="text-foreground font-medium">RLS activé</span> — lectures/écritures
+          directes depuis le frontend limitées. Les écritures sensibles passent par des Edge Functions
+          (service role côté serveur).
+        </p>
+      </div>
+
       <div className="flex gap-1 overflow-x-auto border-b border-border">
         {sections.map((s) => (
           <button
