@@ -236,7 +236,14 @@ export default function AssetsPage() {
               <span className="text-amber font-mono">pgvector : pending</span> — aucune ingestion automatique. Les chunks restent dans OneDrive, seuls les méta-données sont matérialisées dans Supabase.
             </p>
           </div>
-          <VectorPackagesPanel />
+          <VectorPackagesPanel key={refreshKey} />
+          <button
+            onClick={handleSync}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border bg-card hover:border-primary/40 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {syncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCcw size={12} />}
+            Synchroniser métadonnées Supabase
+          </button>
         </div>
       )}
 
