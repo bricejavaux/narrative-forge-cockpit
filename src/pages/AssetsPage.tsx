@@ -4,6 +4,7 @@ import VectorPackagesPanel from '@/components/shared/VectorPackagesPanel';
 import { Cloud, RefreshCcw, Database, CheckCircle2, Loader2, AlertTriangle, FileText, Image as ImageIcon, Archive, Download } from 'lucide-react';
 import { oneDriveService, type OneDriveCheckResult } from '@/services/oneDriveService';
 import { ONEDRIVE_REPOSITORY } from '@/lib/runtimeMode';
+import { indexingService } from '@/services/indexingService';
 
 const sections = ['Sources actives', 'Paquets vectoriels (06_vector_sources)', 'Archives Chroma'];
 
@@ -48,14 +49,27 @@ export default function AssetsPage() {
   const [syncing, setSyncing] = useState(false);
   const [drive, setDrive] = useState<OneDriveCheckResult | null>(null);
   const [expectedFiles, setExpectedFiles] = useState<Array<{ path: string; found: boolean }>>([]);
+  const [syncSummary, setSyncSummary] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleSync = async () => {
     setSyncing(true);
+    setSyncSummary(null);
     try {
       const r = await oneDriveService.checkConnection();
       setDrive(r);
       const ef = await oneDriveService.findExpectedFiles();
       setExpectedFiles(ef);
+      const s = await indexingService.syncVectorPackages();
+      if (s?.mode === 'live' && Array.isArray(s.synced)) {
+        const ok = s.synced.filter((x: any) => x.ok).length;
+        setSyncSummary(`Métadonnées vectorielles synchronisées : ${ok}/${s.synced.length} corpus.`);
+      } else if (s?.mode === 'mock') {
+        setSyncSummary('OneDrive non autorisé — métadonnées vectorielles non rafraîchies.');
+      } else if (s?.error) {
+        setSyncSummary(`Sync vectorielle : ${s.error}`);
+      }
+      setRefreshKey((k) => k + 1);
     } catch (e) {
       setDrive({ mode: 'degraded', structure: { root: ONEDRIVE_REPOSITORY.root, folders: [] }, drive_error: e instanceof Error ? e.message : 'unknown' });
     } finally {
@@ -125,6 +139,11 @@ export default function AssetsPage() {
       {drive?.drive_error && (
         <div className="rounded-xl border border-amber/30 bg-amber/5 p-3 text-xs flex items-center gap-2 text-amber">
           <AlertTriangle size={12} /> {drive.drive_error}
+        </div>
+      )}
+      {syncSummary && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-foreground">
+          {syncSummary}
         </div>
       )}
 
@@ -217,7 +236,14 @@ export default function AssetsPage() {
               <span className="text-amber font-mono">pgvector : pending</span> — aucune ingestion automatique. Les chunks restent dans OneDrive, seuls les méta-données sont matérialisées dans Supabase.
             </p>
           </div>
-          <VectorPackagesPanel />
+          <VectorPackagesPanel key={refreshKey} />
+          <button
+            onClick={handleSync}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border bg-card hover:border-primary/40 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {syncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCcw size={12} />}
+            Synchroniser métadonnées Supabase
+          </button>
         </div>
       )}
 

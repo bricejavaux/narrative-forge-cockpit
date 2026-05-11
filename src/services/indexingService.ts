@@ -59,6 +59,12 @@ export const indexingService = {
     return (data ?? []) as VectorPackageRow[];
   },
 
+  async syncVectorPackages(): Promise<{ mode: string; synced?: any[]; error?: string; message?: string }> {
+    const { data, error } = await supabase.functions.invoke('vector-package-sync', { body: {} });
+    if (error) return { mode: 'degraded', error: error.message };
+    return data;
+  },
+
   async readVectorPackage(corpus: VectorCorpus, sampleSize = 5): Promise<VectorPackageRead> {
     const { data, error } = await supabase.functions.invoke('vector-package-read', {
       body: { corpus, sampleSize },
