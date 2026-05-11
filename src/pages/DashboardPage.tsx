@@ -224,7 +224,10 @@ export default function DashboardPage() {
 
           {/* Activité récente */}
           <div className="cockpit-card space-y-2">
-            <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Activité Récente</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Activité Récente</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">activité exemple</span>
+            </div>
             {recentActivity.slice(0, 6).map(a => (
               <div key={a.id} className="flex items-start gap-2 py-1.5 border-b border-border/50 last:border-0">
                 <div className="mt-0.5">
