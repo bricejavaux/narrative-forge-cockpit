@@ -157,7 +157,7 @@ export default function AgentsPage() {
       <div className="grid grid-cols-12 gap-6">
         <div className={`${agent ? 'col-span-5' : 'col-span-12'} grid ${agent ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'} gap-3 auto-rows-min`}>
           {filtered.map((a) => {
-            const runtimeStatus = openaiReady ? 'live_test_available' : 'mock';
+            // openaiReady drives runtime label
             const persistenceStatus = a.rewriteRights ? 'writes_pending_validation' : 'suggestions_only';
             return (
             <button
