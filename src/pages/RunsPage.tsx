@@ -131,41 +131,34 @@ export default function RunsPage() {
             </ul>
           </div>
 
-          {/* Future payload simulé */}
+          {/* Payload preview (mock until live orchestrator) */}
           <div className="cockpit-card space-y-3">
-            <h3 className="editorial-eyebrow flex items-center gap-2"><Database size={11} /> Payload futur — simulé</h3>
+            <h3 className="editorial-eyebrow flex items-center gap-2"><Database size={11} /> Aperçu payload — mock</h3>
+            <p className="text-[11px] text-muted-foreground">
+              Aperçu indicatif des objets, indexes et tables qui seront mobilisés. Aucune écriture
+              tant que la politique de persistance n'est pas validée et qu'un agent n'est pas live.
+            </p>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <p className="text-muted-foreground mb-1">Objets envoyés</p>
-                <p className="font-mono text-foreground/80">3 chapitres · 2 personnages · 1 arc</p>
+                <p className="font-mono text-foreground/80">selon sélection</p>
               </div>
               <div>
                 <p className="text-muted-foreground mb-1">Indexes consultés</p>
-                <p className="font-mono text-primary">world_index · arc_index · style_index</p>
+                <p className="font-mono text-primary">selon agents</p>
               </div>
               <div>
-                <p className="text-muted-foreground mb-1">Agents appelés</p>
-                <p className="font-mono text-foreground/80">audit_hierarchie_lagrange_walvis · audit_phrase_couteau</p>
+                <p className="text-muted-foreground mb-1">Modèle OpenAI</p>
+                <p className="font-mono text-foreground/80">{readiness?.openai?.model ?? '—'}</p>
               </div>
               <div>
                 <p className="text-muted-foreground mb-1">Outputs attendus</p>
-                <p className="font-mono text-foreground/80">findings + diff + score révisé</p>
+                <p className="font-mono text-foreground/80">findings · scores · rewrite_tasks</p>
               </div>
               <div className="col-span-2">
-                <p className="text-muted-foreground mb-1">Tables Supabase futures touchées</p>
-                <p className="font-mono text-accent">runs · run_findings · diagnostics_scores · audit_logs</p>
+                <p className="text-muted-foreground mb-1">Tables Supabase potentiellement touchées</p>
+                <p className="font-mono text-accent">runs · run_outputs · audit_findings · rewrite_tasks</p>
               </div>
-            </div>
-          </div>
-
-          {/* Simulation */}
-          <div className="cockpit-card">
-            <h3 className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Simulation coût / latence</h3>
-            <div className="grid grid-cols-4 gap-4 text-center">
-              <div className="p-3 bg-surface-2 rounded"><span className="text-lg font-display font-bold text-cyan">$2.35</span><p className="text-[10px] text-muted-foreground">Coût estimé</p></div>
-              <div className="p-3 bg-surface-2 rounded"><span className="text-lg font-display font-bold text-violet">~12min</span><p className="text-[10px] text-muted-foreground">Durée estimée</p></div>
-              <div className="p-3 bg-surface-2 rounded"><span className="text-lg font-display font-bold text-amber">4</span><p className="text-[10px] text-muted-foreground">Agents</p></div>
-              <div className="p-3 bg-surface-2 rounded"><span className="text-lg font-display font-bold text-rose">3</span><p className="text-[10px] text-muted-foreground">Dépendances manquantes</p></div>
             </div>
           </div>
 
