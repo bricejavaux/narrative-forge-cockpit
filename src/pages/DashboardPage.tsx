@@ -130,7 +130,10 @@ export default function DashboardPage() {
 
           {/* Chapitres faibles */}
           <div className="cockpit-card space-y-3">
-            <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Chapitres faibles (score &lt; 60)</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Chapitres faibles (score &lt; 60)</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">mock fallback</span>
+            </div>
             {weakChapters.map(ch => (
               <div key={ch.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                 <div className="flex items-center gap-3">
@@ -147,7 +150,10 @@ export default function DashboardPage() {
 
           {/* Derniers runs */}
           <div className="cockpit-card space-y-3">
-            <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Derniers Runs</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Derniers Runs</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">historique mock</span>
+            </div>
             {runs.slice(0, 4).map(run => (
               <div key={run.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                 <div className="flex items-center gap-3">
@@ -163,6 +169,19 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+
+          {/* Capabilities to finalize */}
+          <details className="cockpit-card">
+            <summary className="text-xs uppercase tracking-wider text-muted-foreground cursor-pointer flex items-center justify-between">
+              <span>Capacités à finaliser</span>
+              <span className="font-mono text-[10px] text-amber">{gapsCount}</span>
+            </summary>
+            <ul className="mt-2 space-y-1 text-xs text-foreground">
+              {gaps.map((g, i) => (
+                <li key={i} className="flex items-center gap-2"><span className="w-1 h-1 rounded-full bg-amber" /> {g}</li>
+              ))}
+            </ul>
+          </details>
         </div>
 
         {/* Right column */}
