@@ -37,7 +37,7 @@ export default function ActiveRecordsBanner({ mode, onSelect }: { mode: Mode; on
             Supabase actif · {total} {mode === 'canon' ? 'objet(s) canon' : 'personnage(s)'}
           </span>
           {total === 0 ? (
-            <span className="text-muted-foreground italic">— fallback dummyData affiché ci-dessous</span>
+            <span className="text-muted-foreground italic">— mock_fallback (démo) en attente d'import OneDrive</span>
           ) : (
             <>
               <span className="text-amber font-mono">{needsReview} à valider</span>
