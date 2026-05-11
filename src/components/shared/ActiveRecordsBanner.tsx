@@ -100,9 +100,18 @@ export default function ActiveRecordsBanner({ mode, onSelect }: { mode: Mode; on
         </div>
       )}
 
-      <p className="text-[10px] text-muted-foreground italic mt-2">
-        Source : <span className="font-mono">OneDrive</span> · Données actives : <span className="font-mono">Supabase</span>. Les modifications enrichissent Supabase.
-      </p>
+      {total === 0 ? (
+        <p className="text-[11px] text-muted-foreground mt-2 leading-snug">
+          Les données affichées ci-dessous sont des <span className="font-mono">données de démonstration</span>.
+          Elles seront remplacées dès validation de l'import depuis OneDrive
+          (<span className="font-mono">{mode === 'canon' ? 'articulation.txt' : 'personnages.txt'}</span> → preview → persistance Supabase).
+          Voir le panneau <span className="font-mono">Import &amp; Reconcile</span> sur le Dashboard.
+        </p>
+      ) : (
+        <p className="text-[10px] text-muted-foreground italic mt-2">
+          Source : <span className="font-mono">OneDrive</span> · Données actives : <span className="font-mono">Supabase</span>. Les modifications enrichissent Supabase.
+        </p>
+      )}
     </div>
   );
 }
