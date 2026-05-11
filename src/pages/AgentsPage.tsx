@@ -212,9 +212,12 @@ export default function AgentsPage() {
                 <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
                   {openaiReady ? 'mode : live' : 'mode : mock'}
                 </span>
-                {agent.status === 'simulated' && (
-                  <span className="text-[10px] text-muted-foreground">orchestration agent encore stubbée</span>
-                )}
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
+                  runtime : {openaiReady ? 'live_test_available' : 'mock'}
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/30">
+                  persistence : {agent.rewriteRights ? 'writes_pending_validation' : 'suggestions_only'}
+                </span>
               </div>
 
               {lastRun && (
