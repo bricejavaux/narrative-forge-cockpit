@@ -172,9 +172,14 @@ export default function AgentsPage() {
                   <Bot size={14} className="text-primary" strokeWidth={1.75} />
                   <span className="font-display text-[14px] text-foreground" style={{ fontWeight: 500 }}>{a.name}</span>
                 </div>
-                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
-                  {openaiReady ? 'live test available' : 'mock'}
-                </span>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
+                    {openaiReady ? 'live OpenAI test' : 'stubbed orchestration'}
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/30">
+                    vector context pending
+                  </span>
+                </div>
               </div>
               <p className="text-xs text-foreground/70 mb-2 leading-snug">{a.objective}</p>
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
