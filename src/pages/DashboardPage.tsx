@@ -57,12 +57,15 @@ export default function DashboardPage() {
     (readiness?.openai?.api_key_configured ? 1 : 0) +
     (readiness?.onedrive?.oauth_configured ? 1 : 0) +
     (readiness?.supabase?.project_connected && readiness?.supabase?.tables_created ? 1 : 0);
-  const gapsCount =
-    (!readiness?.openai?.api_key_configured ? 1 : 0) +
-    (!readiness?.onedrive?.oauth_configured ? 1 : 0) +
-    (!readiness?.indexes?.pgvector_ready ? 1 : 0) +
-    (readiness?.openai?.transcription_pipeline_status &&
-      readiness.openai.transcription_pipeline_status !== 'transcription_live' ? 1 : 0);
+  // Real pending capabilities only (excludes OneDrive/OpenAI/Supabase when live, and excludes auth/notifications/profile)
+  const gaps: string[] = [];
+  if (!readiness?.indexes?.pgvector_ready) gaps.push('pgvector ingestion');
+  if (readiness?.openai?.transcription_pipeline_status &&
+      readiness.openai.transcription_pipeline_status !== 'transcription_live') gaps.push('audio transcription pipeline');
+  if (!readiness?.exports?.supabase_export_persistence_available) gaps.push('run / export persistence');
+  if (readiness?.exports && !readiness.exports.pdf_epub_future) gaps.push('PDF/DOCX/EPUB exports');
+  gaps.push('autonomous rewrite disabled (intentional)');
+  const gapsCount = gaps.length;
   const modeLabel = !readiness ? 'Vérification…'
     : liveCount >= 3 ? 'Live partiel — mock résiduel'
     : liveCount >= 1 ? 'Mode hybride : live + mock'
