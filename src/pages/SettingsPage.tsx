@@ -160,6 +160,12 @@ export default function SettingsPage() {
           directes depuis le frontend limitées. Les écritures sensibles passent par des Edge Functions
           (service role côté serveur).
         </p>
+        <p className="text-rose-600">
+          <span className="font-medium">TODO — .env tracké en git :</span> le fichier <span className="font-mono">.env</span> ne contient
+          que des clés publiques (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY) mais reste suivi par git
+          malgré <span className="font-mono">.gitignore</span>. À retirer manuellement (<span className="font-mono">git rm --cached .env</span>) depuis l'historique.
+          Aucun secret runtime (OPENAI / SERVICE_ROLE / ONEDRIVE) n'y figure.
+        </p>
       </div>
 
       <div className="flex gap-1 overflow-x-auto border-b border-border">
