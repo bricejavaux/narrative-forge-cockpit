@@ -141,6 +141,8 @@ export default function AgentsPage() {
         </div>
       </div>
 
+      <PersistedAgentsPanel />
+
       <div className="flex gap-2 flex-wrap">
         {categories.map((cat) => (
           <button
