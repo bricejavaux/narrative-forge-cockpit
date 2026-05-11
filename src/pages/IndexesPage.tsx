@@ -31,6 +31,17 @@ export default function IndexesPage() {
         </div>
       </div>
 
+      {/* Vector source packages prepared on OneDrive */}
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h3 className="editorial-heading text-foreground text-lg">Paquets vectoriels préparés</h3>
+            <p className="text-xs text-muted-foreground">Corpus chunkés disponibles dans <span className="font-mono">06_vector_sources/</span>. Ingestion pgvector : <span className="text-amber font-mono">pending</span>.</p>
+          </div>
+        </div>
+        <VectorPackagesPanel />
+      </div>
+
       {/* Queue */}
       <div className="cockpit-card">
         <div className="flex items-center justify-between mb-3">
