@@ -141,6 +141,11 @@ export default function AssetsPage() {
           <AlertTriangle size={12} /> {drive.drive_error}
         </div>
       )}
+      {syncSummary && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-foreground">
+          {syncSummary}
+        </div>
+      )}
 
       {activeSection === 'Sources actives' && (
         <div className="space-y-4">
