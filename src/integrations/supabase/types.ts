@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_index_bindings: {
+        Row: {
+          agent_id: string
+          corpus_name: string | null
+          created_at: string
+          id: string
+          index_name: string
+          metadata: Json
+          required: boolean
+          similarity_threshold: number
+          status: string
+          top_k: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          corpus_name?: string | null
+          created_at?: string
+          id?: string
+          index_name: string
+          metadata?: Json
+          required?: boolean
+          similarity_threshold?: number
+          status?: string
+          top_k?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          corpus_name?: string | null
+          created_at?: string
+          id?: string
+          index_name?: string
+          metadata?: Json
+          required?: boolean
+          similarity_threshold?: number
+          status?: string
+          top_k?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_index_bindings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_parameters: {
         Row: {
           agent_id: string | null
@@ -84,57 +134,143 @@ export type Database = {
           },
         ]
       }
+      agent_versions: {
+        Row: {
+          agent_id: string
+          change_reason: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          index_bindings: Json
+          inputs_schema: Json
+          is_current: boolean
+          model_recommendations: Json
+          objective: string | null
+          operating_script: Json
+          outputs_schema: Json
+          parameters: Json
+          permission_policy: Json
+          system_prompt: string | null
+          version_number: number
+        }
+        Insert: {
+          agent_id: string
+          change_reason?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          index_bindings?: Json
+          inputs_schema?: Json
+          is_current?: boolean
+          model_recommendations?: Json
+          objective?: string | null
+          operating_script?: Json
+          outputs_schema?: Json
+          parameters?: Json
+          permission_policy?: Json
+          system_prompt?: string | null
+          version_number: number
+        }
+        Update: {
+          agent_id?: string
+          change_reason?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          index_bindings?: Json
+          inputs_schema?: Json
+          is_current?: boolean
+          model_recommendations?: Json
+          objective?: string | null
+          operating_script?: Json
+          outputs_schema?: Json
+          parameters?: Json
+          permission_policy?: Json
+          system_prompt?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_versions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           category: string
           created_at: string
           criticality: string | null
+          default_model: string | null
+          description: string | null
           external_id: string | null
           future_indexes: Json
           id: string
+          is_active: boolean
           last_run: string | null
           metadata: Json
           name: string
           objective: string | null
           permission_level: string | null
+          persistence_status: string | null
+          quality_profile: string | null
           rewrite_rights: boolean
+          selected_model: string | null
           simulated_cost: string | null
           status: string
           updated_at: string
+          vector_context_status: string | null
         }
         Insert: {
           category: string
           created_at?: string
           criticality?: string | null
+          default_model?: string | null
+          description?: string | null
           external_id?: string | null
           future_indexes?: Json
           id?: string
+          is_active?: boolean
           last_run?: string | null
           metadata?: Json
           name: string
           objective?: string | null
           permission_level?: string | null
+          persistence_status?: string | null
+          quality_profile?: string | null
           rewrite_rights?: boolean
+          selected_model?: string | null
           simulated_cost?: string | null
           status?: string
           updated_at?: string
+          vector_context_status?: string | null
         }
         Update: {
           category?: string
           created_at?: string
           criticality?: string | null
+          default_model?: string | null
+          description?: string | null
           external_id?: string | null
           future_indexes?: Json
           id?: string
+          is_active?: boolean
           last_run?: string | null
           metadata?: Json
           name?: string
           objective?: string | null
           permission_level?: string | null
+          persistence_status?: string | null
+          quality_profile?: string | null
           rewrite_rights?: boolean
+          selected_model?: string | null
           simulated_cost?: string | null
           status?: string
           updated_at?: string
+          vector_context_status?: string | null
         }
         Relationships: []
       }
@@ -1057,6 +1193,57 @@ export type Database = {
           },
         ]
       }
+      impact_analysis: {
+        Row: {
+          affected_object_id: string | null
+          affected_object_type: string | null
+          created_at: string
+          id: string
+          impact_type: string | null
+          metadata: Json
+          proposed_action: string | null
+          proposed_payload: Json
+          severity: string | null
+          source_change_summary: string | null
+          source_object_id: string | null
+          source_object_type: string
+          status: string
+          validated_at: string | null
+        }
+        Insert: {
+          affected_object_id?: string | null
+          affected_object_type?: string | null
+          created_at?: string
+          id?: string
+          impact_type?: string | null
+          metadata?: Json
+          proposed_action?: string | null
+          proposed_payload?: Json
+          severity?: string | null
+          source_change_summary?: string | null
+          source_object_id?: string | null
+          source_object_type: string
+          status?: string
+          validated_at?: string | null
+        }
+        Update: {
+          affected_object_id?: string | null
+          affected_object_type?: string | null
+          created_at?: string
+          id?: string
+          impact_type?: string | null
+          metadata?: Json
+          proposed_action?: string | null
+          proposed_payload?: Json
+          severity?: string | null
+          source_change_summary?: string | null
+          source_object_id?: string | null
+          source_object_type?: string
+          status?: string
+          validated_at?: string | null
+        }
+        Relationships: []
+      }
       import_job_items: {
         Row: {
           confidence: number | null
@@ -1409,6 +1596,48 @@ export type Database = {
           pitch?: string | null
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      retrieval_logs: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          id: string
+          index_names: string[] | null
+          metadata: Json
+          model: string | null
+          query: string | null
+          result_count: number | null
+          run_id: string | null
+          similarity_threshold: number | null
+          top_k: number | null
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          id?: string
+          index_names?: string[] | null
+          metadata?: Json
+          model?: string | null
+          query?: string | null
+          result_count?: number | null
+          run_id?: string | null
+          similarity_threshold?: number | null
+          top_k?: number | null
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          id?: string
+          index_names?: string[] | null
+          metadata?: Json
+          model?: string | null
+          query?: string | null
+          result_count?: number | null
+          run_id?: string | null
+          similarity_threshold?: number | null
+          top_k?: number | null
         }
         Relationships: []
       }
@@ -2032,6 +2261,155 @@ export type Database = {
           target_id?: string | null
           target_type?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      vector_chunks: {
+        Row: {
+          chunk_id: string | null
+          chunk_number: number | null
+          corpus_name: string | null
+          created_at: string
+          document_id: string | null
+          embedding: string | null
+          embedding_model: string | null
+          embedding_status: string
+          id: string
+          index_name: string | null
+          metadata: Json
+          rights: string | null
+          source_file: string | null
+          source_id: string | null
+          target_index: string | null
+          text: string | null
+          text_excerpt: string | null
+          updated_at: string
+          usage: string | null
+        }
+        Insert: {
+          chunk_id?: string | null
+          chunk_number?: number | null
+          corpus_name?: string | null
+          created_at?: string
+          document_id?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          embedding_status?: string
+          id?: string
+          index_name?: string | null
+          metadata?: Json
+          rights?: string | null
+          source_file?: string | null
+          source_id?: string | null
+          target_index?: string | null
+          text?: string | null
+          text_excerpt?: string | null
+          updated_at?: string
+          usage?: string | null
+        }
+        Update: {
+          chunk_id?: string | null
+          chunk_number?: number | null
+          corpus_name?: string | null
+          created_at?: string
+          document_id?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          embedding_status?: string
+          id?: string
+          index_name?: string | null
+          metadata?: Json
+          rights?: string | null
+          source_file?: string | null
+          source_id?: string | null
+          target_index?: string | null
+          text?: string | null
+          text_excerpt?: string | null
+          updated_at?: string
+          usage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vector_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "vector_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vector_documents: {
+        Row: {
+          corpus_name: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          rights: string | null
+          source_file: string | null
+          source_path: string | null
+          source_type: string | null
+          usage: string | null
+        }
+        Insert: {
+          corpus_name?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          rights?: string | null
+          source_file?: string | null
+          source_path?: string | null
+          source_type?: string | null
+          usage?: string | null
+        }
+        Update: {
+          corpus_name?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          rights?: string | null
+          source_file?: string | null
+          source_path?: string | null
+          source_type?: string | null
+          usage?: string | null
+        }
+        Relationships: []
+      }
+      vector_indexes: {
+        Row: {
+          chunk_count: number
+          created_at: string
+          description: string | null
+          dimensions: number | null
+          embedding_model: string | null
+          id: string
+          name: string
+          source_package_count: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          chunk_count?: number
+          created_at?: string
+          description?: string | null
+          dimensions?: number | null
+          embedding_model?: string | null
+          id?: string
+          name: string
+          source_package_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          chunk_count?: number
+          created_at?: string
+          description?: string | null
+          dimensions?: number | null
+          embedding_model?: string | null
+          id?: string
+          name?: string
+          source_package_count?: number
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
