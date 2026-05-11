@@ -196,7 +196,10 @@ export default function RunsPage() {
 
         {/* Historique runs */}
         <div className="space-y-4">
-          <h2 className="editorial-eyebrow">Historique des Runs</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="editorial-eyebrow">Historique des Runs</h2>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">mock history</span>
+          </div>
           <NoteComposer target="run en préparation" compact />
           {runs.map(run => (
             <div key={run.id} className="cockpit-card space-y-2">

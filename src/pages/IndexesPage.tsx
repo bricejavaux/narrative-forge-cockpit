@@ -45,12 +45,12 @@ export default function IndexesPage() {
       {/* Queue */}
       <div className="cockpit-card">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="editorial-eyebrow">File d'indexation — mock</h3>
-          <span className="text-[11px] text-muted-foreground font-mono">aucune file pgvector active</span>
+          <h3 className="editorial-eyebrow">File d'indexation</h3>
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">no active pgvector queue yet</span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Aucune file pgvector active pour l'instant. Les jobs ci-dessous sont des exemples de
-          référence (mock) — ils ne déclenchent aucune réindexation réelle tant que pgvector reste
+          Aucune file pgvector active. Les cartes d'indexes ci-dessous sont des
+          <span className="font-mono"> design examples</span> — aucune réindexation réelle tant que pgvector reste
           <span className="font-mono text-amber"> pending</span>.
         </p>
       </div>
