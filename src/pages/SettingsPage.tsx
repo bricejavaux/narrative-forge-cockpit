@@ -321,7 +321,7 @@ export default function SettingsPage() {
         'Diagnostics', 'Exports', 'Logs & validation humaine',
       ].includes(activeSection) && (
         <div className="cockpit-card p-10 text-center">
-          <p className="text-muted-foreground text-sm">Section "{activeSection}" — simulée</p>
+          <p className="text-muted-foreground text-sm">Section "{activeSection}" — design example (non câblé)</p>
         </div>
       )}
     </div>
