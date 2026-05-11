@@ -24,9 +24,9 @@ export default function CharactersPage() {
           <h1 className="text-3xl editorial-heading text-foreground mt-1">Personnages</h1>
         </div>
         <MicButton label="Note vocale personnage" />
-      </div>
+      <ActiveRecordsBanner mode="characters" />
 
-      <div className="flex gap-1 border-b border-border">
+
         {views.map((v) => (
           <button
             key={v}
