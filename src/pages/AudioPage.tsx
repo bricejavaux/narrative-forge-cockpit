@@ -62,7 +62,9 @@ export default function AudioPage() {
           <div className="cockpit-card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="editorial-eyebrow">Cibles rapides</h3>
-              <span className="text-[10px] font-mono text-muted-foreground">Simulé</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${audioPipelineReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+                {audioPipelineReady ? 'audio live' : 'pending_audio_pipeline'}
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {recordVariants.map(v => (
@@ -105,7 +107,7 @@ export default function AudioPage() {
 
           {/* Audio card detail */}
           <div className="cockpit-card space-y-3">
-            <h3 className="text-sm font-display font-semibold text-foreground">Détail note audio (simulé)</h3>
+            <h3 className="text-sm font-display font-semibold text-foreground">Détail note audio — <span className="font-mono text-xs text-muted-foreground">exemple démo</span></h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-xs text-muted-foreground uppercase">Audio brut</span>
@@ -164,8 +166,11 @@ export default function AudioPage() {
 
       {!['Notes audio', 'Relectures chapitres'].includes(activeSection) && (
         <div className="cockpit-card p-8 text-center">
-          <p className="text-muted-foreground text-sm">Section "{activeSection}" — simulée</p>
-          <p className="text-xs text-muted-foreground mt-2 font-mono">Whisper + Supabase requis</p>
+          <p className="text-muted-foreground text-sm">Section « {activeSection} » — <span className="font-mono">design target</span></p>
+          <p className="text-xs text-muted-foreground mt-2 font-mono">
+            Nécessite : upload audio Supabase Storage + persistance audio_notes / audio_transcripts.
+            Whisper : {audioPipelineReady ? 'live' : 'pending_audio_pipeline'}.
+          </p>
         </div>
       )}
     </div>

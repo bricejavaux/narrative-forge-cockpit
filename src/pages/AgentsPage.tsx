@@ -2,12 +2,66 @@ import { useEffect, useMemo, useState } from 'react';
 import { agents } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
-import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2 } from 'lucide-react';
+import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2, ListChecks, Shield } from 'lucide-react';
 import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID, defaultModelForCategory, defaultProfileForCategory, modelById } from '@/lib/openaiModels';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { openaiService } from '@/services/openaiService';
 
 const categories = ['Tous', 'génération', 'audit', 'diagnostic', 'réécriture', 'style', 'export'];
+
+// Per-category model recommendation set: [fast, balanced, premium, reasoning?]
+function recommendationsFor(category: string): { fast: string; balanced: string; premium: string; reasoning?: string } {
+  switch (category) {
+    case 'génération':   return { fast: 'gpt-4.1-mini', balanced: 'gpt-4.1', premium: 'gpt-5', reasoning: 'o4-mini' };
+    case 'réécriture':   return { fast: 'gpt-4.1-mini', balanced: 'gpt-4.1', premium: 'gpt-5', reasoning: 'o4-mini' };
+    case 'audit':        return { fast: 'gpt-4.1-mini', balanced: 'gpt-4.1', premium: 'o4-mini', reasoning: 'gpt-5' };
+    case 'diagnostic':   return { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1', reasoning: 'o4-mini' };
+    case 'style':        return { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' };
+    case 'export':       return { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' };
+    default:             return { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' };
+  }
+}
+
+function operatingScript(category: string): string[] {
+  if (category === 'génération') return [
+    'Charger l\'objet cible (chapitre / scène / arc)',
+    'Charger le canon actif (Supabase)',
+    'Charger personnages / arcs / chapitres référencés',
+    'Consulter les indexes vectoriels disponibles (si pgvector actif)',
+    'Appeler le modèle OpenAI sélectionné',
+    'Générer un brouillon structuré + métadonnées',
+    'Créer findings / recommandations / rewrite_tasks',
+    'Validation humaine requise',
+    'Persistance optionnelle dans Supabase — jamais d\'écriture directe du texte du chapitre',
+  ];
+  if (category === 'réécriture') return [
+    'Charger l\'objet cible et sa version courante',
+    'Charger canon, personnages, arcs liés',
+    'Consulter indexes vectoriels (si pgvector actif)',
+    'Appeler OpenAI avec instruction de réécriture',
+    'Produire un diff justifié + niveau de confiance',
+    'Créer un rewrite_task (status: pending)',
+    'Validation humaine obligatoire avant intégration',
+    'Aucune modification directe du texte du chapitre',
+  ];
+  if (category === 'export') return [
+    'Charger l\'objet cible (chapitre / canon / scope)',
+    'Mettre en forme selon format (txt / md / json)',
+    'Renvoyer le contenu structuré',
+    'Persistance optionnelle export_jobs',
+    'Upload optionnel OneDrive 04_exports (validation manuelle)',
+  ];
+  return [
+    'Charger l\'objet (ou les objets) cible',
+    'Charger canon actif + personnages / arcs / chapitres liés',
+    'Consulter indexes vectoriels (si pgvector actif)',
+    'Appeler OpenAI avec le profil qualité sélectionné',
+    'Retourner une sortie structurée (JSON)',
+    'Créer findings / recommandations',
+    'Validation humaine requise',
+    'Persistance optionnelle audit_findings — pas d\'écriture du texte',
+  ];
+}
 
 function SliderParam({ label, value, min = 0, max = 100 }: { label: string; value: number; min?: number; max?: number }) {
   return (
@@ -103,7 +157,7 @@ export default function AgentsPage() {
       <div className="grid grid-cols-12 gap-6">
         <div className={`${agent ? 'col-span-5' : 'col-span-12'} grid ${agent ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'} gap-3 auto-rows-min`}>
           {filtered.map((a) => {
-            const runtimeStatus = openaiReady ? 'live_test_available' : 'mock';
+            // openaiReady drives runtime label
             const persistenceStatus = a.rewriteRights ? 'writes_pending_validation' : 'suggestions_only';
             return (
             <button
@@ -118,9 +172,14 @@ export default function AgentsPage() {
                   <Bot size={14} className="text-primary" strokeWidth={1.75} />
                   <span className="font-display text-[14px] text-foreground" style={{ fontWeight: 500 }}>{a.name}</span>
                 </div>
-                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
-                  {openaiReady ? 'live test available' : 'mock'}
-                </span>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
+                    {openaiReady ? 'live OpenAI test' : 'stubbed orchestration'}
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/30">
+                    vector context pending
+                  </span>
+                </div>
               </div>
               <p className="text-xs text-foreground/70 mb-2 leading-snug">{a.objective}</p>
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -185,38 +244,59 @@ export default function AgentsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
-                  <p className="editorial-eyebrow mb-1">Profil qualité</p>
-                  <p className="font-mono text-foreground">{profile}</p>
-                </div>
-                <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
-                  <p className="editorial-eyebrow mb-1">Adéquation</p>
-                  <p className="text-foreground/80">
-                    {profile && modelMeta?.suitableFor?.includes(profile)
-                      ? `${modelMeta.label} adapté à ${profile}.`
-                      : `${modelMeta?.label ?? currentModel} possible mais non optimal pour ${profile ?? 'ce profil'}.`}
-                  </p>
-                </div>
-              </div>
+              {(() => {
+                const rec = recommendationsFor(agent.category);
+                const Pill = ({ id, label }: { id: string; label: string }) => {
+                  const isSel = currentModel === id;
+                  const meta = modelById(id);
+                  return (
+                    <button
+                      onClick={() => setModel(agent.id, id)}
+                      className={`text-left rounded-md border px-2 py-1.5 text-[11px] transition-colors ${isSel ? 'border-primary/50 bg-primary/10 text-primary' : 'border-border hover:border-primary/30 text-foreground/80'}`}
+                      title={meta?.note}
+                    >
+                      <div className="font-mono">{label}: {id}</div>
+                      <div className="text-[10px] text-muted-foreground">{meta?.costEstimate} · {meta?.latencyEstimate}{meta?.availability === 'configurable' ? ' · configurable' : ''}</div>
+                    </button>
+                  );
+                };
+                return (
+                  <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                    <p className="editorial-eyebrow mb-1">Modèles recommandés · profil <span className="font-mono">{profile}</span></p>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5">
+                      <Pill id={rec.fast} label="fast" />
+                      <Pill id={rec.balanced} label="balanced" />
+                      <Pill id={rec.premium} label="premium" />
+                      {rec.reasoning && <Pill id={rec.reasoning} label="reasoning" />}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      Critères : coût · latence · besoin de raisonnement · contexte long · qualité créative · fiabilité JSON.
+                      {modelMeta?.availability === 'configurable' && ' Le modèle sélectionné est configurable — disponibilité non garantie selon votre compte OpenAI.'}
+                    </p>
+                  </div>
+                );
+              })()}
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
                 <button
                   onClick={launchAgent}
                   disabled={running}
                   className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
                 >
                   {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                  {openaiReady ? 'Exécuter (live OpenAI)' : 'Exécuter (mock)'}
+                  {openaiReady ? 'Exécuter test live OpenAI' : 'Tester agent — stub'}
                 </button>
-                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
-                  {openaiReady ? 'mode : live' : 'mode : mock'}
-                </span>
                 <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
-                  runtime : {openaiReady ? 'live_test_available' : 'mock'}
+                  runtime : {openaiReady ? 'live OpenAI test' : 'stubbed orchestration'}
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/30">
-                  persistence : {agent.rewriteRights ? 'writes_pending_validation' : 'suggestions_only'}
+                  vector context pending
+                </span>
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${agent.rewriteRights ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
+                  {agent.rewriteRights ? 'writes pending validation' : 'suggestions only'}
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">
+                  no persistence yet
                 </span>
               </div>
 
@@ -263,14 +343,36 @@ export default function AgentsPage() {
               </div>
 
               <div>
-                <p className="editorial-eyebrow mb-1.5">Indexes consultés</p>
+                <p className="editorial-eyebrow mb-1.5">Indexes consultés (cibles design)</p>
                 <div className="flex flex-wrap gap-1.5">
                   {agent.futureIndexes.map((idx) => (
                     <span key={idx} className="px-2 py-0.5 rounded text-[11px] font-mono bg-primary/10 text-primary border border-primary/20">
-                      {idx}
+                      {idx} · pending
                     </span>
                   ))}
                 </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Contexte d'exécution actuel : payload sélectionné + objets Supabase / fallback démo. Récupération vectorielle <span className="font-mono text-amber">pending</span> (pgvector non actif).
+                </p>
+              </div>
+
+              {/* Operating script */}
+              <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                <p className="editorial-eyebrow flex items-center gap-1 mb-1.5"><ListChecks size={10} /> Script de fonctionnement</p>
+                <ol className="text-[11px] space-y-0.5 text-foreground/85 list-decimal list-inside marker:text-muted-foreground">
+                  {operatingScript(agent.category).map((s, i) => (<li key={i}>{s}</li>))}
+                </ol>
+              </div>
+
+              {/* Persistence policy */}
+              <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                <p className="editorial-eyebrow flex items-center gap-1 mb-1"><Shield size={10} /> Politique de persistance</p>
+                <ul className="text-[11px] space-y-0.5 text-foreground/85 list-disc list-inside marker:text-muted-foreground">
+                  <li>{agent.rewriteRights ? 'Peut produire des rewrite_tasks (jamais d\'écriture directe du texte du chapitre)' : 'Suggestions only — pas de réécriture'}</li>
+                  <li>Écrit findings / recommandations seulement après validation</li>
+                  <li>Validation humaine obligatoire avant toute intégration</li>
+                  <li>Mode autonome : <span className="font-mono">future</span></li>
+                </ul>
               </div>
 
               {agent.rewriteRights && (

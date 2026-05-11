@@ -45,19 +45,23 @@ export default function IndexesPage() {
       {/* Queue */}
       <div className="cockpit-card">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="editorial-eyebrow">File d'indexation</h3>
+          <h3 className="editorial-eyebrow">File d'indexation pgvector</h3>
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">no active pgvector queue yet</span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Aucune file pgvector active. Les cartes d'indexes ci-dessous sont des
-          <span className="font-mono"> design examples</span> — aucune réindexation réelle tant que pgvector reste
-          <span className="font-mono text-amber"> pending</span>.
+          Chunks préparés dans OneDrive · métadonnées synchronisées dans Supabase · aucune recherche sémantique active.
+          Les cartes ci-dessous sont des <span className="font-mono">design targets</span> — pas d'index pgvector créé, pas d'embeddings,
+          non utilisables par les agents tant que pgvector reste <span className="font-mono text-amber">pending</span>.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {indexes.map((idx) => (
-          <div key={idx.id} className={`cockpit-card space-y-3 ${idx.warning ? 'border-amber/30' : ''}`}>
+          <div key={idx.id} className={`cockpit-card space-y-3 relative ${idx.warning ? 'border-amber/30' : ''}`}>
+            <div className="absolute -top-2 right-3 flex gap-1">
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border bg-violet-500/10 text-violet-600 border-violet-500/30">future index</span>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/30">pgvector pending</span>
+            </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Database size={14} className="text-primary" strokeWidth={1.75} />
