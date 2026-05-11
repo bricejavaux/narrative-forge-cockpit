@@ -1,12 +1,57 @@
-import { useState } from 'react';
-import { connectors } from '@/data/dummyData';
+import { useEffect, useState } from 'react';
+import { connectors as staticConnectors, type ConnectorStatus } from '@/data/dummyData';
 import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
 import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
 import OpenAITestPanel from '@/components/shared/OpenAITestPanel';
 import DataFlowDoctrineBanner from '@/components/shared/DataFlowDoctrineBanner';
 import { getRuntimeMode, setRuntimeMode, type RuntimeMode } from '@/lib/runtimeMode';
+import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { Sliders, Mic } from 'lucide-react';
+
+function deriveConnectorStatus(id: string, r: ConnectionReadiness | null): { status: ConnectorStatus; note: string } {
+  if (!r) return { status: 'simulated', note: 'readiness en cours de vérification…' };
+  const oai = r.openai.api_key_configured;
+  const onedriveOk = r.onedrive.oauth_configured;
+  const supaOk = r.supabase.project_connected;
+  switch (id) {
+    case 'openai':
+      return oai
+        ? { status: 'connected', note: `Live — modèle ${r.openai.model ?? 'défaut'}` }
+        : { status: 'not_connected', note: 'OPENAI_API_KEY à configurer en secret Edge Function' };
+    case 'supabase-db':
+      return supaOk && r.supabase.tables_created
+        ? { status: 'connected', note: 'Tables actives — RLS sans policies frontend' }
+        : { status: 'not_connected', note: 'Backend non détecté' };
+    case 'supabase-auth':
+      return r.supabase.auth_configured
+        ? { status: 'connected', note: 'Auth configurée' }
+        : { status: 'simulated', note: 'Optionnel — auth non configurée pour cette phase' };
+    case 'supabase-storage':
+      return r.supabase.storage_buckets_created
+        ? { status: 'connected', note: 'Buckets disponibles (audio, source-files, exports…)' }
+        : { status: 'simulated', note: 'Buckets non vérifiés' };
+    case 'onedrive':
+      return onedriveOk
+        ? { status: 'connected', note: 'Listing + download en direct depuis OneDrive' }
+        : { status: 'not_connected', note: 'OAuth non configuré' };
+    case 'chroma-archive':
+      return { status: 'simulated', note: 'Archives techniques conservées dans OneDrive — non interrogées' };
+    case 'export-engine':
+      return { status: 'connected', note: 'txt / md / json live · PDF / DOCX / EPUB futur' };
+    case 'audio-transcription': {
+      const s = r.openai.transcription_pipeline_status;
+      if (s === 'transcription_live') return { status: 'connected', note: 'Pipeline Whisper actif (download + transcription + persistance)' };
+      if (!oai) return { status: 'not_connected', note: 'Whisper en attente de OPENAI_API_KEY' };
+      if (s === 'storage_missing') return { status: 'warning', note: 'OpenAI live — bucket audio manquant' };
+      return { status: 'warning', note: 'OpenAI live — pipeline audio en préparation' };
+    }
+    case 'vector-index':
+      return { status: 'warning', note: 'Paquets vectoriels préparés — pgvector pending' };
+    default:
+      return { status: 'simulated', note: 'à finaliser' };
+  }
+}
 
 function NarrativeSlider({ label, value, min = 0, max = 100 }: { label: string; value: number; min?: number; max?: number }) {
   return (
