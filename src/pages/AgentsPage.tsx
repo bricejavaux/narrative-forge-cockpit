@@ -102,7 +102,10 @@ export default function AgentsPage() {
 
       <div className="grid grid-cols-12 gap-6">
         <div className={`${agent ? 'col-span-5' : 'col-span-12'} grid ${agent ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'} gap-3 auto-rows-min`}>
-          {filtered.map((a) => (
+          {filtered.map((a) => {
+            const runtimeStatus = openaiReady ? 'live_test_available' : 'mock';
+            const persistenceStatus = a.rewriteRights ? 'writes_pending_validation' : 'suggestions_only';
+            return (
             <button
               key={a.id}
               onClick={() => setSelectedAgent(a.id)}
@@ -115,16 +118,19 @@ export default function AgentsPage() {
                   <Bot size={14} className="text-primary" strokeWidth={1.75} />
                   <span className="font-display text-[14px] text-foreground" style={{ fontWeight: 500 }}>{a.name}</span>
                 </div>
-                <StatusBadge status={a.status} />
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-600 border-slate-500/30'}`}>
+                  {openaiReady ? 'live test available' : 'mock'}
+                </span>
               </div>
               <p className="text-xs text-foreground/70 mb-2 leading-snug">{a.objective}</p>
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span className="font-mono">{a.simulatedCost}</span>
-                <StatusBadge status={a.criticality === 'haute' ? 'high' : a.criticality === 'moyenne' ? 'medium' : 'low'} />
+                <span className="text-[10px] uppercase tracking-wider">{persistenceStatus.replace(/_/g, ' ')}</span>
                 {a.rewriteRights && <span className="text-amber">écriture</span>}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
 
         {agent && (
