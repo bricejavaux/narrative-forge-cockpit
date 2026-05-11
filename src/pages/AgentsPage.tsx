@@ -2,12 +2,66 @@ import { useEffect, useMemo, useState } from 'react';
 import { agents } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
-import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2 } from 'lucide-react';
+import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2, ListChecks, Shield } from 'lucide-react';
 import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID, defaultModelForCategory, defaultProfileForCategory, modelById } from '@/lib/openaiModels';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { openaiService } from '@/services/openaiService';
 
 const categories = ['Tous', 'génération', 'audit', 'diagnostic', 'réécriture', 'style', 'export'];
+
+// Per-category model recommendation set: [fast, balanced, premium, reasoning?]
+function recommendationsFor(category: string): { fast: string; balanced: string; premium: string; reasoning?: string } {
+  switch (category) {
+    case 'génération':   return { fast: 'gpt-4.1-mini', balanced: 'gpt-4.1', premium: 'gpt-5', reasoning: 'o4-mini' };
+    case 'réécriture':   return { fast: 'gpt-4.1-mini', balanced: 'gpt-4.1', premium: 'gpt-5', reasoning: 'o4-mini' };
+    case 'audit':        return { fast: 'gpt-4.1-mini', balanced: 'gpt-4.1', premium: 'o4-mini', reasoning: 'gpt-5' };
+    case 'diagnostic':   return { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1', reasoning: 'o4-mini' };
+    case 'style':        return { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' };
+    case 'export':       return { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' };
+    default:             return { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' };
+  }
+}
+
+function operatingScript(category: string): string[] {
+  if (category === 'génération') return [
+    'Charger l\'objet cible (chapitre / scène / arc)',
+    'Charger le canon actif (Supabase)',
+    'Charger personnages / arcs / chapitres référencés',
+    'Consulter les indexes vectoriels disponibles (si pgvector actif)',
+    'Appeler le modèle OpenAI sélectionné',
+    'Générer un brouillon structuré + métadonnées',
+    'Créer findings / recommandations / rewrite_tasks',
+    'Validation humaine requise',
+    'Persistance optionnelle dans Supabase — jamais d\'écriture directe du texte du chapitre',
+  ];
+  if (category === 'réécriture') return [
+    'Charger l\'objet cible et sa version courante',
+    'Charger canon, personnages, arcs liés',
+    'Consulter indexes vectoriels (si pgvector actif)',
+    'Appeler OpenAI avec instruction de réécriture',
+    'Produire un diff justifié + niveau de confiance',
+    'Créer un rewrite_task (status: pending)',
+    'Validation humaine obligatoire avant intégration',
+    'Aucune modification directe du texte du chapitre',
+  ];
+  if (category === 'export') return [
+    'Charger l\'objet cible (chapitre / canon / scope)',
+    'Mettre en forme selon format (txt / md / json)',
+    'Renvoyer le contenu structuré',
+    'Persistance optionnelle export_jobs',
+    'Upload optionnel OneDrive 04_exports (validation manuelle)',
+  ];
+  return [
+    'Charger l\'objet (ou les objets) cible',
+    'Charger canon actif + personnages / arcs / chapitres liés',
+    'Consulter indexes vectoriels (si pgvector actif)',
+    'Appeler OpenAI avec le profil qualité sélectionné',
+    'Retourner une sortie structurée (JSON)',
+    'Créer findings / recommandations',
+    'Validation humaine requise',
+    'Persistance optionnelle audit_findings — pas d\'écriture du texte',
+  ];
+}
 
 function SliderParam({ label, value, min = 0, max = 100 }: { label: string; value: number; min?: number; max?: number }) {
   return (
