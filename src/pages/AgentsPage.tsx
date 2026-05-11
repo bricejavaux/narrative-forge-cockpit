@@ -343,14 +343,36 @@ export default function AgentsPage() {
               </div>
 
               <div>
-                <p className="editorial-eyebrow mb-1.5">Indexes consultés</p>
+                <p className="editorial-eyebrow mb-1.5">Indexes consultés (cibles design)</p>
                 <div className="flex flex-wrap gap-1.5">
                   {agent.futureIndexes.map((idx) => (
                     <span key={idx} className="px-2 py-0.5 rounded text-[11px] font-mono bg-primary/10 text-primary border border-primary/20">
-                      {idx}
+                      {idx} · pending
                     </span>
                   ))}
                 </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Contexte d'exécution actuel : payload sélectionné + objets Supabase / fallback démo. Récupération vectorielle <span className="font-mono text-amber">pending</span> (pgvector non actif).
+                </p>
+              </div>
+
+              {/* Operating script */}
+              <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                <p className="editorial-eyebrow flex items-center gap-1 mb-1.5"><ListChecks size={10} /> Script de fonctionnement</p>
+                <ol className="text-[11px] space-y-0.5 text-foreground/85 list-decimal list-inside marker:text-muted-foreground">
+                  {operatingScript(agent.category).map((s, i) => (<li key={i}>{s}</li>))}
+                </ol>
+              </div>
+
+              {/* Persistence policy */}
+              <div className="rounded-lg border border-border bg-secondary/30 p-2.5">
+                <p className="editorial-eyebrow flex items-center gap-1 mb-1"><Shield size={10} /> Politique de persistance</p>
+                <ul className="text-[11px] space-y-0.5 text-foreground/85 list-disc list-inside marker:text-muted-foreground">
+                  <li>{agent.rewriteRights ? 'Peut produire des rewrite_tasks (jamais d\'écriture directe du texte du chapitre)' : 'Suggestions only — pas de réécriture'}</li>
+                  <li>Écrit findings / recommandations seulement après validation</li>
+                  <li>Validation humaine obligatoire avant toute intégration</li>
+                  <li>Mode autonome : <span className="font-mono">future</span></li>
+                </ul>
               </div>
 
               {agent.rewriteRights && (
