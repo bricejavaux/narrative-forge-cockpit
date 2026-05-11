@@ -53,11 +53,30 @@ export default function DashboardPage() {
   const riskArcs = arcs.filter(a => a.status === 'warning' || a.status === 'critical');
   const criticalWarnings = buildWarnings(readiness);
 
+  const liveCount =
+    (readiness?.openai?.api_key_configured ? 1 : 0) +
+    (readiness?.onedrive?.oauth_configured ? 1 : 0) +
+    (readiness?.supabase?.project_connected && readiness?.supabase?.tables_created ? 1 : 0);
+  const gapsCount =
+    (!readiness?.openai?.api_key_configured ? 1 : 0) +
+    (!readiness?.onedrive?.oauth_configured ? 1 : 0) +
+    (!readiness?.indexes?.pgvector_ready ? 1 : 0) +
+    (readiness?.openai?.transcription_pipeline_status &&
+      readiness.openai.transcription_pipeline_status !== 'transcription_live' ? 1 : 0);
+  const modeLabel = !readiness ? 'Vérification…'
+    : liveCount >= 3 ? 'Live partiel — mock résiduel'
+    : liveCount >= 1 ? 'Mode hybride : live + mock'
+    : 'Mock fallback';
+  const lastChecked = readiness?.checked_at ? new Date(readiness.checked_at) : new Date();
+
   return (
     <div className="space-y-6 animate-slide-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-display font-bold text-foreground">Dashboard</h1>
-        <span className="text-xs font-mono text-muted-foreground">Dernière mise à jour : 2026-04-14 10:30</span>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-display font-bold text-foreground">Dashboard</h1>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border bg-primary/5 border-primary/30 text-primary">{modeLabel}</span>
+        </div>
+        <span className="text-xs font-mono text-muted-foreground">Vérifié : {lastChecked.toLocaleString()}</span>
       </div>
 
       <WarningBanner warnings={criticalWarnings} />
@@ -78,7 +97,7 @@ export default function DashboardPage() {
         <KpiCard label="Alertes" value={project.criticalAlerts} icon={AlertTriangle} color="destructive" />
         <KpiCard label="Dette Narrative" value={project.narrativeDebt} icon={TrendingDown} color="amber" subtitle="points de dette" />
         <KpiCard label="Audio non traités" value={project.untreatedAudioComments} icon={Mic} color="rose" />
-        <KpiCard label="Connecteurs" value={`${connectors.filter(c => c.status === 'not_connected').length} / ${connectors.length}`} icon={Plug} color="destructive" subtitle="déconnectés" />
+        <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
