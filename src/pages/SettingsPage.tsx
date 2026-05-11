@@ -124,6 +124,12 @@ const sections = [
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState(sections[0]);
+  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  useEffect(() => { supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
+  const liveConnectors = staticConnectors.map((c) => {
+    const d = deriveConnectorStatus(c.id, readiness);
+    return { ...c, status: d.status, note: d.note };
+  });
 
   return (
     <div className="space-y-6 animate-slide-in">
