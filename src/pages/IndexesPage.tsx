@@ -44,7 +44,6 @@ export default function IndexesPage() {
       </div>
 
       <VectorIngestionPanel />
-      </div>
 
       {/* Queue */}
       <div className="cockpit-card">
