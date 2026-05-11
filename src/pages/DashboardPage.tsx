@@ -57,12 +57,15 @@ export default function DashboardPage() {
     (readiness?.openai?.api_key_configured ? 1 : 0) +
     (readiness?.onedrive?.oauth_configured ? 1 : 0) +
     (readiness?.supabase?.project_connected && readiness?.supabase?.tables_created ? 1 : 0);
-  const gapsCount =
-    (!readiness?.openai?.api_key_configured ? 1 : 0) +
-    (!readiness?.onedrive?.oauth_configured ? 1 : 0) +
-    (!readiness?.indexes?.pgvector_ready ? 1 : 0) +
-    (readiness?.openai?.transcription_pipeline_status &&
-      readiness.openai.transcription_pipeline_status !== 'transcription_live' ? 1 : 0);
+  // Real pending capabilities only (excludes OneDrive/OpenAI/Supabase when live, and excludes auth/notifications/profile)
+  const gaps: string[] = [];
+  if (!readiness?.indexes?.pgvector_ready) gaps.push('pgvector ingestion');
+  if (readiness?.openai?.transcription_pipeline_status &&
+      readiness.openai.transcription_pipeline_status !== 'transcription_live') gaps.push('audio transcription pipeline');
+  if (!readiness?.exports?.supabase_export_persistence_available) gaps.push('run / export persistence');
+  if (readiness?.exports && !readiness.exports.pdf_epub_future) gaps.push('PDF/DOCX/EPUB exports');
+  gaps.push('autonomous rewrite disabled (intentional)');
+  const gapsCount = gaps.length;
   const modeLabel = !readiness ? 'Vérification…'
     : liveCount >= 3 ? 'Live partiel — mock résiduel'
     : liveCount >= 1 ? 'Mode hybride : live + mock'
@@ -127,7 +130,10 @@ export default function DashboardPage() {
 
           {/* Chapitres faibles */}
           <div className="cockpit-card space-y-3">
-            <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Chapitres faibles (score &lt; 60)</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Chapitres faibles (score &lt; 60)</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">mock fallback</span>
+            </div>
             {weakChapters.map(ch => (
               <div key={ch.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                 <div className="flex items-center gap-3">
@@ -144,7 +150,10 @@ export default function DashboardPage() {
 
           {/* Derniers runs */}
           <div className="cockpit-card space-y-3">
-            <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Derniers Runs</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Derniers Runs</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">historique mock</span>
+            </div>
             {runs.slice(0, 4).map(run => (
               <div key={run.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                 <div className="flex items-center gap-3">
@@ -160,6 +169,19 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+
+          {/* Capabilities to finalize */}
+          <details className="cockpit-card">
+            <summary className="text-xs uppercase tracking-wider text-muted-foreground cursor-pointer flex items-center justify-between">
+              <span>Capacités à finaliser</span>
+              <span className="font-mono text-[10px] text-amber">{gapsCount}</span>
+            </summary>
+            <ul className="mt-2 space-y-1 text-xs text-foreground">
+              {gaps.map((g, i) => (
+                <li key={i} className="flex items-center gap-2"><span className="w-1 h-1 rounded-full bg-amber" /> {g}</li>
+              ))}
+            </ul>
+          </details>
         </div>
 
         {/* Right column */}
@@ -202,7 +224,10 @@ export default function DashboardPage() {
 
           {/* Activité récente */}
           <div className="cockpit-card space-y-2">
-            <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Activité Récente</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Activité Récente</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">activité exemple</span>
+            </div>
             {recentActivity.slice(0, 6).map(a => (
               <div key={a.id} className="flex items-start gap-2 py-1.5 border-b border-border/50 last:border-0">
                 <div className="mt-0.5">

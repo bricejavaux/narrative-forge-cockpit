@@ -1,73 +1,93 @@
-## Pre-connection stabilization pass
+# Structural Iteration — Plan
 
-This is a large structural pass before connecting OpenAI, Supabase and OneDrive. I'll keep all existing routes, the editorial pastel design and reusable components untouched, and focus on data correction, explicit linking, richer simulation and code structure.
+This iteration covers 16 sections. I'll execute it as a single large migration + multi-file code update, in clear phases.
 
-### Scope summary
+## Phase A — Security
+- Add Settings warning text exactly as specified (".env was previously tracked…").
+- Note: I cannot run `git rm --cached .env` (no stateful git allowed). I'll instruct the user to run it themselves and surface that prominently in Settings + chat.
+- Verify `.env.example` (already exists) and `.gitignore` already excludes `.env`.
 
-1. **Canon corrections in characters & chapters**
-   - Rewrite Brice's secret (Lagrange-4 04:17 witness, ΔS non-noisy, regulation-like behavior, chose silence — no "Pinch-off from inside")
-   - Rewrite Amina (science & dignity, not SAS doctor)
-   - Rewrite Karim (UN treaty weaver, not intelligence)
-   - Rewrite Mila (finance / fund / term sheet / automated tolls / capture)
-   - Refine secondaries: Jonas Rieck as Movery chief security; Anvers syndical leader; SAS operator (separate); Éléa & Alice
-   - Apply requested macro/micro chapter scale corrections (ch1 micro, ch4 macro, ch7 macro, ch8 mixte, ch10 macro, ch12 macro, etc.)
+## Phase B — Database migration (single migration)
 
-2. **Explicit object linking**
-   - Add `linkedChapterIds`, `linkedCharacterIds`, `linkedArcIds`, `linkedAssetIds`, `linkedAudioNoteIds` to canon rules, characters, arcs, audio notes
-   - Populate explicit links (Lagrange-4, Walvis Bay, SAS, Trust, Trace) instead of slice-based generic links
-   - Update `CanonPage`, `CharactersPage`, `ArchitecturePage` to consume explicit IDs
+New tables / columns:
+- `agents` — add columns: `description`, `default_model`, `selected_model`, `quality_profile`, `persistence_status`, `vector_context_status`, `is_active` (keep existing structure).
+- `agent_versions` (new, with `is_current`, `version_number`, prompts, scripts, schemas).
+- `agent_index_bindings` (new).
+- `vector_indexes`, `vector_documents`, `vector_chunks` (with `embedding vector(1536)` if extension available; fallback to `jsonb` if not), `retrieval_logs`.
+- `impact_analysis` (new).
+- Enable `vector` extension (idempotent).
+- No RLS yet (matches existing tables — none have RLS). Document for user.
 
-3. **Diagnostics rewrite**
-   - Replace "tome 2" / "conspiration" copy with project-specific language
-   - Each score block shows: why this score, narrative risk, recommendation, linked chapters/arcs/audio, proposed rewrite task
-   - Add dimensions: Lagrange-4 → Walvis Bay hierarchy, macro/micro alternation, one tech detail per scene, cost per activation, phrase-couteau ending, B+ Trace non-humanized, system log consistency
+## Phase C — Edge Functions
+- `vector-ingest-package` (modes: metadata_only | embed_and_store, dry_run).
+- `vector-search` (embeds query, cosine top-k, logs retrieval).
+- Update `openai-agent-run` to: load agent config from Supabase, resolve index bindings, optionally call vector-search, return rich output with `vector_context_used`, `indexes_active`, `indexes_pending`, `retrieved_chunks`, warnings.
+- New `agents-bootstrap` function: idempotently insert default agents + versions into Supabase from the existing dummy catalog.
 
-4. **Architecture enrichment**
-   - Chapters table: macro/micro, main arc, cost type, technical detail focus, phrase-couteau status, audio review
-   - Beats tab: 3–5 simulated beats per selected chapter
-   - Revelations/Payoffs: setup, payoff, delay, risk, status, related arc
-   - Consequences: open consequences by chapter (political/social/physical/biosecurity/family)
+## Phase D — Services
+- `src/services/agentsService.ts` (new): list/load/save agents + versions + bindings; bootstrap.
+- `src/services/vectorIngestionService.ts` (new): ingest, search, list indexes.
+- `src/services/impactAnalysisService.ts` (new): list, create, validate.
+- Extend `supabaseService.getReadiness()` capability map (audio pipeline, run persistence, pgvector activeness flags).
 
-5. **Audio & reviews enrichment**
-   - Filters: target type / status / treatment status
-   - "Remarks not yet taken into account" panel
-   - Text + voice review available on each item
+## Phase E — UI changes
 
-6. **Assets & Indexes**
-   - Explicit OneDrive sources: `articulation.txt`, `personnages.txt`, `cover.jpg`, `follett/chroma.sqlite3`, `science_portals/chroma.sqlite3`, `sf_portals_fiction/chroma.sqlite3`, simulated EPUB/PDF refs
-   - Chroma files labelled as OneDrive technical archive (not active Supabase index), with "migration/re-vectorization required" status
-   - Indexes: linked assets, linked agents, freshness, status, pending refresh, queue, migration strategy
-   - Two future technical options: re-vectorize from sources / extract chunks+embeddings from existing Chroma archives
+Dashboard (`DashboardPage.tsx`):
+- Remove static date `2026-04-14 10:30`; use `readiness.checked_at` / `new Date()`.
+- Dynamic title: Live / Hybride / À finaliser based on readiness.
+- Capability count excludes OneDrive/OpenAI/Supabase when live; excludes notifications/profile/auth.
+- Clickable details panel listing real pending capabilities.
+- Label dummy KPIs / activity / runs as `mock fallback`, `activité exemple`, `historique mock`.
 
-7. **Settings readiness sections**
-   - Supabase / OpenAI / OneDrive readiness
-   - Audio retention, transcription validation, index refresh, rewrite governance, run logging, human validation, export priority
-   - Note the 3-layer architecture (Supabase active / OneDrive sources & archives / OpenAI intelligence)
+Settings (`SettingsPage.tsx`):
+- Capability-level cards driven by `connection-status`.
+- Add explicit `.env` warning message.
+- Chroma → `archived_not_active` (not "simulé").
+- Pipeline indexation → `prepared_pgvector_pending`.
+- Whisper logic: don't say "OpenAI requis" when live.
+- Disable deep rewrite toggle with tooltip.
 
-8. **Code restructure (non-breaking)**
-   - Split `src/data/dummyData.ts` into per-domain files in `src/data/` (project, connectors, chapters, characters, arcs, canon, agents, runs, diagnostics, audioNotes, assets, indexes, exports)
-   - Keep `src/data/dummyData.ts` as a barrel re-export so existing pages keep importing unchanged
-   - Create `src/types/` with shared interfaces
-   - Create mocked service stubs (no network): `openaiService.ts`, `supabaseService.ts`, `oneDriveService.ts`, `audioTranscriptionService.ts`, `indexingService.ts`, `exportService.ts`
+Agents (`AgentsPage.tsx`):
+- Load from Supabase first via `agentsService`, fallback to dummy.
+- "Initialize default agents" button → calls `agents-bootstrap`.
+- Editable detail panel: objective, system prompt, operating script (JSON), inputs/outputs schemas, model selection, vector bindings, top_k, similarity threshold, permission policy.
+- Save new version / Restore / Compare / Test buttons.
+- Model adequacy block + Data sources block + Current vs future context note.
 
-9. **Data quality vitest tests**
-   - Every chapter has a main arc
-   - Every critical canon rule has an index
-   - Every character has role/function/trajectory/linked chapters
-   - Every agent references existing future indexes
-   - Every audio note has a target
-   - Every explicit linked ID points to an existing object
+Indexes (`IndexesPage.tsx`):
+- Add ingestion actions per vector package: metadata-only, sample embeddings, full embeddings, search test, bind to agents.
+- Cautions for `follett`, `sf_portals_fiction`. Recommend `science_portals` first.
+- Future index cards with `future` / `pending_pgvector` / `active` labels driven by chunk counts.
 
-### Out of scope
-- No real API connections (OpenAI, Supabase, OneDrive)
-- No real transcription / vector search / export
-- No visual redesign — current pastel editorial design preserved
-- No route/layout changes
+Canon (`CanonPage.tsx`):
+- Add "Impacts potentiels" panel reading `impact_analysis` table.
+- On canon edit (existing form), enqueue an impact analysis row, set `needs_index_refresh=true`.
+- Validate / Ignore / Create rewrite_task buttons.
 
-### Technical details
+Architecture (`ArchitecturePage.tsx`):
+- Replace "future connection required" with Supabase-first / mock-fallback logic.
+- Add "Import from articulation.txt" + "Generate proposal from canon" actions (wire to existing import-source where possible; otherwise stub with clear status).
 
-- Backward compatibility kept via `src/data/dummyData.ts` barrel: pages don't need import path changes
-- New explicit-link fields are additive; existing slice-based code paths are replaced where the linking is used
-- Services are typed stubs that return mocked promises so future wiring is a swap, not a rewrite
+NoteComposer:
+- Already mostly correct. Tighten copy: never say "OpenAI requis" when OpenAI live. Audio tab message: "Audio transcription pending — use text note or upload audio file."
 
-This is a sizable pass touching ~15 files. Ready to execute on approval.
+Header:
+- Tooltip on project/tome dropdowns. Mark notifications + profile as `future` if no notification system / no auth.
+
+## Phase F — Mock data policy
+- Add `MOCK_LABEL` utility to label fallback regions consistently. Audit each dummy-driven block to use it.
+
+## Phase G — Acceptance verification
+- Build check via harness.
+- Smoke check Settings, Dashboard, Agents detail, Indexes ingestion controls visible.
+
+## Out of scope (explicit)
+- Do not run ingestion automatically.
+- Do not enable autonomous rewrite.
+- Do not modify chapters/characters automatically.
+- Do not migrate Chroma.
+- Do not remove mock mode.
+- No RLS added (current schema has none; introducing it now would break the app — user can request a dedicated security pass later).
+
+## Approval needed
+The DB migration is large (3 new domains: agent versioning, vector RAG, impact analysis) and enables the `vector` extension. Approve to proceed.

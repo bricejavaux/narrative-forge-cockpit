@@ -161,10 +161,10 @@ export default function SettingsPage() {
           (service role côté serveur).
         </p>
         <p className="text-rose-600">
-          <span className="font-medium">TODO — .env tracké en git :</span> le fichier <span className="font-mono">.env</span> ne contient
-          que des clés publiques (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY) mais reste suivi par git
-          malgré <span className="font-mono">.gitignore</span>. À retirer manuellement (<span className="font-mono">git rm --cached .env</span>) depuis l'historique.
-          Aucun secret runtime (OPENAI / SERVICE_ROLE / ONEDRIVE) n'y figure.
+          <span className="font-medium">.env was previously tracked.</span> Remove it from git tracking
+          (<span className="font-mono">git rm --cached .env</span> then commit). Only public
+          <span className="font-mono"> VITE_*</span> values may appear in frontend environment files.
+          Runtime secrets must remain in Edge Function / Lovable Cloud secrets.
         </p>
       </div>
 
