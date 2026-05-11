@@ -45,27 +45,14 @@ export default function IndexesPage() {
       {/* Queue */}
       <div className="cockpit-card">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="editorial-eyebrow">File d'indexation simulée</h3>
-          <span className="text-[11px] text-muted-foreground font-mono">3 jobs en attente · 1 actif</span>
+          <h3 className="editorial-eyebrow">File d'indexation — mock</h3>
+          <span className="text-[11px] text-muted-foreground font-mono">aucune file pgvector active</span>
         </div>
-        <div className="space-y-2">
-          {[
-            { name: 'draft_index · réingestion Ch.8 v5', status: 'active' },
-            { name: 'style_index · rafraîchissement complet', status: 'pending' },
-            { name: 'audio_memory_index · 9 nouvelles notes', status: 'pending' },
-            { name: 'world_index · diff canon v3', status: 'pending' },
-          ].map((j, i) => (
-            <div key={i} className="flex items-center gap-3 text-xs">
-              {j.status === 'active' ? (
-                <Loader2 size={12} className="animate-spin text-primary" />
-              ) : (
-                <span className="w-2 h-2 rounded-full bg-amber" />
-              )}
-              <span className="flex-1 text-foreground font-mono">{j.name}</span>
-              <span className="text-muted-foreground">{j.status === 'active' ? 'en cours' : 'en attente'}</span>
-            </div>
-          ))}
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Aucune file pgvector active pour l'instant. Les jobs ci-dessous sont des exemples de
+          référence (mock) — ils ne déclenchent aucune réindexation réelle tant que pgvector reste
+          <span className="font-mono text-amber"> pending</span>.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

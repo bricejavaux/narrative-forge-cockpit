@@ -27,7 +27,7 @@ export default function RunsPage() {
     { label: 'OpenAI disponible', ok: openaiOk, note: openaiOk ? readiness?.openai?.model ?? undefined : 'clé absente' },
     { label: 'Supabase disponible', ok: supabaseOk },
     { label: 'OneDrive disponible', ok: onedriveOk, note: onedriveOk ? undefined : 'optionnel' },
-    { label: 'Indexes requis disponibles', ok: true, note: 'simulés' },
+    { label: 'Indexes requis disponibles', ok: true, note: 'mock — pgvector pending' },
     { label: 'Objets cibles sélectionnés', ok: true },
     { label: 'Format de sortie sélectionné', ok: true },
   ];
