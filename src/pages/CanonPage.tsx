@@ -72,6 +72,8 @@ export default function CanonPage() {
         technologies et lieux — chaque objet est relié aux personnages, chapitres et notes vocales associés.
       </p>
 
+      <ActiveRecordsBanner mode="canon" />
+
       <div className="grid grid-cols-12 gap-6">
         {/* Tree navigation */}
         <aside className="col-span-3">
