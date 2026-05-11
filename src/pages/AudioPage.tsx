@@ -62,7 +62,9 @@ export default function AudioPage() {
           <div className="cockpit-card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="editorial-eyebrow">Cibles rapides</h3>
-              <span className="text-[10px] font-mono text-muted-foreground">Simulé</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${audioPipelineReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+                {audioPipelineReady ? 'audio live' : 'pending_audio_pipeline'}
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {recordVariants.map(v => (
