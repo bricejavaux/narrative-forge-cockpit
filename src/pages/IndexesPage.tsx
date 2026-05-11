@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { indexes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
+import VectorPackagesPanel from '@/components/shared/VectorPackagesPanel';
 import { Database, AlertTriangle, RefreshCcw, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function IndexesPage() {
