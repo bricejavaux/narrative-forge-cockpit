@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
+import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
 import { User, X, Heart, Sparkles, Mic, MessageSquare, History } from 'lucide-react';
 
 const views = ['Liste', 'Matrice de relations', 'Timeline émotionnelle', 'Présence par chapitre', 'Alertes de continuité'];
@@ -24,6 +25,8 @@ export default function CharactersPage() {
         </div>
         <MicButton label="Note vocale personnage" />
       </div>
+
+      <ActiveRecordsBanner mode="characters" onSelect={(id) => setSelectedChar(id)} />
 
       <div className="flex gap-1 border-b border-border">
         {views.map((v) => (

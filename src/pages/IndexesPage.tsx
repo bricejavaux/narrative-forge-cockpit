@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { indexes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
+import VectorPackagesPanel from '@/components/shared/VectorPackagesPanel';
 import { Database, AlertTriangle, RefreshCcw, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function IndexesPage() {
@@ -28,6 +29,17 @@ export default function IndexesPage() {
             Chroma (OneDrive) : archives techniques — pas des indexes actifs
           </span>
         </div>
+      </div>
+
+      {/* Vector source packages prepared on OneDrive */}
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h3 className="editorial-heading text-foreground text-lg">Paquets vectoriels préparés</h3>
+            <p className="text-xs text-muted-foreground">Corpus chunkés disponibles dans <span className="font-mono">06_vector_sources/</span>. Ingestion pgvector : <span className="text-amber font-mono">pending</span>.</p>
+          </div>
+        </div>
+        <VectorPackagesPanel />
       </div>
 
       {/* Queue */}

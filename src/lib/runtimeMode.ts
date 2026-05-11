@@ -27,10 +27,52 @@ export const ONEDRIVE_REPOSITORY = {
     chromaArchives: '03_chroma_archives',
     exports: '04_exports',
     covers: '05_covers',
+    vectorSources: '06_vector_sources',
   },
   expectedFiles: {
     sources: ['articulation.txt', 'personnages.txt'],
     covers: ['cover.jpg'],
     chromaSubfolders: ['follett', 'science_portals', 'sf_portals_fiction'],
+    vectorCorpora: ['follett', 'sf_portals_fiction', 'science_portals'],
   },
 };
+
+export type VectorCorpus = 'follett' | 'sf_portals_fiction' | 'science_portals';
+
+export const VECTOR_CORPORA: Array<{
+  id: VectorCorpus;
+  label: string;
+  targetIndex: 'style_index' | 'fiction_reference_index' | 'science_index';
+  usage: string;
+  rights: 'private' | 'reference';
+  caution: string;
+  onedrivePath: string;
+}> = [
+  {
+    id: 'follett',
+    label: 'follett',
+    targetIndex: 'style_index',
+    usage: 'private reference only — no direct imitation',
+    rights: 'private',
+    caution: 'Référence privée. Pas de réutilisation directe ni d\'imitation.',
+    onedrivePath: 'Documents/Projet Roman/Les_Arches/06_vector_sources/follett',
+  },
+  {
+    id: 'sf_portals_fiction',
+    label: 'sf_portals_fiction',
+    targetIndex: 'fiction_reference_index',
+    usage: 'private reference only — no direct reuse',
+    rights: 'private',
+    caution: 'Référence privée. Pas de réutilisation directe.',
+    onedrivePath: 'Documents/Projet Roman/Les_Arches/06_vector_sources/sf_portals_fiction',
+  },
+  {
+    id: 'science_portals',
+    label: 'science_portals',
+    targetIndex: 'science_index',
+    usage: 'preferred first candidate for pgvector ingestion',
+    rights: 'reference',
+    caution: 'Référence scientifique — candidat prioritaire pour pgvector.',
+    onedrivePath: 'Documents/Projet Roman/Les_Arches/06_vector_sources/science_portals',
+  },
+];
