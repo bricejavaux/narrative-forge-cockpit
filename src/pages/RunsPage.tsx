@@ -42,7 +42,7 @@ const LEGACY: ModeDef[] = [
 const ALL_MODES = [...PRODUCTION_CHAIN, ...PRESETS, ...LEGACY];
 
 export default function RunsPage() {
-  const [selectedMode, setSelectedMode] = useState(modes[0]);
+  const [selectedMode, setSelectedMode] = useState<ModeDef>(PRODUCTION_CHAIN[0]);
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [loadingReadiness, setLoadingReadiness] = useState(true);
 
@@ -67,7 +67,7 @@ export default function RunsPage() {
   ];
   const required = [openaiOk, supabaseOk]; // OneDrive optional
   const ready = required.every(Boolean);
-  const isDryRun = selectedMode === modes[0];
+  const isDryRun = selectedMode.id === 's1';
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -84,11 +84,31 @@ export default function RunsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Mode</label>
-                <select value={selectedMode} onChange={e => setSelectedMode(e.target.value)}
-                  className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground">
-                  {modes.map(m => <option key={m} value={m}>{m}</option>)}
+                <label className="text-xs text-muted-foreground uppercase tracking-wider">Mode (chaîne de production)</label>
+                <select
+                  value={selectedMode.id}
+                  onChange={e => setSelectedMode(ALL_MODES.find(m => m.id === e.target.value) || PRODUCTION_CHAIN[0])}
+                  className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground"
+                >
+                  <optgroup label="Chaîne de production (numérotée)">
+                    {PRODUCTION_CHAIN.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </optgroup>
+                  <optgroup label="Presets opérationnels">
+                    {PRESETS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </optgroup>
+                  <optgroup label="Presets avancés / legacy">
+                    {LEGACY.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </optgroup>
                 </select>
+                {selectedMode.blockers && selectedMode.blockers.length > 0 && (
+                  <div className="mt-2 rounded border border-amber/30 bg-amber/5 p-2 text-[11px] text-amber-700">
+                    <p className="font-display font-semibold mb-1">Conditions requises :</p>
+                    <ul className="space-y-0.5">
+                      {selectedMode.blockers.map(b => <li key={b}>· {b}</li>)}
+                    </ul>
+                    <p className="mt-1 italic opacity-80">Persistance des runs en cours d'implémentation — résultats actuels non sauvegardés.</p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground uppercase tracking-wider">Périmètre</label>
