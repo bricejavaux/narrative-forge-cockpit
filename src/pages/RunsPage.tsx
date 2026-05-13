@@ -5,7 +5,21 @@ import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
-const modes = ['Dry run (simulation seule)', 'SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome', 'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final', 'Vérification cross-chapitres', 'Vérification notes audio'];
+const modes = [
+  'Dry run (simulation seule)',
+  'Production · Générer beats prévus',
+  'Production · Auditer beats prévus',
+  'Production · Générer chapitre depuis beats validés',
+  'Production · Extraire beats observés',
+  'Production · Auditer chapitre vs beats',
+  'Production · Réécriture ciblée',
+  'Production · Audit méta-tome',
+  'Production · Analyse impact canon',
+  'Production · Audit lisibilité export',
+  'SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome',
+  'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final',
+  'Vérification cross-chapitres', 'Vérification notes audio',
+];
 
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState(modes[0]);

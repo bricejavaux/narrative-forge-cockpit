@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ObjectProvenance from '@/components/shared/ObjectProvenance';
 import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
+import CanonImpactBanner from '@/components/production/CanonImpactBanner';
 import {
   ChevronRight, ChevronDown, BookOpen, Globe, Shield, AlertOctagon, Building2,
   Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic, Database
@@ -73,6 +74,7 @@ export default function CanonPage() {
       </p>
 
       <ActiveRecordsBanner mode="canon" />
+      <div className="my-3"><CanonImpactBanner /></div>
 
       <div className="grid grid-cols-12 gap-6">
         {/* Tree navigation */}
