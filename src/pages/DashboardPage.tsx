@@ -124,7 +124,10 @@ export default function DashboardPage() {
           
           {/* Arcs à risque */}
           <div className="cockpit-card space-y-3">
-            <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Arcs à risque</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Arcs à risque</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">mock fallback — démo</span>
+            </div>
             {riskArcs.map(arc => (
               <div key={arc.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                 <div className="flex items-center gap-3">
@@ -204,12 +207,16 @@ export default function DashboardPage() {
           </h2>
 
           <div className="cockpit-card space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Système</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">estimations mock</span>
+            </div>
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Coût simulé</span>
+              <span className="text-muted-foreground">Coût estimé — mock</span>
               <span className="font-mono text-foreground">{project.simulatedCost}</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Latence simulée</span>
+              <span className="text-muted-foreground">Latence estimée — mock</span>
               <span className="font-mono text-foreground">{project.simulatedLatency}</span>
             </div>
             <div className="flex justify-between text-xs">
@@ -220,6 +227,7 @@ export default function DashboardPage() {
               <span className="text-muted-foreground">Dernier export</span>
               <span className="font-mono text-foreground">{project.lastExport}</span>
             </div>
+            <p className="text-[10px] text-muted-foreground italic">Sera remplacé par les coûts/latences réels dès que des runs seront persistés.</p>
           </div>
 
           {/* Connecteurs résumé */}
@@ -236,11 +244,14 @@ export default function DashboardPage() {
           {/* Activité récente */}
           <div className="cockpit-card space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Activité Récente</h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">activité exemple</span>
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Activité récente — exemple</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">design example</span>
             </div>
+            <p className="text-[10px] text-muted-foreground italic">
+              Les liens seront activés lorsque les runs, imports et notes seront persistés.
+            </p>
             {recentActivity.slice(0, 6).map(a => (
-              <div key={a.id} className="flex items-start gap-2 py-1.5 border-b border-border/50 last:border-0">
+              <div key={a.id} className="flex items-start gap-2 py-1.5 border-b border-border/50 last:border-0 opacity-80" title="Persistance non implémentée — lien désactivé">
                 <div className="mt-0.5">
                   {a.type === 'run' && <Play size={10} className="text-cyan" />}
                   {a.type === 'audio' && <Mic size={10} className="text-rose" />}
