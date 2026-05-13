@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, Users, Network, Bot, Play,
   Activity, Mic, FolderOpen, Database, FileOutput, Settings,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Workflow,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -11,6 +11,7 @@ const sections: { label: string; items: { to: string; icon: any; label: string }
     label: 'Pilotage',
     items: [
       { to: '/', icon: LayoutDashboard, label: 'Tableau de bord' },
+      { to: '/production', icon: Workflow, label: 'Production' },
       { to: '/architecture', icon: Network, label: 'Architecture tome' },
     ],
   },
