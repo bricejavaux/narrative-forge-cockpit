@@ -12,6 +12,9 @@ import KpiCard from '@/components/shared/KpiCard';
 import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
+import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
+import ProductionFlowPanel from '@/components/shared/ProductionFlowPanel';
+import NextBestActionPanel from '@/components/shared/NextBestActionPanel';
 import { project, connectors, chapters, arcs, recentActivity, audioNotes, runs } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
@@ -45,6 +48,7 @@ function buildWarnings(r: ConnectionReadiness | null) {
 
 export default function DashboardPage() {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  const [capsOpen, setCapsOpen] = useState(false);
   useEffect(() => {
     supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
   }, []);
