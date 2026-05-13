@@ -185,12 +185,14 @@ export default function RunsPage() {
             </ul>
           </div>
 
-          {/* Payload preview (mock until live orchestrator) */}
+          {/* Payload preview */}
           <div className="cockpit-card space-y-3">
-            <h3 className="editorial-eyebrow flex items-center gap-2"><Database size={11} /> Aperçu payload — mock</h3>
+            <h3 className="editorial-eyebrow flex items-center gap-2">
+              <Database size={11} /> Aperçu payload — {isDryRun ? 'dry run' : (ready ? 'live test' : 'pré-vérification')}
+            </h3>
             <p className="text-[11px] text-muted-foreground">
               Aperçu indicatif des objets, indexes et tables qui seront mobilisés. Aucune écriture
-              tant que la politique de persistance n'est pas validée et qu'un agent n'est pas live.
+              persistée tant que la persistance des runs n'est pas implémentée.
             </p>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
@@ -222,20 +224,28 @@ export default function RunsPage() {
               <Zap size={14} /> Simuler (dry run)
             </button>
             <button
-              disabled={!ready || isDryRun}
-              title={!ready ? 'OpenAI ou Supabase non branchés' : isDryRun ? 'Mode Dry Run sélectionné — change de mode pour lancer en live' : 'Lancer en live'}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-display ${ready && !isDryRun ? 'bg-primary text-primary-foreground hover:opacity-90 cursor-pointer' : 'bg-primary text-primary-foreground opacity-50 cursor-not-allowed'}`}
+              disabled={!openaiOk || isDryRun}
+              title={!openaiOk ? 'OpenAI runtime non disponible' : isDryRun ? 'Mode Dry Run sélectionné' : 'Lancer en live (OpenAI)'}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-display ${openaiOk && !isDryRun ? 'bg-primary text-primary-foreground hover:opacity-90' : 'bg-primary text-primary-foreground opacity-50 cursor-not-allowed'}`}
             >
-              <Play size={14} /> Lancer le Run {!isDryRun && ready && '(live)'}
+              <Play size={14} /> Live test {openaiOk && !isDryRun && '(OpenAI)'}
             </button>
-            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
-              <Save size={14} /> Sauver preset
+            <button
+              disabled
+              title="Persistance des runs non implémentée — capacité « run_persistence » pending"
+              className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm opacity-50 cursor-not-allowed"
+            >
+              <Save size={14} /> Sauver dans la DB
+            </button>
+            <button
+              disabled
+              title="Réécriture autonome désactivée intentionnellement — validation humaine requise"
+              className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm opacity-50 cursor-not-allowed"
+            >
+              <Zap size={14} /> Réécriture autonome (désactivée)
             </button>
             <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
               <Download size={14} /> Exporter config
-            </button>
-            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
-              <ExternalLink size={14} /> Dernier résultat
             </button>
           </div>
           <div className={`flex items-center gap-2 text-[11px] ${ready ? 'text-emerald-600' : 'text-amber'}`}>
@@ -251,9 +261,12 @@ export default function RunsPage() {
         {/* Historique runs */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="editorial-eyebrow">Historique des Runs</h2>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">mock history</span>
+            <h2 className="editorial-eyebrow">Exemples de runs — mock</h2>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">non exécutés / design examples</span>
           </div>
+          <p className="text-[11px] text-muted-foreground italic">
+            L'historique réel apparaîtra ici dès que la persistance des runs sera activée.
+          </p>
           <NoteComposer target="run en préparation" compact />
           {runs.map(run => (
             <div key={run.id} className="cockpit-card space-y-2">
