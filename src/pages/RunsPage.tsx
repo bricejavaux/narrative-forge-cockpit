@@ -5,21 +5,41 @@ import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
-const modes = [
-  'Dry run (simulation seule)',
-  'Production · Générer beats prévus',
-  'Production · Auditer beats prévus',
-  'Production · Générer chapitre depuis beats validés',
-  'Production · Extraire beats observés',
-  'Production · Auditer chapitre vs beats',
-  'Production · Réécriture ciblée',
-  'Production · Audit méta-tome',
-  'Production · Analyse impact canon',
-  'Production · Audit lisibilité export',
-  'SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome',
-  'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final',
-  'Vérification cross-chapitres', 'Vérification notes audio',
+type ModeDef = { id: string; label: string; live?: boolean; blockers?: string[] };
+
+const PRODUCTION_CHAIN: ModeDef[] = [
+  { id: 'p1', label: '1. Préparer / générer les beats prévus', blockers: ['plan chapitre requis'] },
+  { id: 'p2', label: '2. Auditer les beats prévus', blockers: ['beats prévus requis'] },
+  { id: 'p3', label: '3. Valider les beats', blockers: ['beats prévus requis · validation humaine'] },
+  { id: 'p4', label: '4. Générer chapitre depuis beats validés', blockers: ['beats validés', 'canon non stale', 'personnages disponibles', 'chapitre cible sélectionné'] },
+  { id: 'p5', label: '5. Extraire beats observés', blockers: ['chapter full_text requis'] },
+  { id: 'p6', label: '6. Auditer chapitre vs beats prévus', blockers: ['beats observés requis'] },
+  { id: 'p7', label: '7. Créer réécritures ciblées', blockers: ['audit chapitre requis'] },
+  { id: 'p8', label: '8. Valider / intégrer réécritures', blockers: ['rewrite_tasks pending'] },
+  { id: 'p9', label: '9. Verrouiller chapitre', blockers: ['rewrite_tasks resolved'] },
+  { id: 'p10', label: '10. Lancer audit méta-tome', blockers: ['au moins 3 chapitres verrouillés'] },
+  { id: 'p11', label: '11. Analyser impact canon', blockers: ['changement canon récent'] },
+  { id: 'p12', label: '12. Préparer export', blockers: ['chapitres sélectionnés'] },
 ];
+
+const PRESETS: ModeDef[] = [
+  { id: 's1', label: 'Dry run (simulation seule)' },
+  { id: 's2', label: 'SAFE_BATCH' },
+  { id: 's3', label: 'Audit complet' },
+  { id: 's4', label: 'Pré-export' },
+  { id: 's5', label: 'Vérification notes audio' },
+];
+
+const LEGACY: ModeDef[] = [
+  { id: 'l1', label: 'Génération chapitre (legacy)' },
+  { id: 'l2', label: 'Audit tome (legacy)' },
+  { id: 'l3', label: 'Réécriture ciblée (legacy)' },
+  { id: 'l4', label: 'Réécriture profonde (legacy — désactivé)' },
+  { id: 'l5', label: 'Export final (legacy)' },
+  { id: 'l6', label: 'Vérification cross-chapitres (legacy)' },
+];
+
+const ALL_MODES = [...PRODUCTION_CHAIN, ...PRESETS, ...LEGACY];
 
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState(modes[0]);
