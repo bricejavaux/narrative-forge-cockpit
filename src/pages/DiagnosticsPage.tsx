@@ -5,7 +5,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
-import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap } from 'lucide-react';
+import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap, Mic } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { openaiService } from '@/services/openaiService';
 
