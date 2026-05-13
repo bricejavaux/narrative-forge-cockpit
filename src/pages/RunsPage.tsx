@@ -5,24 +5,44 @@ import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
-const modes = [
-  'Dry run (simulation seule)',
-  'Production · Générer beats prévus',
-  'Production · Auditer beats prévus',
-  'Production · Générer chapitre depuis beats validés',
-  'Production · Extraire beats observés',
-  'Production · Auditer chapitre vs beats',
-  'Production · Réécriture ciblée',
-  'Production · Audit méta-tome',
-  'Production · Analyse impact canon',
-  'Production · Audit lisibilité export',
-  'SAFE_BATCH', 'Audit complet', 'Génération chapitre', 'Audit tome',
-  'Réécriture ciblée', 'Réécriture profonde', 'Pré-export', 'Export final',
-  'Vérification cross-chapitres', 'Vérification notes audio',
+type ModeDef = { id: string; label: string; live?: boolean; blockers?: string[] };
+
+const PRODUCTION_CHAIN: ModeDef[] = [
+  { id: 'p1', label: '1. Préparer / générer les beats prévus', blockers: ['plan chapitre requis'] },
+  { id: 'p2', label: '2. Auditer les beats prévus', blockers: ['beats prévus requis'] },
+  { id: 'p3', label: '3. Valider les beats', blockers: ['beats prévus requis · validation humaine'] },
+  { id: 'p4', label: '4. Générer chapitre depuis beats validés', blockers: ['beats validés', 'canon non stale', 'personnages disponibles', 'chapitre cible sélectionné'] },
+  { id: 'p5', label: '5. Extraire beats observés', blockers: ['chapter full_text requis'] },
+  { id: 'p6', label: '6. Auditer chapitre vs beats prévus', blockers: ['beats observés requis'] },
+  { id: 'p7', label: '7. Créer réécritures ciblées', blockers: ['audit chapitre requis'] },
+  { id: 'p8', label: '8. Valider / intégrer réécritures', blockers: ['rewrite_tasks pending'] },
+  { id: 'p9', label: '9. Verrouiller chapitre', blockers: ['rewrite_tasks resolved'] },
+  { id: 'p10', label: '10. Lancer audit méta-tome', blockers: ['au moins 3 chapitres verrouillés'] },
+  { id: 'p11', label: '11. Analyser impact canon', blockers: ['changement canon récent'] },
+  { id: 'p12', label: '12. Préparer export', blockers: ['chapitres sélectionnés'] },
 ];
 
+const PRESETS: ModeDef[] = [
+  { id: 's1', label: 'Dry run (simulation seule)' },
+  { id: 's2', label: 'SAFE_BATCH' },
+  { id: 's3', label: 'Audit complet' },
+  { id: 's4', label: 'Pré-export' },
+  { id: 's5', label: 'Vérification notes audio' },
+];
+
+const LEGACY: ModeDef[] = [
+  { id: 'l1', label: 'Génération chapitre (legacy)' },
+  { id: 'l2', label: 'Audit tome (legacy)' },
+  { id: 'l3', label: 'Réécriture ciblée (legacy)' },
+  { id: 'l4', label: 'Réécriture profonde (legacy — désactivé)' },
+  { id: 'l5', label: 'Export final (legacy)' },
+  { id: 'l6', label: 'Vérification cross-chapitres (legacy)' },
+];
+
+const ALL_MODES = [...PRODUCTION_CHAIN, ...PRESETS, ...LEGACY];
+
 export default function RunsPage() {
-  const [selectedMode, setSelectedMode] = useState(modes[0]);
+  const [selectedMode, setSelectedMode] = useState<ModeDef>(PRODUCTION_CHAIN[0]);
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [loadingReadiness, setLoadingReadiness] = useState(true);
 
@@ -47,7 +67,7 @@ export default function RunsPage() {
   ];
   const required = [openaiOk, supabaseOk]; // OneDrive optional
   const ready = required.every(Boolean);
-  const isDryRun = selectedMode === modes[0];
+  const isDryRun = selectedMode.id === 's1';
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -64,11 +84,31 @@ export default function RunsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Mode</label>
-                <select value={selectedMode} onChange={e => setSelectedMode(e.target.value)}
-                  className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground">
-                  {modes.map(m => <option key={m} value={m}>{m}</option>)}
+                <label className="text-xs text-muted-foreground uppercase tracking-wider">Mode (chaîne de production)</label>
+                <select
+                  value={selectedMode.id}
+                  onChange={e => setSelectedMode(ALL_MODES.find(m => m.id === e.target.value) || PRODUCTION_CHAIN[0])}
+                  className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground"
+                >
+                  <optgroup label="Chaîne de production (numérotée)">
+                    {PRODUCTION_CHAIN.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </optgroup>
+                  <optgroup label="Presets opérationnels">
+                    {PRESETS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </optgroup>
+                  <optgroup label="Presets avancés / legacy">
+                    {LEGACY.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </optgroup>
                 </select>
+                {selectedMode.blockers && selectedMode.blockers.length > 0 && (
+                  <div className="mt-2 rounded border border-amber/30 bg-amber/5 p-2 text-[11px] text-amber-700">
+                    <p className="font-display font-semibold mb-1">Conditions requises :</p>
+                    <ul className="space-y-0.5">
+                      {selectedMode.blockers.map(b => <li key={b}>· {b}</li>)}
+                    </ul>
+                    <p className="mt-1 italic opacity-80">Persistance des runs en cours d'implémentation — résultats actuels non sauvegardés.</p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground uppercase tracking-wider">Périmètre</label>
@@ -145,12 +185,14 @@ export default function RunsPage() {
             </ul>
           </div>
 
-          {/* Payload preview (mock until live orchestrator) */}
+          {/* Payload preview */}
           <div className="cockpit-card space-y-3">
-            <h3 className="editorial-eyebrow flex items-center gap-2"><Database size={11} /> Aperçu payload — mock</h3>
+            <h3 className="editorial-eyebrow flex items-center gap-2">
+              <Database size={11} /> Aperçu payload — {isDryRun ? 'dry run' : (ready ? 'live test' : 'pré-vérification')}
+            </h3>
             <p className="text-[11px] text-muted-foreground">
               Aperçu indicatif des objets, indexes et tables qui seront mobilisés. Aucune écriture
-              tant que la politique de persistance n'est pas validée et qu'un agent n'est pas live.
+              persistée tant que la persistance des runs n'est pas implémentée.
             </p>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
@@ -182,20 +224,28 @@ export default function RunsPage() {
               <Zap size={14} /> Simuler (dry run)
             </button>
             <button
-              disabled={!ready || isDryRun}
-              title={!ready ? 'OpenAI ou Supabase non branchés' : isDryRun ? 'Mode Dry Run sélectionné — change de mode pour lancer en live' : 'Lancer en live'}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-display ${ready && !isDryRun ? 'bg-primary text-primary-foreground hover:opacity-90 cursor-pointer' : 'bg-primary text-primary-foreground opacity-50 cursor-not-allowed'}`}
+              disabled={!openaiOk || isDryRun}
+              title={!openaiOk ? 'OpenAI runtime non disponible' : isDryRun ? 'Mode Dry Run sélectionné' : 'Lancer en live (OpenAI)'}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-display ${openaiOk && !isDryRun ? 'bg-primary text-primary-foreground hover:opacity-90' : 'bg-primary text-primary-foreground opacity-50 cursor-not-allowed'}`}
             >
-              <Play size={14} /> Lancer le Run {!isDryRun && ready && '(live)'}
+              <Play size={14} /> Live test {openaiOk && !isDryRun && '(OpenAI)'}
             </button>
-            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
-              <Save size={14} /> Sauver preset
+            <button
+              disabled
+              title="Persistance des runs non implémentée — capacité « run_persistence » pending"
+              className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm opacity-50 cursor-not-allowed"
+            >
+              <Save size={14} /> Sauver dans la DB
+            </button>
+            <button
+              disabled
+              title="Réécriture autonome désactivée intentionnellement — validation humaine requise"
+              className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm opacity-50 cursor-not-allowed"
+            >
+              <Zap size={14} /> Réécriture autonome (désactivée)
             </button>
             <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
               <Download size={14} /> Exporter config
-            </button>
-            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
-              <ExternalLink size={14} /> Dernier résultat
             </button>
           </div>
           <div className={`flex items-center gap-2 text-[11px] ${ready ? 'text-emerald-600' : 'text-amber'}`}>
@@ -211,9 +261,12 @@ export default function RunsPage() {
         {/* Historique runs */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="editorial-eyebrow">Historique des Runs</h2>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">mock history</span>
+            <h2 className="editorial-eyebrow">Exemples de runs — mock</h2>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">non exécutés / design examples</span>
           </div>
+          <p className="text-[11px] text-muted-foreground italic">
+            L'historique réel apparaîtra ici dès que la persistance des runs sera activée.
+          </p>
           <NoteComposer target="run en préparation" compact />
           {runs.map(run => (
             <div key={run.id} className="cockpit-card space-y-2">
