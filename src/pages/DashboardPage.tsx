@@ -93,19 +93,26 @@ export default function DashboardPage() {
       <ConnectionReadinessPanel compact />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <NextBestActionPanel />
         <OneDriveRepositoryPanel />
-        <ImportReconcilePanel />
       </div>
 
-      {/* KPIs */}
+      <ProductionFlowPanel compact />
+
+      <ImportReconcilePanel />
+
+      {/* KPIs — narrative metrics still mock until Supabase populated */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <KpiCard label="Score Tome" value={project.globalScore} icon={BarChart3} color="cyan" subtitle="/ 100" />
-        <KpiCard label="Chapitres" value={project.totalChapters} icon={BookOpen} color="violet" />
-        <KpiCard label="Alertes" value={project.criticalAlerts} icon={AlertTriangle} color="destructive" />
-        <KpiCard label="Dette Narrative" value={project.narrativeDebt} icon={TrendingDown} color="amber" subtitle="points de dette" />
-        <KpiCard label="Audio non traités" value={project.untreatedAudioComments} icon={Mic} color="rose" />
-        <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live`} />
+        <KpiCard label="Score Tome" value={project.globalScore} icon={BarChart3} color="cyan" subtitle="/ 100 · mock" />
+        <KpiCard label="Chapitres" value={project.totalChapters} icon={BookOpen} color="violet" subtitle="mock" />
+        <KpiCard label="Alertes" value={project.criticalAlerts} icon={AlertTriangle} color="destructive" subtitle="mock" />
+        <KpiCard label="Dette Narrative" value={project.narrativeDebt} icon={TrendingDown} color="amber" subtitle="mock" />
+        <KpiCard label="Audio non traités" value={project.untreatedAudioComments} icon={Mic} color="rose" subtitle="mock" />
+        <button onClick={() => setCapsOpen(true)} className="text-left">
+          <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live · cliquer`} />
+        </button>
       </div>
+      <CapabilitiesModal open={capsOpen} onClose={() => setCapsOpen(false)} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Santé narrative */}
