@@ -245,8 +245,39 @@ export default function ArchitecturePage() {
 
       {/* Heatmap */}
       {(activeTab === 'Chapitres' || activeTab === 'Arcs globaux') && (
-        <div className="cockpit-card">
-          <h3 className="text-sm font-display font-semibold text-foreground mb-4">Heatmap Arc × Chapitre (avec marqueur d'échelle)</h3>
+        <div className="cockpit-card space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-display font-semibold text-foreground">Heatmap Arc × Chapitre (avec marqueur d'échelle)</h3>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">
+              généré depuis mock fallback
+            </span>
+          </div>
+
+          <details className="rounded-lg border border-border bg-secondary/30 p-3">
+            <summary className="text-xs font-display font-semibold text-foreground cursor-pointer">
+              Comment lire la heatmap Arc × Chapitre
+            </summary>
+            <div className="mt-2 space-y-1.5 text-[11px] text-foreground/80 leading-relaxed">
+              <p>· <b>Lignes</b> = arcs narratifs.</p>
+              <p>· <b>Colonnes</b> = chapitres.</p>
+              <p>· <b>Nombre dans la cellule</b> = intensité / présence narrative de l'arc dans ce chapitre.</p>
+              <p>· <b>Cellule vide</b> = arc absent ou sous le seuil.</p>
+              <p>· <b>Cellule plus sombre</b> = présence d'arc plus forte.</p>
+              <p>· <b>Macro</b> = chapitre qui fait avancer les enjeux systémiques / géopolitiques / mondiaux.</p>
+              <p>· <b>Micro</b> = chapitre qui fait avancer les enjeux intimes / personnage / locaux.</p>
+              <p>· <b>Mixte</b> = chapitre qui relie les conséquences personnelles aux enjeux systémiques.</p>
+              <p>· <b>Objectif</b> = détecter trous, sur-concentrations, arcs faibles, et ratés d'escalade.</p>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase border bg-rose/10 text-rose border-rose/20">micro</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase border bg-primary/10 text-primary border-primary/20">macro</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase border bg-amber/10 text-amber border-amber/20">mixte</span>
+              </div>
+              <p className="text-amber-700 italic mt-2">
+                Heatmap générée depuis le mock fallback tant que les chapitres et arcs ne sont pas importés en Supabase.
+              </p>
+            </div>
+          </details>
+
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -287,9 +318,10 @@ export default function ArchitecturePage() {
       )}
 
       {!['Chapitres', 'Arcs globaux', 'Beats', 'Révélations', 'Payoffs', 'Conséquences'].includes(activeTab) && (
-        <div className="cockpit-card p-8 text-center">
-          <p className="text-muted-foreground text-sm">Vue "{activeTab}" — simulée</p>
-          <p className="text-xs text-muted-foreground mt-2 font-mono">Future connexion requise</p>
+        <div className="cockpit-card p-8 text-center space-y-2">
+          <p className="text-foreground text-sm">Vue "{activeTab}" — mock fallback</p>
+          <p className="text-xs text-muted-foreground">Import architecture requis (articulation.txt) pour afficher des données réelles.</p>
+          <a href="/assets" className="inline-block text-xs text-primary hover:underline">→ Importer architecture depuis articulation.txt</a>
         </div>
       )}
 
