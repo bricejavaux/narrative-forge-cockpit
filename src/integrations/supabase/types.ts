@@ -609,37 +609,106 @@ export type Database = {
       }
       beats: {
         Row: {
+          arcs: Json
+          beat_number: number | null
+          beat_type: string
+          canon_links: Json
           chapter_id: string | null
+          characters: Json
+          consequence: string | null
           created_at: string
+          decision_made: string | null
           detail: string | null
+          emotional_density: number | null
           id: string
+          locked: boolean
           metadata: Json
+          narrative_function: string | null
+          objective: string | null
           order_index: number
+          payoff: string | null
+          project_id: string | null
+          required_detail: string | null
+          revelation: string | null
           scale: string | null
+          scientific_density: number | null
+          source: string
+          status: string
+          tension_end: number | null
+          tension_start: number | null
           title: string
+          tome_id: string | null
           updated_at: string
+          validation_status: string
+          version: number
         }
         Insert: {
+          arcs?: Json
+          beat_number?: number | null
+          beat_type?: string
+          canon_links?: Json
           chapter_id?: string | null
+          characters?: Json
+          consequence?: string | null
           created_at?: string
+          decision_made?: string | null
           detail?: string | null
+          emotional_density?: number | null
           id?: string
+          locked?: boolean
           metadata?: Json
+          narrative_function?: string | null
+          objective?: string | null
           order_index: number
+          payoff?: string | null
+          project_id?: string | null
+          required_detail?: string | null
+          revelation?: string | null
           scale?: string | null
+          scientific_density?: number | null
+          source?: string
+          status?: string
+          tension_end?: number | null
+          tension_start?: number | null
           title: string
+          tome_id?: string | null
           updated_at?: string
+          validation_status?: string
+          version?: number
         }
         Update: {
+          arcs?: Json
+          beat_number?: number | null
+          beat_type?: string
+          canon_links?: Json
           chapter_id?: string | null
+          characters?: Json
+          consequence?: string | null
           created_at?: string
+          decision_made?: string | null
           detail?: string | null
+          emotional_density?: number | null
           id?: string
+          locked?: boolean
           metadata?: Json
+          narrative_function?: string | null
+          objective?: string | null
           order_index?: number
+          payoff?: string | null
+          project_id?: string | null
+          required_detail?: string | null
+          revelation?: string | null
           scale?: string | null
+          scientific_density?: number | null
+          source?: string
+          status?: string
+          tension_end?: number | null
+          tension_start?: number | null
           title?: string
+          tome_id?: string | null
           updated_at?: string
+          validation_status?: string
+          version?: number
         }
         Relationships: [
           {
@@ -743,21 +812,64 @@ export type Database = {
           },
         ]
       }
+      chapter_versions: {
+        Row: {
+          chapter_id: string | null
+          created_at: string
+          full_text: string | null
+          generation_log: string | null
+          id: string
+          inputs: Json
+          model: string | null
+          planned_beat_coverage: number | null
+          version: number
+          warnings: Json
+        }
+        Insert: {
+          chapter_id?: string | null
+          created_at?: string
+          full_text?: string | null
+          generation_log?: string | null
+          id?: string
+          inputs?: Json
+          model?: string | null
+          planned_beat_coverage?: number | null
+          version?: number
+          warnings?: Json
+        }
+        Update: {
+          chapter_id?: string | null
+          created_at?: string
+          full_text?: string | null
+          generation_log?: string | null
+          id?: string
+          inputs?: Json
+          model?: string | null
+          planned_beat_coverage?: number | null
+          version?: number
+          warnings?: Json
+        }
+        Relationships: []
+      }
       chapters: {
         Row: {
+          active_version: number
           arc_ids: Json
           audio_review_status: string | null
           cost_type: string | null
           created_at: string
           emotion: number | null
           external_id: string | null
+          full_text: string | null
           has_audio: boolean
           id: string
           linked_character_ids: Json
+          locked: boolean
           main_arc: string | null
           metadata: Json
           number: number
           phrase_couteau: string | null
+          production_status: string
           scale: string | null
           sci_density: number | null
           score: number | null
@@ -770,19 +882,23 @@ export type Database = {
           version: number
         }
         Insert: {
+          active_version?: number
           arc_ids?: Json
           audio_review_status?: string | null
           cost_type?: string | null
           created_at?: string
           emotion?: number | null
           external_id?: string | null
+          full_text?: string | null
           has_audio?: boolean
           id?: string
           linked_character_ids?: Json
+          locked?: boolean
           main_arc?: string | null
           metadata?: Json
           number: number
           phrase_couteau?: string | null
+          production_status?: string
           scale?: string | null
           sci_density?: number | null
           score?: number | null
@@ -795,19 +911,23 @@ export type Database = {
           version?: number
         }
         Update: {
+          active_version?: number
           arc_ids?: Json
           audio_review_status?: string | null
           cost_type?: string | null
           created_at?: string
           emotion?: number | null
           external_id?: string | null
+          full_text?: string | null
           has_audio?: boolean
           id?: string
           linked_character_ids?: Json
+          locked?: boolean
           main_arc?: string | null
           metadata?: Json
           number?: number
           phrase_couteau?: string | null
+          production_status?: string
           scale?: string | null
           sci_density?: number | null
           score?: number | null
@@ -1569,6 +1689,198 @@ export type Database = {
           },
         ]
       }
+      production_dependencies: {
+        Row: {
+          created_at: string
+          dependency_type: string | null
+          id: string
+          metadata: Json
+          project_id: string | null
+          source_unit_id: string | null
+          source_unit_type: string | null
+          status: string
+          target_unit_id: string | null
+          target_unit_type: string | null
+          tome_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          dependency_type?: string | null
+          id?: string
+          metadata?: Json
+          project_id?: string | null
+          source_unit_id?: string | null
+          source_unit_type?: string | null
+          status?: string
+          target_unit_id?: string | null
+          target_unit_type?: string | null
+          tome_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          dependency_type?: string | null
+          id?: string
+          metadata?: Json
+          project_id?: string | null
+          source_unit_id?: string | null
+          source_unit_type?: string | null
+          status?: string
+          target_unit_id?: string | null
+          target_unit_type?: string | null
+          tome_id?: string | null
+        }
+        Relationships: []
+      }
+      production_events: {
+        Row: {
+          created_at: string
+          event_summary: string | null
+          event_type: string | null
+          id: string
+          metadata: Json
+          new_status: string | null
+          object_id: string | null
+          object_type: string | null
+          previous_status: string | null
+          project_id: string | null
+          tome_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_summary?: string | null
+          event_type?: string | null
+          id?: string
+          metadata?: Json
+          new_status?: string | null
+          object_id?: string | null
+          object_type?: string | null
+          previous_status?: string | null
+          project_id?: string | null
+          tome_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_summary?: string | null
+          event_type?: string | null
+          id?: string
+          metadata?: Json
+          new_status?: string | null
+          object_id?: string | null
+          object_type?: string | null
+          previous_status?: string | null
+          project_id?: string | null
+          tome_id?: string | null
+        }
+        Relationships: []
+      }
+      production_units: {
+        Row: {
+          created_at: string
+          dependency_hash: string | null
+          id: string
+          locked: boolean
+          locked_at: string | null
+          locked_reason: string | null
+          metadata: Json
+          parent_unit_id: string | null
+          project_id: string | null
+          reopened_at: string | null
+          reopened_reason: string | null
+          stale_reason: string | null
+          status: string
+          title: string | null
+          tome_id: string | null
+          unit_id: string | null
+          unit_type: string
+          updated_at: string
+          validation_status: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          dependency_hash?: string | null
+          id?: string
+          locked?: boolean
+          locked_at?: string | null
+          locked_reason?: string | null
+          metadata?: Json
+          parent_unit_id?: string | null
+          project_id?: string | null
+          reopened_at?: string | null
+          reopened_reason?: string | null
+          stale_reason?: string | null
+          status?: string
+          title?: string | null
+          tome_id?: string | null
+          unit_id?: string | null
+          unit_type: string
+          updated_at?: string
+          validation_status?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          dependency_hash?: string | null
+          id?: string
+          locked?: boolean
+          locked_at?: string | null
+          locked_reason?: string | null
+          metadata?: Json
+          parent_unit_id?: string | null
+          project_id?: string | null
+          reopened_at?: string | null
+          reopened_reason?: string | null
+          stale_reason?: string | null
+          status?: string
+          title?: string | null
+          tome_id?: string | null
+          unit_id?: string | null
+          unit_type?: string
+          updated_at?: string
+          validation_status?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      production_validations: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string | null
+          status: string
+          tome_id: string | null
+          unit_id: string | null
+          unit_type: string | null
+          validation_notes: string | null
+          validation_type: string | null
+          validator: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          status?: string
+          tome_id?: string | null
+          unit_id?: string | null
+          unit_type?: string | null
+          validation_notes?: string | null
+          validation_type?: string | null
+          validator?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          status?: string
+          tome_id?: string | null
+          unit_id?: string | null
+          unit_type?: string | null
+          validation_notes?: string | null
+          validation_type?: string | null
+          validator?: string | null
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string
@@ -1741,43 +2053,67 @@ export type Database = {
       }
       rewrite_tasks: {
         Row: {
+          beat_id: string | null
+          chapter_id: string | null
           created_at: string
+          created_by_agent: string | null
           diff: Json
           id: string
+          instruction: string | null
+          issue_type: string | null
           metadata: Json
           project_id: string | null
           proposal: string | null
+          proposed_change: string | null
           requires_validation: boolean
+          severity: string | null
           status: string
           target_id: string | null
+          target_section: string | null
           target_type: string
           title: string
           updated_at: string
         }
         Insert: {
+          beat_id?: string | null
+          chapter_id?: string | null
           created_at?: string
+          created_by_agent?: string | null
           diff?: Json
           id?: string
+          instruction?: string | null
+          issue_type?: string | null
           metadata?: Json
           project_id?: string | null
           proposal?: string | null
+          proposed_change?: string | null
           requires_validation?: boolean
+          severity?: string | null
           status?: string
           target_id?: string | null
+          target_section?: string | null
           target_type: string
           title: string
           updated_at?: string
         }
         Update: {
+          beat_id?: string | null
+          chapter_id?: string | null
           created_at?: string
+          created_by_agent?: string | null
           diff?: Json
           id?: string
+          instruction?: string | null
+          issue_type?: string | null
           metadata?: Json
           project_id?: string | null
           proposal?: string | null
+          proposed_change?: string | null
           requires_validation?: boolean
+          severity?: string | null
           status?: string
           target_id?: string | null
+          target_section?: string | null
           target_type?: string
           title?: string
           updated_at?: string

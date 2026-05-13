@@ -1,93 +1,87 @@
-# Structural Iteration — Plan
+# Production Flow Iteration — Plan
 
-This iteration covers 16 sections. I'll execute it as a single large migration + multi-file code update, in clear phases.
+This iteration adds a **production pipeline layer** on top of the existing app: Canon → Architecture → Plan → Planned Beats → Validation → Generation → Observed Beats → Audit → Targeted Rewrite → Lock → Meta-audit → Export. Beats become first-class objects, planned **before** generation and observed **after**.
 
-## Phase A — Security
-- Add Settings warning text exactly as specified (".env was previously tracked…").
-- Note: I cannot run `git rm --cached .env` (no stateful git allowed). I'll instruct the user to run it themselves and surface that prominently in Settings + chat.
-- Verify `.env.example` (already exists) and `.gitignore` already excludes `.env`.
+The current design, routes, and pastel layout stay intact. A new `/production` route is added, plus a Chapter Production Board, beat validation flow, and lock/reopen logic. Mock fallback is preserved but never shown as real production state.
 
-## Phase B — Database migration (single migration)
+## Phase A — Database migration (single migration, requires approval)
 
-New tables / columns:
-- `agents` — add columns: `description`, `default_model`, `selected_model`, `quality_profile`, `persistence_status`, `vector_context_status`, `is_active` (keep existing structure).
-- `agent_versions` (new, with `is_current`, `version_number`, prompts, scripts, schemas).
-- `agent_index_bindings` (new).
-- `vector_indexes`, `vector_documents`, `vector_chunks` (with `embedding vector(1536)` if extension available; fallback to `jsonb` if not), `retrieval_logs`.
-- `impact_analysis` (new).
-- Enable `vector` extension (idempotent).
-- No RLS yet (matches existing tables — none have RLS). Document for user.
+New tables:
+- `production_units` (canon | tome_architecture | chapter | beat_set | beat | audit | rewrite_task | export, with status, locked, version, parent_unit_id, dependency_hash, stale_reason)
+- `production_dependencies` (requires | informs | blocks | invalidates | audits | rewrites)
+- `production_validations` (human | agent | audit | lock validation)
+- `production_events` (audit log of stage transitions)
 
-## Phase C — Edge Functions
-- `vector-ingest-package` (modes: metadata_only | embed_and_store, dry_run).
-- `vector-search` (embeds query, cosine top-k, logs retrieval).
-- Update `openai-agent-run` to: load agent config from Supabase, resolve index bindings, optionally call vector-search, return rich output with `vector_context_used`, `indexes_active`, `indexes_pending`, `retrieved_chunks`, warnings.
-- New `agents-bootstrap` function: idempotently insert default agents + versions into Supabase from the existing dummy catalog.
+Extensions:
+- Extend `beats` with: `tome_id`, `beat_type` (planned/observed/revised), `objective`, `narrative_function`, `characters jsonb`, `arcs jsonb`, `canon_links jsonb`, `tension_start/end`, `scientific_density`, `emotional_density`, `decision_made`, `consequence`, `revelation`, `payoff`, `required_detail`, `validation_status`, `source`, `version`, `locked`, `beat_number`. Keep existing columns.
+- Extend `chapters.metadata` is already JSONB — store production sub-statuses there to avoid breaking existing structure: `planning_status`, `beats_status`, `generation_status`, `audit_status`, `rewrite_status`, `lock_status`, `export_status`, `planned_beat_count`, `observed_beat_count`, `revised_beat_count`, `last_audit_score`, `needs_rewrite`, `needs_meta_audit`, `stale_due_to_canon`, `stale_due_to_character`. Add real columns only for `full_text`, `active_version`, `locked`, `production_status`.
+- Extend `rewrite_tasks` with: `chapter_id`, `beat_id`, `issue_type`, `severity`, `target_section`, `instruction`, `proposed_change`, `created_by_agent`. Keep existing.
+- Add `chapter_versions` table (id, chapter_id, version, full_text, generation_log, model, inputs jsonb, planned_beat_coverage numeric, warnings jsonb, created_at).
 
-## Phase D — Services
-- `src/services/agentsService.ts` (new): list/load/save agents + versions + bindings; bootstrap.
-- `src/services/vectorIngestionService.ts` (new): ingest, search, list indexes.
-- `src/services/impactAnalysisService.ts` (new): list, create, validate.
-- Extend `supabaseService.getReadiness()` capability map (audio pipeline, run persistence, pgvector activeness flags).
+No RLS yet (consistent with existing schema).
 
-## Phase E — UI changes
+## Phase B — Edge Functions
 
-Dashboard (`DashboardPage.tsx`):
-- Remove static date `2026-04-14 10:30`; use `readiness.checked_at` / `new Date()`.
-- Dynamic title: Live / Hybride / À finaliser based on readiness.
-- Capability count excludes OneDrive/OpenAI/Supabase when live; excludes notifications/profile/auth.
-- Clickable details panel listing real pending capabilities.
-- Label dummy KPIs / activity / runs as `mock fallback`, `activité exemple`, `historique mock`.
+- `production-state` — returns full pipeline state for a tome (stages, statuses, blockers, counts).
+- `beats-plan` — generates planned beats from chapter plan + canon + characters via OpenAI.
+- `beats-validate` — marks beat set as validated, creates `production_validations` row.
+- `beats-extract-observed` — analyzes chapter `full_text` and extracts observed beats via OpenAI.
+- `beats-compare` — produces planned-vs-observed coverage report (covered/partial/missing/distorted/overdeveloped + unplanned).
+- `chapter-generate` — gated function. Refuses if planned beats not validated, canon stale, or architecture missing. Creates new `chapter_versions` row.
+- `chapter-audit` — runs canon/character/rhythm/density audits, writes findings, creates targeted `rewrite_tasks`.
+- `chapter-lock` / `chapter-reopen` — lock/unlock with reason, propagates `stale_*` flags to dependents.
+- `meta-tome-audit` — periodic cross-chapter audit, proposes architecture changes.
+- `canon-impact-analysis` — extends existing `impact_analysis` table to enumerate affected chapters/beats/characters.
 
-Settings (`SettingsPage.tsx`):
-- Capability-level cards driven by `connection-status`.
-- Add explicit `.env` warning message.
-- Chroma → `archived_not_active` (not "simulé").
-- Pipeline indexation → `prepared_pgvector_pending`.
-- Whisper logic: don't say "OpenAI requis" when live.
-- Disable deep rewrite toggle with tooltip.
+All functions use OpenAI only (no Lovable AI Gateway), respect existing `_shared/openai.ts` and `_shared/cors.ts`.
 
-Agents (`AgentsPage.tsx`):
-- Load from Supabase first via `agentsService`, fallback to dummy.
-- "Initialize default agents" button → calls `agents-bootstrap`.
-- Editable detail panel: objective, system prompt, operating script (JSON), inputs/outputs schemas, model selection, vector bindings, top_k, similarity threshold, permission policy.
-- Save new version / Restore / Compare / Test buttons.
-- Model adequacy block + Data sources block + Current vs future context note.
+## Phase C — Frontend services
 
-Indexes (`IndexesPage.tsx`):
-- Add ingestion actions per vector package: metadata-only, sample embeddings, full embeddings, search test, bind to agents.
-- Cautions for `follett`, `sf_portals_fiction`. Recommend `science_portals` first.
-- Future index cards with `future` / `pending_pgvector` / `active` labels driven by chunk counts.
+- `src/services/productionFlowService.ts` — read pipeline state, list stages, fetch blockers.
+- `src/services/beatsService.ts` — CRUD + validation + comparison.
+- `src/services/chapterProductionService.ts` — generate/audit/lock/reopen + version history.
+- Extend `impactAnalysisService` with affected-objects enumeration.
 
-Canon (`CanonPage.tsx`):
-- Add "Impacts potentiels" panel reading `impact_analysis` table.
-- On canon edit (existing form), enqueue an impact analysis row, set `needs_index_refresh=true`.
-- Validate / Ignore / Create rewrite_task buttons.
+## Phase D — UI
 
-Architecture (`ArchitecturePage.tsx`):
-- Replace "future connection required" with Supabase-first / mock-fallback logic.
-- Add "Import from articulation.txt" + "Generate proposal from canon" actions (wire to existing import-source where possible; otherwise stub with clear status).
+New page **`src/pages/ProductionPage.tsx`** route `/production`:
+- Schematic flow visualization (11 stages with color states: green validated, amber pending, red blocked/stale, blue live, grey future). Click → relevant page.
+- Stage cards: status, owner, inputs, outputs, validation requirement, last updated, blockers, "Open" + "Validate/Reopen" buttons.
+- French status badges as specified.
 
-NoteComposer:
-- Already mostly correct. Tighten copy: never say "OpenAI requis" when OpenAI live. Audio tab message: "Audio transcription pending — use text note or upload audio file."
+New components:
+- `src/components/production/ProductionFlowDiagram.tsx` — schematic node graph.
+- `src/components/production/StageCard.tsx` — per-stage detail card.
+- `src/components/production/ChapterProductionBoard.tsx` — per-chapter horizontal progress strip with clickable segments.
+- `src/components/production/BeatValidationPanel.tsx` — list planned beats, edit/split/merge/reorder/validate, missing-field highlighting.
+- `src/components/production/BeatComparisonPanel.tsx` — planned vs observed coverage matrix with severity & recommendations.
+- `src/components/production/RewriteTasksPanel.tsx` — targeted rewrite list with accept/reject/escalate.
+- `src/components/production/LockReopenButton.tsx` — reusable lock/reopen with reason capture.
+- `src/components/production/ProductionStatusBadge.tsx` — French status badges.
 
-Header:
-- Tooltip on project/tome dropdowns. Mark notifications + profile as `future` if no notification system / no auth.
+Page integrations:
+- **CanonPage**: after edit, surface "Cette modification peut impacter l'architecture du tome" + actions (Run impact / View affected / Create proposals / Validate / Ignore).
+- **ArchitecturePage**: link to `/production` and per-chapter board.
+- **ChaptersPage / per-chapter detail** (or new chapter detail panel inside Architecture): Chapter Production Board with all 8 stages, beats panels (planned/observed/revised tabs), audit results, rewrite tasks, lock/reopen.
+- **RunsPage / Run Designer**: new production run types: `generate_planned_beats`, `audit_planned_beats`, `generate_chapter_from_validated_beats`, `extract_observed_beats`, `audit_chapter_against_beats`, `targeted_rewrite`, `meta_tome_audit`, `canon_impact_analysis`, `export_readiness_audit`. Each shows required inputs, blockers, agents, models, persistence policy, validation requirement. Block invalid sequences (no chapter gen without validated beats; no full rewrite without snapshot; no export with unlocked chapters; no vector-retrieval claim while pgvector pending).
+- **AgentsPage**: add `production_stage` mapping field to each agent card (Génération Beats, Audit Beats, Génération Chapitre, Audit Canon/Personnages/Rythme/Révélations, Réécriture ciblée, Style pass).
+- **Sidebar/Header**: add "Production" nav entry.
 
-## Phase F — Mock data policy
-- Add `MOCK_LABEL` utility to label fallback regions consistently. Audit each dummy-driven block to use it.
+## Phase E — Doctrine & guardrails
 
-## Phase G — Acceptance verification
-- Build check via harness.
-- Smoke check Settings, Dashboard, Agents detail, Indexes ingestion controls visible.
+- New `src/lib/productionDoctrine.ts` — central enforcement helpers (`canGenerateChapter`, `canExport`, `propagateStaleness`, status→French label).
+- All gating happens both server-side (edge functions refuse) and client-side (buttons disabled with explanatory tooltip).
+- Mock fallback labelled "Design target — not active yet." Never show OK/validated unless a real row exists.
 
-## Out of scope (explicit)
-- Do not run ingestion automatically.
-- Do not enable autonomous rewrite.
-- Do not modify chapters/characters automatically.
-- Do not migrate Chroma.
-- Do not remove mock mode.
-- No RLS added (current schema has none; introducing it now would break the app — user can request a dedicated security pass later).
+## Phase F — Out of scope
+
+- No automatic structural changes (chapter add/remove/split, character merge).
+- No autonomous full rewrites.
+- pgvector activation untouched (still pending).
+- No Chroma migration.
+- No RLS pass.
+- No removal of mock mode.
 
 ## Approval needed
-The DB migration is large (3 new domains: agent versioning, vector RAG, impact analysis) and enables the `vector` extension. Approve to proceed.
+
+The DB migration adds 4 new tables + extends `beats`, `chapters`, `rewrite_tasks`, plus a new `chapter_versions` table. Approve to proceed with the full implementation in one shot.
