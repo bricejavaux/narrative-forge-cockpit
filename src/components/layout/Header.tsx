@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Bell, ChevronDown, Plug, User, Sparkles } from 'lucide-react';
 import { project } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
 
 export default function Header() {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  const [capsOpen, setCapsOpen] = useState(false);
   useEffect(() => {
     supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
   }, []);
@@ -64,18 +66,20 @@ export default function Header() {
         </div>
 
         <button
+          onClick={() => setCapsOpen(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-          title={`Capacités à finaliser : ${gaps.join(', ')}`}
+          title="Voir les capacités à finaliser"
         >
           <Plug size={12} />
           <span>
             <span className={gaps.length > 0 ? 'text-amber' : 'text-emerald-600'}>{gaps.length}</span> capacités à finaliser
           </span>
         </button>
+        <CapabilitiesModal open={capsOpen} onClose={() => setCapsOpen(false)} />
 
         <button
           className="relative p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          title="Notifications — future (alertes d'activité, auth requise)"
+          title="Aucune activité persistée — alertes futures (runs, validations, réécritures)"
         >
           <Bell size={15} />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
