@@ -97,6 +97,41 @@ export default function DiagnosticsPage() {
             </div>
           </div>
 
+          {/* Methodology disclosure */}
+          <details className="cockpit-card">
+            <summary className="text-sm font-display font-semibold text-foreground cursor-pointer flex items-center gap-2">
+              <Lightbulb size={14} className="text-amber" /> Méthodologie du score
+              <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">
+                {liveDiag?.mode === 'live' ? 'live' : 'mock fallback'}
+              </span>
+            </summary>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-foreground/80">
+              <div>
+                <p className="editorial-eyebrow mb-1">Dimensions & poids</p>
+                <ul className="space-y-0.5">
+                  <li>· Cohérence canon — 15%</li>
+                  <li>· Hiérarchie L4 / Walvis Bay — 10%</li>
+                  <li>· Alternance macro/micro — 10%</li>
+                  <li>· Détail technique par scène — 10%</li>
+                  <li>· Coût par activation — 10%</li>
+                  <li>· Phrase-couteau de fin — 10%</li>
+                  <li>· Trace non-humanisée — 10%</li>
+                  <li>· Distribution B+ — 10%</li>
+                  <li>· Brice ingénieur → gardien — 15%</li>
+                </ul>
+              </div>
+              <div>
+                <p className="editorial-eyebrow mb-1">Source & limites</p>
+                <ul className="space-y-0.5">
+                  <li>· Données : {liveDiag?.mode === 'live' ? 'diagnostic live' : 'mock fallback (dummy)'}</li>
+                  <li>· Modèle : {liveDiag?.model ?? readiness?.openai?.model ?? '—'}</li>
+                  <li>· Dernier calcul : {liveDiag ? 'à l\'instant' : '—'}</li>
+                  <li>· Limites : score indicatif tant que les chapitres ne sont pas importés en Supabase.</li>
+                </ul>
+              </div>
+            </div>
+          </details>
+
           {/* Explanation panel */}
           <div className="cockpit-card space-y-4">
             <div className="flex items-center gap-2">
@@ -107,10 +142,7 @@ export default function DiagnosticsPage() {
               <div>
                 <p className="editorial-eyebrow mb-1.5">Pourquoi ce score</p>
                 <p className="text-foreground/80 leading-relaxed">
-                  Score Tome I = combiné de 9 dimensions spécifiques : cohérence canon (15%),
-                  hiérarchie Lagrange-4/Walvis Bay (10%), alternance macro/micro (10%), un détail
-                  technique par scène (10%), coût par activation (10%), phrase-couteau de fin (10%),
-                  Trace non-humanisée (10%), distribution B+ (10%), Brice ingénieur → gardien (15%).
+                  Score Tome I = combiné de 9 dimensions. Voir « Méthodologie du score ».
                 </p>
               </div>
               <div>
@@ -131,8 +163,12 @@ export default function DiagnosticsPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
-                <Wand2 size={12} /> Générer les recommandations
+              <button
+                disabled={!openaiReady}
+                title={openaiReady ? 'Générer des recommandations via OpenAI (à câbler à un agent dédié)' : 'OpenAI absent'}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg ${openaiReady ? 'bg-primary text-primary-foreground hover:opacity-90' : 'bg-primary text-primary-foreground opacity-50 cursor-not-allowed'}`}
+              >
+                <Wand2 size={12} /> Générer les recommandations {!openaiReady && '(OpenAI requis)'}
               </button>
               <button
                 onClick={runLiveDiagnostic}
@@ -143,10 +179,20 @@ export default function DiagnosticsPage() {
                 {diagLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
                 {openaiReady ? 'Générer un diagnostic live' : 'Diagnostic mock (OpenAI absent)'}
               </button>
-              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground transition-colors">
+              <button
+                onClick={() => setActiveView('Par chapitre')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                title="Filtrer la vue Par chapitre sur les chapitres à risque (mock)"
+              >
                 <ArrowRight size={12} /> Ouvrir les chapitres à risque
               </button>
-              <MicButton label="Relecture vocale du diagnostic" size="sm" />
+              <button
+                disabled
+                title="Pipeline audio pending — utiliser la note texte ci-dessous"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground opacity-50 cursor-not-allowed"
+              >
+                <Mic size={12} /> Relecture vocale (audio pipeline pending)
+              </button>
             </div>
             {liveDiag && (
               <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2.5">
