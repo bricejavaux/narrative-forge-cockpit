@@ -324,10 +324,10 @@ export default function DiagnosticsPage() {
       )}
 
       {!['Score global', 'Par chapitre', 'Audio review coverage'].includes(activeView) && (
-        <div className="cockpit-card p-12 text-center">
-          <Sparkles size={20} className="mx-auto text-muted-foreground/50 mb-3" />
-          <p className="text-muted-foreground text-sm">Vue "{activeView}" — données simulées</p>
-          <p className="text-xs text-muted-foreground/70 mt-2 font-mono">Nécessite Supabase + OpenAI</p>
+        <div className="cockpit-card p-12 text-center space-y-2">
+          <Sparkles size={20} className="mx-auto text-muted-foreground/50" />
+          <p className="text-foreground text-sm">Vue "{activeView}" — mock fallback</p>
+          <p className="text-xs text-muted-foreground">Données simulées — Supabase et agents requis pour activer cette vue.</p>
         </div>
       )}
     </div>
