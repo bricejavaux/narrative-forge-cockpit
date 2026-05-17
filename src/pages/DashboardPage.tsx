@@ -230,15 +230,44 @@ export default function DashboardPage() {
             <p className="text-[10px] text-muted-foreground italic">Sera remplacé par les coûts/latences réels dès que des runs seront persistés.</p>
           </div>
 
-          {/* Connecteurs résumé */}
+          {/* Connecteurs résumé — dérivés de connection-status (truthful) */}
           <div className="cockpit-card space-y-2">
-            <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Connecteurs</h3>
-            {connectors.slice(0, 6).map(c => (
-              <div key={c.id} className="flex items-center justify-between py-1">
-                <span className="text-xs text-muted-foreground truncate">{c.name}</span>
-                <StatusBadge status={c.status} />
-              </div>
-            ))}
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Connecteurs (readiness)</h3>
+              <span className="text-[10px] font-mono text-muted-foreground">live · pending · future</span>
+            </div>
+            {(() => {
+              const r = readiness;
+              const openai = !!r?.openai?.api_key_configured;
+              const onedrive = !!r?.onedrive?.oauth_configured;
+              const dbOk = !!r?.supabase?.tables_created;
+              const storageOk = !!r?.supabase?.storage_buckets_created;
+              const audioLive = r?.openai?.transcription_pipeline_status === 'transcription_live';
+              const pgv = !!r?.indexes?.pgvector_ready;
+              const items: Array<{ name: string; status: 'live' | 'pending' | 'degraded' | 'future' | 'archived'; note?: string }> = [
+                { name: 'OpenAI runtime', status: openai ? 'live' : 'pending' },
+                { name: 'Supabase DB', status: dbOk ? 'live' : 'pending' },
+                { name: 'Supabase Storage', status: storageOk ? 'live' : 'pending' },
+                { name: 'OneDrive', status: onedrive ? 'live' : 'pending' },
+                { name: 'pgvector', status: pgv ? 'live' : 'pending', note: pgv ? undefined : 'extension non activée' },
+                { name: 'Audio transcription', status: audioLive ? 'live' : 'pending' },
+                { name: 'Exports txt/md/json', status: 'live' },
+                { name: 'Chroma archive', status: 'archived', note: 'conservé, non interrogé' },
+              ];
+              const STYLE: Record<string, string> = {
+                live: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30',
+                pending: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
+                degraded: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
+                future: 'bg-violet-500/10 text-violet-700 border-violet-500/30',
+                archived: 'bg-slate-500/10 text-slate-600 border-slate-500/30',
+              };
+              return items.map((i) => (
+                <div key={i.name} className="flex items-center justify-between py-1">
+                  <span className="text-xs text-muted-foreground truncate" title={i.note}>{i.name}</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${STYLE[i.status]}`}>{i.status}</span>
+                </div>
+              ));
+            })()}
           </div>
 
           {/* Activité récente */}

@@ -3,10 +3,11 @@ import { audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
+import AudioReviewTypesPanel from '@/components/shared/AudioReviewTypesPanel';
 import { Mic, Play } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 
-const subSections = ['Notes audio', 'Relectures chapitres', 'Commentaires beats', 'Revues cross-chapitres', 'Sessions de lecture', 'Historique vocal', 'Traçabilité'];
+const subSections = ['Notes audio', 'Types de relecture', 'Relectures chapitres', 'Commentaires beats', 'Revues cross-chapitres', 'Sessions de lecture', 'Historique vocal', 'Traçabilité'];
 
 const recordVariants = [
   'Sur le canon', 'Sur un personnage', 'Sur un arc', 'Sur un beat',
@@ -164,7 +165,9 @@ export default function AudioPage() {
         </div>
       )}
 
-      {!['Notes audio', 'Relectures chapitres'].includes(activeSection) && (
+      {activeSection === 'Types de relecture' && <AudioReviewTypesPanel />}
+
+      {!['Notes audio', 'Relectures chapitres', 'Types de relecture'].includes(activeSection) && (
         <div className="cockpit-card p-8 text-center">
           <p className="text-muted-foreground text-sm">Section « {activeSection} » — <span className="font-mono">design target</span></p>
           <p className="text-xs text-muted-foreground mt-2 font-mono">

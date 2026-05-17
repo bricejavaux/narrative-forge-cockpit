@@ -7,6 +7,8 @@ import OpenAITestPanel from '@/components/shared/OpenAITestPanel';
 import DataFlowDoctrineBanner from '@/components/shared/DataFlowDoctrineBanner';
 import { getRuntimeMode, setRuntimeMode, type RuntimeMode } from '@/lib/runtimeMode';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import QAActionRegistryPanel from '@/components/shared/QAActionRegistryPanel';
+import TestReadinessPanel from '@/components/shared/TestReadinessPanel';
 import { Sliders, Mic } from 'lucide-react';
 
 function deriveConnectorStatus(id: string, r: ConnectionReadiness | null): { status: ConnectorStatus; note: string } {
@@ -113,6 +115,8 @@ function RuntimeModeSwitch() {
 const sections = [
   'Connecteurs',
   'Readiness Supabase / OpenAI / OneDrive',
+  'QA actions & boutons',
+  'Prêt pour premiers tests ?',
   'Paramètres narratifs',
   'Gouvernance réécriture',
   'Indexes & sync',
@@ -144,27 +148,31 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-amber/40 bg-amber/5 p-4 text-xs space-y-1.5">
-        <p className="font-display text-sm text-amber">Sécurité — secrets &amp; RLS</p>
+      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-xs space-y-1.5">
+        <p className="font-display text-sm text-emerald-700">Sécurité — secrets &amp; RLS</p>
         <p className="text-foreground/85">
-          Les secrets (<span className="font-mono">OPENAI_API_KEY</span>,{' '}
+          <span className="text-emerald-700 font-medium">Aucun secret runtime exposé dans le bundle frontend.</span>{' '}
+          Le fichier <span className="font-mono">.env</span> ne contient que des valeurs publiques
+          <span className="font-mono"> VITE_SUPABASE_URL</span>, <span className="font-mono">VITE_SUPABASE_PUBLISHABLE_KEY</span>,
+          <span className="font-mono"> VITE_SUPABASE_PROJECT_ID</span> (publishable, conçues pour le client).
+        </p>
+        <p className="text-foreground/85">
+          Les secrets <span className="font-mono">OPENAI_API_KEY</span>,{' '}
           <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span>,{' '}
           <span className="font-mono">MICROSOFT_ONEDRIVE_API_KEY</span>,{' '}
-          <span className="font-mono">LOVABLE_API_KEY</span>) ne doivent être configurés qu'en{' '}
-          <span className="text-foreground font-medium">secrets Edge Function / Lovable Cloud</span>.
-          Ne jamais committer de <span className="font-mono">.env</span> contenant des valeurs réelles.
-          Utiliser <span className="font-mono">.env.example</span> avec placeholders.
+          <span className="font-mono">LOVABLE_API_KEY</span> sont uniquement présents en{' '}
+          <span className="text-foreground font-medium">secrets Edge Function / Lovable Cloud</span> —
+          jamais committés, jamais bundlés côté client.
         </p>
         <p className="text-foreground/85">
           <span className="text-foreground font-medium">RLS activé</span> — lectures/écritures
           directes depuis le frontend limitées. Les écritures sensibles passent par des Edge Functions
           (service role côté serveur).
         </p>
-        <p className="text-rose-600">
-          <span className="font-medium">.env was previously tracked.</span> Remove it from git tracking
-          (<span className="font-mono">git rm --cached .env</span> then commit). Only public
-          <span className="font-mono"> VITE_*</span> values may appear in frontend environment files.
-          Runtime secrets must remain in Edge Function / Lovable Cloud secrets.
+        <p className="text-amber-700">
+          Action recommandée côté repo Git : si <span className="font-mono">.env</span> est encore suivi,
+          exécutez <span className="font-mono">git rm --cached .env</span> et committez. Seules les valeurs
+          <span className="font-mono"> VITE_*</span> publiques peuvent apparaître dans un .env frontend.
         </p>
       </div>
 
@@ -210,6 +218,10 @@ export default function SettingsPage() {
           <OneDriveRepositoryPanel />
         </div>
       )}
+
+      {activeSection === 'QA actions & boutons' && <QAActionRegistryPanel />}
+
+      {activeSection === 'Prêt pour premiers tests ?' && <TestReadinessPanel />}
 
       {activeSection === 'Paramètres narratifs' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -267,9 +279,9 @@ export default function SettingsPage() {
             ['Microphone sur les chapitres', true, undefined],
             ['Microphone sur les beats', true, undefined],
             ['Microphone sur les agents (tuning vocal)', true, undefined],
-            ['Transcription automatique (Whisper)', false, 'OpenAI requis'],
-            ['Structuration post-transcription', false, 'OpenAI requis'],
-            ['Indexation des notes vocales', false, 'Supabase requis'],
+            ['Transcription automatique (Whisper)', false, 'pipeline audio pending — upload + edge non câblés'],
+            ['Structuration post-transcription (OpenAI)', true, 'live si OPENAI_API_KEY présent'],
+            ['Indexation des notes vocales', false, 'audio_memory_index futur'],
             ['Conservation audio brut', true, undefined],
             ['Validation humaine avant intégration', true, undefined],
             ['Traçabilité complète', true, undefined],
@@ -316,7 +328,9 @@ export default function SettingsPage() {
       )}
 
       {![
-        'Connecteurs', 'Readiness Supabase / OpenAI / OneDrive', 'Paramètres narratifs',
+        'Connecteurs', 'Readiness Supabase / OpenAI / OneDrive',
+        'QA actions & boutons', 'Prêt pour premiers tests ?',
+        'Paramètres narratifs',
         'Gouvernance réécriture', 'Indexes & sync', 'Audio & transcription',
         'Diagnostics', 'Exports', 'Logs & validation humaine',
       ].includes(activeSection) && (
