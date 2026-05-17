@@ -219,7 +219,11 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {activeSection === 'Paramètres narratifs' && (
+      {activeSection === 'QA actions & boutons' && <QAActionRegistryPanel />}
+
+      {activeSection === 'Prêt pour premiers tests ?' && <TestReadinessPanel />}
+
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="cockpit-card space-y-4">
             <h3 className="editorial-eyebrow flex items-center gap-2"><Sliders size={12} /> Structure & rythme</h3>
