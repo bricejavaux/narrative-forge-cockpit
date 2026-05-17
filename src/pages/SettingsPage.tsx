@@ -275,9 +275,9 @@ export default function SettingsPage() {
             ['Microphone sur les chapitres', true, undefined],
             ['Microphone sur les beats', true, undefined],
             ['Microphone sur les agents (tuning vocal)', true, undefined],
-            ['Transcription automatique (Whisper)', false, 'OpenAI requis'],
-            ['Structuration post-transcription', false, 'OpenAI requis'],
-            ['Indexation des notes vocales', false, 'Supabase requis'],
+            ['Transcription automatique (Whisper)', false, 'pipeline audio pending — upload + edge non câblés'],
+            ['Structuration post-transcription (OpenAI)', true, 'live si OPENAI_API_KEY présent'],
+            ['Indexation des notes vocales', false, 'audio_memory_index futur'],
             ['Conservation audio brut', true, undefined],
             ['Validation humaine avant intégration', true, undefined],
             ['Traçabilité complète', true, undefined],
@@ -324,7 +324,9 @@ export default function SettingsPage() {
       )}
 
       {![
-        'Connecteurs', 'Readiness Supabase / OpenAI / OneDrive', 'Paramètres narratifs',
+        'Connecteurs', 'Readiness Supabase / OpenAI / OneDrive',
+        'QA actions & boutons', 'Prêt pour premiers tests ?',
+        'Paramètres narratifs',
         'Gouvernance réécriture', 'Indexes & sync', 'Audio & transcription',
         'Diagnostics', 'Exports', 'Logs & validation humaine',
       ].includes(activeSection) && (
