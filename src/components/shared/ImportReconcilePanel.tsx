@@ -134,14 +134,15 @@ export default function ImportReconcilePanel() {
   return (
     <div className="rounded-lg border border-border/60 bg-card/40 p-4 space-y-4">
       <div className="flex items-start justify-between">
-          <h3 className="text-lg editorial-heading text-foreground">OneDrive → OpenAI → Supabase</h3>
-
+        <div>
           <p className="editorial-eyebrow">Import & Réconciliation</p>
-          <h3 className="text-lg editorial-heading text-foreground">OneDrive → Lovable AI → Supabase</h3>
+          <h3 className="text-lg editorial-heading text-foreground">OneDrive → OpenAI → Supabase</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Téléchargement réel, extraction structurée, puis persistance encadrée par validation humaine.
+            Téléchargement réel, extraction structurée OpenAI, puis persistance encadrée par validation humaine.
           </p>
         </div>
+      </div>
+
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
