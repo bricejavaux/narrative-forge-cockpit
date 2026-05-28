@@ -86,6 +86,16 @@ export default function CanonPage() {
       <ActiveRecordsBanner mode="canon" />
       <div className="my-3"><CanonImpactBanner /></div>
 
+      {supaActive && supaRecords ? (
+        <SupabaseCanonView records={supaRecords} onRefresh={loadSupa} />
+      ) : (
+        <>
+        {supaRecords !== null && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 mb-3">
+            <span className="font-mono">mock_fallback</span> — aucun objet Supabase actif. Lancez l'import <span className="font-mono">articulation.txt</span> pour activer le canon Supabase.
+          </div>
+        )}
+
       <div className="grid grid-cols-12 gap-6">
         {/* Tree navigation */}
         <aside className="col-span-3">
