@@ -338,6 +338,9 @@ export default function CanonPage() {
           )}
         </aside>
       </div>
+      </>
+      )}
+
     </div>
   );
 }
