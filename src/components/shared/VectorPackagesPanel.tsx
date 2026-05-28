@@ -27,18 +27,41 @@ export default function VectorPackagesPanel({ compact = false }: { compact?: boo
   const [reading, setReading] = useState<VectorCorpus | null>(null);
   const [reads, setReads] = useState<Partial<Record<VectorCorpus, VectorPackageRead>>>({});
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [tableMissing, setTableMissing] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const rows = await indexingService.listVectorPackages();
-        setPackages(rows);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const reload = async () => {
+    setLoading(true);
+    try {
+      const rows = await indexingService.listVectorPackages();
+      setPackages(rows);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { reload(); }, []);
+
+  const sync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    setError(null);
+    try {
+      const r = await indexingService.syncVectorPackages();
+      const msg = r.error
+        ? (r.error.toLowerCase().includes('does not exist') || r.error.toLowerCase().includes('relation'))
+          ? (setTableMissing(true), `Table vector_source_packages absente — migration requise.`)
+          : `Erreur sync : ${r.error}`
+        : `Synchronisé : ${Array.isArray(r.synced) ? r.synced.length : 0} corpus.`;
+      setSyncResult(msg);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'erreur');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const toggle = async (corpus: VectorCorpus) => {
     const isOpen = openCorpus === corpus;
@@ -67,11 +90,32 @@ export default function VectorPackagesPanel({ compact = false }: { compact?: boo
 
   if (!packages.length) {
     return (
-      <div className="cockpit-card text-xs text-muted-foreground">
-        Aucun paquet enregistré. Lance la migration pour seed follett / sf_portals_fiction / science_portals.
+      <div className="cockpit-card space-y-3 text-xs">
+        {tableMissing ? (
+          <p className="text-amber-700 flex items-center gap-1.5">
+            <AlertTriangle size={12} /> Table <span className="font-mono">vector_source_packages</span> absente — migration requise.
+          </p>
+        ) : (
+          <p className="text-muted-foreground">
+            Aucun paquet enregistré. Synchronisez les métadonnées depuis OneDrive pour activer
+            <span className="font-mono"> follett</span>, <span className="font-mono">science_portals</span> et <span className="font-mono">sf_portals_fiction</span>.
+          </p>
+        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={sync}
+            disabled={syncing || tableMissing}
+            className="text-[11px] flex items-center gap-1 px-2 py-1 rounded border border-primary/40 bg-primary/5 hover:bg-primary/10 disabled:opacity-50"
+          >
+            {syncing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+            Seed / sync vector packages from OneDrive
+          </button>
+          {syncResult && <span className="text-muted-foreground">{syncResult}</span>}
+        </div>
       </div>
     );
   }
+
 
   return (
     <div className="space-y-3">

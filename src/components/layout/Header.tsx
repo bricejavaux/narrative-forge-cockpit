@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Bell, ChevronDown, Plug, User, Sparkles } from 'lucide-react';
+import { Bell, ChevronDown, Plug, User, Sparkles, FlaskConical } from 'lucide-react';
 import { project } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
+import { getProductionMode, PRODUCTION_MODE_LABEL, PRODUCTION_MODE_TOOLTIP } from '@/lib/productionMode';
 
 export default function Header() {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
@@ -57,6 +58,22 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        {(() => {
+          const pm = getProductionMode();
+          const cls = pm === 'production_test'
+            ? 'border-amber-500/40 bg-amber-500/10 text-amber-700'
+            : pm === 'production_locked'
+              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700'
+              : 'border-slate-500/40 bg-slate-500/10 text-slate-600';
+          return (
+            <div
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-mono ${cls}`}
+              title={PRODUCTION_MODE_TOOLTIP[pm]}
+            >
+              <FlaskConical size={11} /> {PRODUCTION_MODE_LABEL[pm]}
+            </div>
+          );
+        })()}
         <div
           className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full border border-primary/30 bg-primary/5 text-primary text-[11px] font-mono"
           title={`OpenAI: ${openaiOk ? 'live' : 'absent'} · OneDrive: ${onedriveOk ? 'live' : 'absent'} · Supabase: ${supabaseOk ? 'actif' : 'absent'}`}
@@ -64,6 +81,7 @@ export default function Header() {
           <Sparkles size={11} />
           {modeLabel}
         </div>
+
 
         <button
           onClick={() => setCapsOpen(true)}
