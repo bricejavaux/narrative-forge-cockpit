@@ -34,10 +34,7 @@ const STATUS_STYLE: Record<CapabilityStatus, string> = {
 };
 
 export function buildCapabilities(r: ConnectionReadiness | null): Capability[] {
-  const pgvOk = !!r?.indexes?.pgvector_ready;
-  const audioPipelineOk = r?.openai?.transcription_pipeline_status === 'transcription_live';
-  const exportsPersist = !!r?.exports?.supabase_export_persistence_available;
-export function buildCapabilities(r: ConnectionReadiness | null): Capability[] {
+
   const pgvOk = !!r?.indexes?.pgvector_ready;
   const audioPipelineOk = r?.openai?.transcription_pipeline_status === 'transcription_live';
   const exportsPersist = !!r?.exports?.supabase_export_persistence_available;
