@@ -21,10 +21,6 @@ export type Capability = {
   notes?: string;
 };
 
-  blocksTesting: boolean;
-  notes?: string;
-};
-
 const STATUS_STYLE: Record<CapabilityStatus, string> = {
   live: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30',
   degraded: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
