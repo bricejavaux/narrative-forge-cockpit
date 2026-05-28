@@ -36,6 +36,16 @@ export default function CharactersPage() {
 
       <ActiveRecordsBanner mode="characters" onSelect={(id) => setSelectedChar(id)} />
 
+      {supaActive && supaRecords ? (
+        <SupabaseCharactersView records={supaRecords} onRefresh={loadSupa} />
+      ) : (
+      <>
+      {supaRecords !== null && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800">
+          <span className="font-mono">mock_fallback</span> — aucun personnage Supabase actif. Lancez l'import <span className="font-mono">personnages.txt</span> pour activer les personnages Supabase.
+        </div>
+      )}
+
       <div className="flex gap-1 border-b border-border">
         {views.map((v) => (
           <button
