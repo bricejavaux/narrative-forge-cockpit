@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { characters, chapters, audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
+import SupabaseCharactersView from '@/components/shared/SupabaseCharactersView';
+import { supabaseService, type ActiveCharacter } from '@/services/supabaseService';
 import { User, X, Heart, Sparkles, Mic, MessageSquare, History } from 'lucide-react';
 
 const views = ['Liste', 'Matrice de relations', 'Timeline émotionnelle', 'Présence par chapitre', 'Alertes de continuité'];
@@ -12,9 +14,15 @@ const views = ['Liste', 'Matrice de relations', 'Timeline émotionnelle', 'Prés
 export default function CharactersPage() {
   const [activeView, setActiveView] = useState(views[0]);
   const [selectedChar, setSelectedChar] = useState<string | null>(characters[0]?.id ?? null);
+  const [supaRecords, setSupaRecords] = useState<ActiveCharacter[] | null>(null);
+  const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCharacters());
+  useEffect(() => { loadSupa(); }, []);
+  const supaActive = (supaRecords?.length ?? 0) > 0;
+
   const char = characters.find((c) => c.id === selectedChar);
   const charChapters = char ? chapters.filter((c) => char.linkedChapterIds?.includes(c.id) || c.linkedCharacterIds?.includes(char.id)) : [];
   const charAudio = char ? audioNotes.filter((a) => a.linkedCharacterIds?.includes(char.id) || a.target === char.name).slice(0, 4) : [];
+
 
   return (
     <div className="animate-slide-in space-y-6">
