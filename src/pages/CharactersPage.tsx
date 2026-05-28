@@ -18,10 +18,15 @@ export default function CharactersPage() {
   const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCharacters());
   useEffect(() => {
     loadSupa();
-    const h = (e: Event) => { const d = (e as CustomEvent).detail; if (!d || d.target === 'characters') loadSupa(); };
+    const h = (e: Event) => { const d = (e as CustomEvent).detail; if (!d || d.target === 'characters' || d.target === undefined) loadSupa(); };
     window.addEventListener('supabase-records-refresh', h);
-    return () => window.removeEventListener('supabase-records-refresh', h);
+    window.addEventListener('characters-imported', h);
+    return () => {
+      window.removeEventListener('supabase-records-refresh', h);
+      window.removeEventListener('characters-imported', h);
+    };
   }, []);
+
 
   const supaActive = (supaRecords?.length ?? 0) > 0;
 

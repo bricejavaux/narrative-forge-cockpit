@@ -124,12 +124,18 @@ export default function ImportReconcilePanel() {
     try {
       const r = await importService.persist(target, preview.extracted);
       setPersisted((s) => ({ ...s, [target]: r }));
+      try {
+        const evt = target === 'articulation' ? 'canon-imported' : 'characters-imported';
+        window.dispatchEvent(new CustomEvent(evt, { detail: r }));
+        window.dispatchEvent(new CustomEvent('supabase-records-refresh', { detail: { target: target === 'articulation' ? 'canon' : 'characters' } }));
+      } catch {}
     } catch (e) {
       setErrors((s) => ({ ...s, [target]: e instanceof Error ? e.message : 'erreur' }));
     } finally {
       setPersisting(null);
     }
   };
+
 
   return (
     <div className="rounded-lg border border-border/60 bg-card/40 p-4 space-y-4">

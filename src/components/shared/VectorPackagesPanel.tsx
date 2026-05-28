@@ -20,7 +20,7 @@ function ModeBadge({ mode }: { mode?: string }) {
   return <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${cls}`}>{m}</span>;
 }
 
-export default function VectorPackagesPanel({ compact = false }: { compact?: boolean }) {
+export default function VectorPackagesPanel({ compact = false, refreshKey = 0 }: { compact?: boolean; refreshKey?: number }) {
   const [packages, setPackages] = useState<VectorPackageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCorpus, setOpenCorpus] = useState<VectorCorpus | null>(null);
@@ -41,7 +41,8 @@ export default function VectorPackagesPanel({ compact = false }: { compact?: boo
     }
   };
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload(); }, [refreshKey]);
+
 
   const sync = async () => {
     setSyncing(true);
