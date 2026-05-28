@@ -36,10 +36,15 @@ export default function CanonPage() {
   const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCanonObjects());
   useEffect(() => {
     loadSupa();
-    const h = (e: Event) => { const d = (e as CustomEvent).detail; if (!d || d.target === 'canon') loadSupa(); };
+    const h = (e: Event) => { const d = (e as CustomEvent).detail; if (!d || d.target === 'canon' || d.target === undefined) loadSupa(); };
     window.addEventListener('supabase-records-refresh', h);
-    return () => window.removeEventListener('supabase-records-refresh', h);
+    window.addEventListener('canon-imported', h);
+    return () => {
+      window.removeEventListener('supabase-records-refresh', h);
+      window.removeEventListener('canon-imported', h);
+    };
   }, []);
+
 
   const supaActive = (supaRecords?.length ?? 0) > 0;
 

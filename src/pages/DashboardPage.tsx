@@ -16,7 +16,8 @@ import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
 import ProductionFlowPanel from '@/components/shared/ProductionFlowPanel';
 import NextBestActionPanel from '@/components/shared/NextBestActionPanel';
 import { project, connectors, chapters, arcs, recentActivity, audioNotes, runs } from '@/data/dummyData';
-import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import { supabaseService, type ConnectionReadiness, type ProductionCounts, deriveProductionStages } from '@/services/supabaseService';
+
 
 function buildWarnings(r: ConnectionReadiness | null) {
   const w: Array<{ text: string; severity: 'info' | 'warning' | 'critical' }> = [];
@@ -49,9 +50,22 @@ function buildWarnings(r: ConnectionReadiness | null) {
 export default function DashboardPage() {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [capsOpen, setCapsOpen] = useState(false);
+  const [counts, setCounts] = useState<ProductionCounts | null>(null);
   useEffect(() => {
     supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
+    const loadCounts = () => supabaseService.getProductionCounts().then(setCounts).catch(() => setCounts(null));
+    loadCounts();
+    const h = () => loadCounts();
+    window.addEventListener('canon-imported', h);
+    window.addEventListener('characters-imported', h);
+    window.addEventListener('supabase-records-refresh', h);
+    return () => {
+      window.removeEventListener('canon-imported', h);
+      window.removeEventListener('characters-imported', h);
+      window.removeEventListener('supabase-records-refresh', h);
+    };
   }, []);
+
 
   const weakChapters = chapters.filter(c => c.score < 60);
   const riskArcs = arcs.filter(a => a.status === 'warning' || a.status === 'critical');
@@ -97,7 +111,8 @@ export default function DashboardPage() {
         <OneDriveRepositoryPanel />
       </div>
 
-      <ProductionFlowPanel compact />
+      <ProductionFlowPanel compact stages={deriveProductionStages(counts)} />
+
 
       <ImportReconcilePanel />
 
