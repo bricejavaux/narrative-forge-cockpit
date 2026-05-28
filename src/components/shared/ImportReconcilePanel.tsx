@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Download, FileText, Users, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, FileText, Users, Loader2, CheckCircle2, AlertTriangle, RefreshCw, ArrowRight } from 'lucide-react';
 import { importService, type ImportTarget, type ImportPreview } from '@/services/importService';
 import { canonRules, characters } from '@/data/dummyData';
+
 
 const TARGETS: { id: ImportTarget; label: string; path: string; icon: typeof FileText; kind: 'canon' | 'characters' }[] = [
   { id: 'articulation', label: 'articulation.txt → canon', path: '01_sources/articulation.txt', icon: FileText, kind: 'canon' },
@@ -134,12 +136,14 @@ export default function ImportReconcilePanel() {
       <div className="flex items-start justify-between">
         <div>
           <p className="editorial-eyebrow">Import & Réconciliation</p>
-          <h3 className="text-lg editorial-heading text-foreground">OneDrive → Lovable AI → Supabase</h3>
+          <h3 className="text-lg editorial-heading text-foreground">OneDrive → OpenAI → Supabase</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Téléchargement réel, extraction structurée, puis persistance encadrée par validation humaine.
+            Téléchargement réel, extraction structurée OpenAI, puis persistance encadrée par validation humaine.
           </p>
         </div>
       </div>
+
+
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {TARGETS.map((t) => {
@@ -218,6 +222,14 @@ export default function ImportReconcilePanel() {
                       )}
                       {result.job_id && <div className="text-muted-foreground">job · {result.job_id.slice(0, 8)}</div>}
                       <p className="text-muted-foreground italic">Objets marqués needs_review = true.</p>
+                      <Link
+                        to={t.kind === 'canon' ? '/canon' : '/characters'}
+                        onClick={() => { try { window.dispatchEvent(new CustomEvent('supabase-records-refresh', { detail: { target: t.kind } })); } catch {} }}
+                        className="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded border border-primary/40 bg-primary/5 hover:bg-primary/10 text-foreground"
+                      >
+                        Voir dans {t.kind === 'canon' ? 'Canon' : 'Personnages'} <ArrowRight className="w-3 h-3" />
+                      </Link>
+
                     </div>
                   ) : (
                     <button

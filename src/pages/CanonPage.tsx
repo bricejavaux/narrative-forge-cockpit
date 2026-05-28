@@ -34,7 +34,13 @@ export default function CanonPage() {
   const [supaRecords, setSupaRecords] = useState<ActiveCanonObject[] | null>(null);
 
   const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCanonObjects());
-  useEffect(() => { loadSupa(); }, []);
+  useEffect(() => {
+    loadSupa();
+    const h = (e: Event) => { const d = (e as CustomEvent).detail; if (!d || d.target === 'canon') loadSupa(); };
+    window.addEventListener('supabase-records-refresh', h);
+    return () => window.removeEventListener('supabase-records-refresh', h);
+  }, []);
+
   const supaActive = (supaRecords?.length ?? 0) > 0;
 
 

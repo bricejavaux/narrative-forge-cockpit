@@ -16,7 +16,13 @@ export default function CharactersPage() {
   const [selectedChar, setSelectedChar] = useState<string | null>(characters[0]?.id ?? null);
   const [supaRecords, setSupaRecords] = useState<ActiveCharacter[] | null>(null);
   const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCharacters());
-  useEffect(() => { loadSupa(); }, []);
+  useEffect(() => {
+    loadSupa();
+    const h = (e: Event) => { const d = (e as CustomEvent).detail; if (!d || d.target === 'characters') loadSupa(); };
+    window.addEventListener('supabase-records-refresh', h);
+    return () => window.removeEventListener('supabase-records-refresh', h);
+  }, []);
+
   const supaActive = (supaRecords?.length ?? 0) > 0;
 
   const char = characters.find((c) => c.id === selectedChar);
