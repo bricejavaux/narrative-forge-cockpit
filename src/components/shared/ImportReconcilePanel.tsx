@@ -222,6 +222,14 @@ export default function ImportReconcilePanel() {
                       )}
                       {result.job_id && <div className="text-muted-foreground">job · {result.job_id.slice(0, 8)}</div>}
                       <p className="text-muted-foreground italic">Objets marqués needs_review = true.</p>
+                      <Link
+                        to={t.kind === 'canon' ? '/canon' : '/characters'}
+                        onClick={() => { try { window.dispatchEvent(new CustomEvent('supabase-records-refresh', { detail: { target: t.kind } })); } catch {} }}
+                        className="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded border border-primary/40 bg-primary/5 hover:bg-primary/10 text-foreground"
+                      >
+                        Voir dans {t.kind === 'canon' ? 'Canon' : 'Personnages'} <ArrowRight className="w-3 h-3" />
+                      </Link>
+
                     </div>
                   ) : (
                     <button
