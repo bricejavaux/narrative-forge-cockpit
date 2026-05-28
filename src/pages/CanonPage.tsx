@@ -1,14 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { canonRules, characters, chapters, arcs, audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ObjectProvenance from '@/components/shared/ObjectProvenance';
 import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
 import CanonImpactBanner from '@/components/production/CanonImpactBanner';
+import SupabaseCanonView from '@/components/shared/SupabaseCanonView';
+import { supabaseService, type ActiveCanonObject } from '@/services/supabaseService';
 import {
   ChevronRight, ChevronDown, BookOpen, Globe, Shield, AlertOctagon, Building2,
   Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic, Database
 } from 'lucide-react';
+
 
 const categoryMeta: Record<string, { icon: any; label: string }> = {
   Monde: { icon: Globe, label: 'Règles du monde' },
