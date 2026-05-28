@@ -8,13 +8,19 @@ export type CapabilityStatus =
   | 'live' | 'degraded' | 'dry_run' | 'mock_fallback'
   | 'design_example' | 'stubbed' | 'pending' | 'future' | 'inactive';
 
+export type CapabilityPhase = 'production_test' | 'chapter_production' | 'future';
+
 export type Capability = {
   key: string;
   name: string;
   status: CapabilityStatus;
+  phase: CapabilityPhase;
   blocker?: string;
   nextAction?: string;
   relatedRoute?: string;
+  notes?: string;
+};
+
   blocksTesting: boolean;
   notes?: string;
 };
