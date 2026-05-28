@@ -1,14 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { canonRules, characters, chapters, arcs, audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ObjectProvenance from '@/components/shared/ObjectProvenance';
 import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
 import CanonImpactBanner from '@/components/production/CanonImpactBanner';
+import SupabaseCanonView from '@/components/shared/SupabaseCanonView';
+import { supabaseService, type ActiveCanonObject } from '@/services/supabaseService';
 import {
   ChevronRight, ChevronDown, BookOpen, Globe, Shield, AlertOctagon, Building2,
   Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic, Database
 } from 'lucide-react';
+
 
 const categoryMeta: Record<string, { icon: any; label: string }> = {
   Monde: { icon: Globe, label: 'Règles du monde' },
@@ -28,6 +31,13 @@ export default function CanonPage() {
     Technologie: true, Lieu: true, Glossaire: false, Panne: true, Source: true,
   });
   const [search, setSearch] = useState('');
+  const [supaRecords, setSupaRecords] = useState<ActiveCanonObject[] | null>(null);
+
+  const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCanonObjects());
+  useEffect(() => { loadSupa(); }, []);
+  const supaActive = (supaRecords?.length ?? 0) > 0;
+
+
 
   const grouped = useMemo(() => {
     const map: Record<string, typeof canonRules> = {};
@@ -75,6 +85,16 @@ export default function CanonPage() {
 
       <ActiveRecordsBanner mode="canon" />
       <div className="my-3"><CanonImpactBanner /></div>
+
+      {supaActive && supaRecords ? (
+        <SupabaseCanonView records={supaRecords} onRefresh={loadSupa} />
+      ) : (
+        <>
+        {supaRecords !== null && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 mb-3">
+            <span className="font-mono">mock_fallback</span> — aucun objet Supabase actif. Lancez l'import <span className="font-mono">articulation.txt</span> pour activer le canon Supabase.
+          </div>
+        )}
 
       <div className="grid grid-cols-12 gap-6">
         {/* Tree navigation */}
@@ -318,6 +338,9 @@ export default function CanonPage() {
           )}
         </aside>
       </div>
+      </>
+      )}
+
     </div>
   );
 }

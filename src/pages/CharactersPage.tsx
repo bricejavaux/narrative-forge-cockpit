@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { characters, chapters, audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
+import SupabaseCharactersView from '@/components/shared/SupabaseCharactersView';
+import { supabaseService, type ActiveCharacter } from '@/services/supabaseService';
 import { User, X, Heart, Sparkles, Mic, MessageSquare, History } from 'lucide-react';
 
 const views = ['Liste', 'Matrice de relations', 'Timeline émotionnelle', 'Présence par chapitre', 'Alertes de continuité'];
@@ -12,9 +14,15 @@ const views = ['Liste', 'Matrice de relations', 'Timeline émotionnelle', 'Prés
 export default function CharactersPage() {
   const [activeView, setActiveView] = useState(views[0]);
   const [selectedChar, setSelectedChar] = useState<string | null>(characters[0]?.id ?? null);
+  const [supaRecords, setSupaRecords] = useState<ActiveCharacter[] | null>(null);
+  const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCharacters());
+  useEffect(() => { loadSupa(); }, []);
+  const supaActive = (supaRecords?.length ?? 0) > 0;
+
   const char = characters.find((c) => c.id === selectedChar);
   const charChapters = char ? chapters.filter((c) => char.linkedChapterIds?.includes(c.id) || c.linkedCharacterIds?.includes(char.id)) : [];
   const charAudio = char ? audioNotes.filter((a) => a.linkedCharacterIds?.includes(char.id) || a.target === char.name).slice(0, 4) : [];
+
 
   return (
     <div className="animate-slide-in space-y-6">
@@ -27,6 +35,16 @@ export default function CharactersPage() {
       </div>
 
       <ActiveRecordsBanner mode="characters" onSelect={(id) => setSelectedChar(id)} />
+
+      {supaActive && supaRecords ? (
+        <SupabaseCharactersView records={supaRecords} onRefresh={loadSupa} />
+      ) : (
+      <>
+      {supaRecords !== null && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800">
+          <span className="font-mono">mock_fallback</span> — aucun personnage Supabase actif. Lancez l'import <span className="font-mono">personnages.txt</span> pour activer les personnages Supabase.
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-border">
         {views.map((v) => (
@@ -229,6 +247,9 @@ export default function CharactersPage() {
           <p className="text-xs text-muted-foreground/70 mt-2 font-mono">Nécessite Supabase + OpenAI</p>
         </div>
       )}
+      </>
+      )}
     </div>
+
   );
 }
