@@ -247,6 +247,9 @@ export default function CharactersPage() {
           <p className="text-xs text-muted-foreground/70 mt-2 font-mono">Nécessite Supabase + OpenAI</p>
         </div>
       )}
+      </>
+      )}
     </div>
+
   );
 }
