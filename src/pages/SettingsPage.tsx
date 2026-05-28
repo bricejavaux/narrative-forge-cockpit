@@ -148,33 +148,35 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-xs space-y-1.5">
-        <p className="font-display text-sm text-emerald-700">Sécurité — secrets &amp; RLS</p>
+      <div className="rounded-lg border border-rose-500/40 bg-rose-500/5 p-4 text-xs space-y-2">
+        <p className="font-display text-sm text-rose-700">Sécurité — action manuelle requise (Git)</p>
         <p className="text-foreground/85">
-          <span className="text-emerald-700 font-medium">Aucun secret runtime exposé dans le bundle frontend.</span>{' '}
-          Le fichier <span className="font-mono">.env</span> ne contient que des valeurs publiques
-          <span className="font-mono"> VITE_SUPABASE_URL</span>, <span className="font-mono">VITE_SUPABASE_PUBLISHABLE_KEY</span>,
-          <span className="font-mono"> VITE_SUPABASE_PROJECT_ID</span> (publishable, conçues pour le client).
+          Le fichier <span className="font-mono">.env</span> est encore suivi par le dépôt GitHub.
+          Lovable ne peut pas modifier l'historique Git depuis l'application. Exécutez dans votre terminal local :
+        </p>
+        <pre className="text-[11px] bg-secondary/60 border border-border rounded p-2 overflow-x-auto">
+{`git rm --cached .env
+git commit -m "Stop tracking .env"
+git push`}
+        </pre>
+        <p className="text-foreground/85">
+          Après cette opération : <span className="font-mono">.env</span> ne doit plus apparaître à la racine du dépôt
+          GitHub, <span className="font-mono">.env.example</span> reste public, <span className="font-mono">.env</span> reste
+          listé dans <span className="font-mono">.gitignore</span>.
+        </p>
+        <div className="soft-divider" />
+        <p className="font-display text-sm text-emerald-700">Runtime secrets — non exposés côté client</p>
+        <p className="text-foreground/85">
+          <span className="font-mono">OPENAI_API_KEY</span>, <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span>,
+          <span className="font-mono"> MICROSOFT_ONEDRIVE_API_KEY</span>, <span className="font-mono">LOVABLE_API_KEY</span> :
+          uniquement présents en secrets Edge Function / Lovable Cloud, jamais bundlés dans le frontend.
         </p>
         <p className="text-foreground/85">
-          Les secrets <span className="font-mono">OPENAI_API_KEY</span>,{' '}
-          <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span>,{' '}
-          <span className="font-mono">MICROSOFT_ONEDRIVE_API_KEY</span>,{' '}
-          <span className="font-mono">LOVABLE_API_KEY</span> sont uniquement présents en{' '}
-          <span className="text-foreground font-medium">secrets Edge Function / Lovable Cloud</span> —
-          jamais committés, jamais bundlés côté client.
-        </p>
-        <p className="text-foreground/85">
-          <span className="text-foreground font-medium">RLS activé</span> — lectures/écritures
-          directes depuis le frontend limitées. Les écritures sensibles passent par des Edge Functions
-          (service role côté serveur).
-        </p>
-        <p className="text-amber-700">
-          Action recommandée côté repo Git : si <span className="font-mono">.env</span> est encore suivi,
-          exécutez <span className="font-mono">git rm --cached .env</span> et committez. Seules les valeurs
-          <span className="font-mono"> VITE_*</span> publiques peuvent apparaître dans un .env frontend.
+          <span className="text-foreground font-medium">RLS activé</span> — lectures/écritures directes depuis le frontend limitées
+          aux utilisateurs authentifiés. Les écritures sensibles passent par des Edge Functions (service role côté serveur).
         </p>
       </div>
+
 
       <div className="flex gap-1 overflow-x-auto border-b border-border">
         {sections.map((s) => (
