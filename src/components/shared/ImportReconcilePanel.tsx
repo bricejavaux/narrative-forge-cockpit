@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Download, FileText, Users, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, FileText, Users, Loader2, CheckCircle2, AlertTriangle, RefreshCw, ArrowRight } from 'lucide-react';
 import { importService, type ImportTarget, type ImportPreview } from '@/services/importService';
 import { canonRules, characters } from '@/data/dummyData';
+
 
 const TARGETS: { id: ImportTarget; label: string; path: string; icon: typeof FileText; kind: 'canon' | 'characters' }[] = [
   { id: 'articulation', label: 'articulation.txt → canon', path: '01_sources/articulation.txt', icon: FileText, kind: 'canon' },
