@@ -31,6 +31,13 @@ export default function CanonPage() {
     Technologie: true, Lieu: true, Glossaire: false, Panne: true, Source: true,
   });
   const [search, setSearch] = useState('');
+  const [supaRecords, setSupaRecords] = useState<ActiveCanonObject[] | null>(null);
+
+  const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCanonObjects());
+  useEffect(() => { loadSupa(); }, []);
+  const supaActive = (supaRecords?.length ?? 0) > 0;
+
+
 
   const grouped = useMemo(() => {
     const map: Record<string, typeof canonRules> = {};
