@@ -32,6 +32,8 @@ export default function IndexesPage() {
           </span>
         </div>
       </div>
+      <PgvectorReadinessPanel />
+
 
       {/* Vector source packages prepared on OneDrive */}
       <div className="space-y-3">
