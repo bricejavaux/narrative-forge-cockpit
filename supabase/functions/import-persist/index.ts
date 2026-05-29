@@ -197,17 +197,44 @@ Deno.serve(async (req) => {
       return json({ error: e instanceof Error ? e.message : 'persistence_failed' }, 500);
     }
 
+    // Post-write verification via service role — distinguishes "write failed" vs "read blocked client-side".
+    let service_role_visible_count = 0;
+    let service_role_sample: Array<Record<string, unknown>> = [];
+    try {
+      if (target === 'articulation') {
+        const { count } = await client.from('canon_objects').select('id', { count: 'exact', head: true });
+        service_role_visible_count = count ?? 0;
+        const { data: sample } = await client
+          .from('canon_objects')
+          .select('id, title, category, updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(5);
+        service_role_sample = sample ?? [];
+      } else {
+        const { count } = await client.from('characters').select('id', { count: 'exact', head: true });
+        service_role_visible_count = count ?? 0;
+        const { data: sample } = await client
+          .from('characters')
+          .select('id, name, role, updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(5);
+        service_role_sample = sample ?? [];
+      }
+    } catch (_) {
+      // verification is best-effort; never fail the persist response over this
+    }
+
     await client.from('import_jobs').update({
       status: result.errors.length ? 'partial' : 'done',
       finished_at: new Date().toISOString(),
-      output: result,
+      output: { ...result, service_role_visible_count, service_role_sample },
     }).eq('id', job.id);
 
     await client.from('logs').insert({
       level: result.errors.length ? 'warn' : 'info',
       source: 'import-persist',
-      message: `import ${target} ok — ${result.inserted} ajoutés / ${result.updated} mis à jour / ${result.skipped} ignorés`,
-      payload: { target, ...result },
+      message: `import ${target} ok — ${result.inserted} ajoutés / ${result.updated} mis à jour / ${result.skipped} ignorés · visibles(service_role)=${service_role_visible_count}`,
+      payload: { target, ...result, service_role_visible_count },
     });
 
     return json({
@@ -215,6 +242,8 @@ Deno.serve(async (req) => {
       target,
       job_id: job.id,
       ...result,
+      service_role_visible_count,
+      service_role_sample,
     });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'unknown' }, 500);

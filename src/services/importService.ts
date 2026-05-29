@@ -40,6 +40,8 @@ export const importService = {
     skipped?: number;
     errors?: string[];
     details?: Array<{ category?: string; name?: string; title?: string; action: 'insert' | 'update' | 'skip' }>;
+    service_role_visible_count?: number;
+    service_role_sample?: Array<Record<string, unknown>>;
     error?: string;
   }> {
     const { data, error } = await supabase.functions.invoke('import-persist', {

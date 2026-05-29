@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { canonRules, characters, chapters, arcs, audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
@@ -6,7 +7,8 @@ import ObjectProvenance from '@/components/shared/ObjectProvenance';
 import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
 import CanonImpactBanner from '@/components/production/CanonImpactBanner';
 import SupabaseCanonView from '@/components/shared/SupabaseCanonView';
-import { supabaseService, type ActiveCanonObject } from '@/services/supabaseService';
+import { supabaseService, type ActiveCanonObject, type ReadStatus } from '@/services/supabaseService';
+import { isDemoMode } from '@/lib/productionMode';
 import {
   ChevronRight, ChevronDown, BookOpen, Globe, Shield, AlertOctagon, Building2,
   Cpu, MapPin, BookMarked, X, Link2, Clock, Users, GitBranch, FileText, Mic, Database
@@ -31,9 +33,10 @@ export default function CanonPage() {
     Technologie: true, Lieu: true, Glossaire: false, Panne: true, Source: true,
   });
   const [search, setSearch] = useState('');
-  const [supaRecords, setSupaRecords] = useState<ActiveCanonObject[] | null>(null);
+  const [supa, setSupa] = useState<ReadStatus<ActiveCanonObject> | null>(null);
+  const demo = isDemoMode();
 
-  const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCanonObjects());
+  const loadSupa = async () => setSupa(await supabaseService.getCanonObjectsWithStatus());
   useEffect(() => {
     loadSupa();
     const h = (e: Event) => { const d = (e as CustomEvent).detail; if (!d || d.target === 'canon' || d.target === undefined) loadSupa(); };
@@ -46,7 +49,9 @@ export default function CanonPage() {
   }, []);
 
 
-  const supaActive = (supaRecords?.length ?? 0) > 0;
+  const supaActive = (supa?.rows?.length ?? 0) > 0;
+  const supaError = supa && !supa.ok;
+
 
 
 
@@ -97,19 +102,31 @@ export default function CanonPage() {
       <ActiveRecordsBanner mode="canon" />
       <div className="my-3"><CanonImpactBanner /></div>
 
-      {supaActive && supaRecords ? (
-        <SupabaseCanonView records={supaRecords} onRefresh={loadSupa} />
+      {supaActive && supa ? (
+        <SupabaseCanonView records={supa.rows} onRefresh={loadSupa} />
+      ) : supaError ? (
+        <div className="rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-3 text-[12px] text-rose-800 mb-3 space-y-2">
+          <div><span className="font-mono">Lecture canon_objects impossible</span> — {supa?.error}</div>
+          <div className="text-rose-700/80">Cause probable : policy RLS SELECT manquante pour anon/authenticated.</div>
+        </div>
+      ) : !demo ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-6 text-[12px] text-amber-800 mb-3 space-y-3">
+          <div className="font-display text-sm">Aucun objet canon actif dans Supabase.</div>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/" className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-600/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 text-xs">Importer articulation.txt →</Link>
+            <button onClick={loadSupa} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-600/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 text-xs">Rafraîchir Supabase</button>
+          </div>
+          <div className="text-[11px] text-amber-700/80">Mode Production Test : aucune donnée fictive ne sera affichée. Active Demo Mode dans Réglages pour voir les exemples.</div>
+        </div>
       ) : (
         <>
-        {supaRecords !== null && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-3 text-[12px] text-amber-800 mb-3 space-y-2">
-            <div><span className="font-mono">mock_fallback</span> — aucun objet Supabase actif dans <span className="font-mono">canon_objects</span>.</div>
-            <div className="flex flex-wrap gap-2">
-              <a href="/" className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-600/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 text-xs">Importer articulation.txt →</a>
-              <span className="text-[11px] text-amber-700/80 self-center">Le panneau Import & Réconciliation se trouve sur le Dashboard.</span>
-            </div>
+        {supa !== null && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-3 text-[12px] text-amber-800 mb-3">
+            <span className="font-mono">demo_mode</span> — aucun objet Supabase, exemples affichés.
           </div>
         )}
+
+
 
       <div className="grid grid-cols-12 gap-6">
         {/* Tree navigation */}
@@ -354,7 +371,7 @@ export default function CanonPage() {
         </aside>
       </div>
       </>
-      )}
+      ) : null}
 
     </div>
   );

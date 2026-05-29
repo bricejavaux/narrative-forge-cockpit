@@ -106,6 +106,18 @@ export type ActiveCharacter = {
   updated_at: string;
 };
 
+export type ReadStatus<T> = {
+  rows: T[];
+  count: number;
+  ok: boolean;
+  error?: string;
+  source: 'supabase';
+  table: string;
+  checked_at: string;
+};
+
+export type CountStatus = { count: number; ok: boolean; error?: string; missing?: boolean; table: string };
+
 export const supabaseService = {
   client: supabase,
   async getReadiness(): Promise<ConnectionReadiness> {
@@ -118,25 +130,65 @@ export const supabaseService = {
     return { ok: !error, error: error?.message };
   },
 
-  /** Returns the active canon objects in Supabase. Empty array means "no active data yet" — UI should fall back to dummy. */
+  /** @deprecated Use getCanonObjectsWithStatus(). Returns [] on error which hides RLS issues. */
   async getActiveCanonObjects(): Promise<ActiveCanonObject[]> {
-    const { data, error } = await supabase
-      .from('canon_objects')
-      .select('id,external_id,title,category,summary,description,exceptions,criticality,rigidity,status,version,validation_status,needs_review,needs_index_refresh,source_reference,index_associated,updated_at')
-      .order('updated_at', { ascending: false })
-      .limit(500);
-    if (error) return [];
-    return (data ?? []) as ActiveCanonObject[];
+    const r = await this.getCanonObjectsWithStatus();
+    return r.rows;
   },
 
+  /** @deprecated Use getCharactersWithStatus(). Returns [] on error which hides RLS issues. */
   async getActiveCharacters(): Promise<ActiveCharacter[]> {
-    const { data, error } = await supabase
-      .from('characters')
-      .select('id,external_id,name,role,function,apparent_goal,real_goal,flaw,secret,forbidden,emotional_trajectory,breaking_point,narrative_weight,exposure_level,validation_status,needs_review,updated_at')
-      .order('updated_at', { ascending: false })
-      .limit(500);
-    if (error) return [];
-    return (data ?? []) as ActiveCharacter[];
+    const r = await this.getCharactersWithStatus();
+    return r.rows;
+  },
+
+  /** Diagnostic read for canon — never silently returns [] on error. */
+  async getCanonObjectsWithStatus(): Promise<ReadStatus<ActiveCanonObject>> {
+    const checked_at = new Date().toISOString();
+    try {
+      const { data, error, count } = await supabase
+        .from('canon_objects')
+        .select('id,external_id,title,category,summary,description,exceptions,criticality,rigidity,status,version,validation_status,needs_review,needs_index_refresh,source_reference,index_associated,updated_at', { count: 'exact' })
+        .order('updated_at', { ascending: false })
+        .limit(500);
+      if (error) return { rows: [], count: 0, ok: false, error: error.message, source: 'supabase', table: 'canon_objects', checked_at };
+      return { rows: (data ?? []) as ActiveCanonObject[], count: count ?? (data?.length ?? 0), ok: true, source: 'supabase', table: 'canon_objects', checked_at };
+    } catch (e) {
+      return { rows: [], count: 0, ok: false, error: e instanceof Error ? e.message : 'unknown', source: 'supabase', table: 'canon_objects', checked_at };
+    }
+  },
+
+  /** Diagnostic read for characters — never silently returns [] on error. */
+  async getCharactersWithStatus(): Promise<ReadStatus<ActiveCharacter>> {
+    const checked_at = new Date().toISOString();
+    try {
+      const { data, error, count } = await supabase
+        .from('characters')
+        .select('id,external_id,name,role,function,apparent_goal,real_goal,flaw,secret,forbidden,emotional_trajectory,breaking_point,narrative_weight,exposure_level,validation_status,needs_review,updated_at', { count: 'exact' })
+        .order('updated_at', { ascending: false })
+        .limit(500);
+      if (error) return { rows: [], count: 0, ok: false, error: error.message, source: 'supabase', table: 'characters', checked_at };
+      return { rows: (data ?? []) as ActiveCharacter[], count: count ?? (data?.length ?? 0), ok: true, source: 'supabase', table: 'characters', checked_at };
+    } catch (e) {
+      return { rows: [], count: 0, ok: false, error: e instanceof Error ? e.message : 'unknown', source: 'supabase', table: 'characters', checked_at };
+    }
+  },
+
+  /** Diagnostic count — distinguishes ok=0, RLS error, missing table. */
+  async countWithStatus(table: string, filter?: (q: any) => any): Promise<CountStatus> {
+    try {
+      let q = supabase.from(table as any).select('id', { count: 'exact', head: true });
+      if (filter) q = filter(q);
+      const { count, error } = await q;
+      if (error) {
+        const msg = error.message || '';
+        const missing = /relation .* does not exist|not found|schema cache/i.test(msg);
+        return { count: 0, ok: false, error: msg, missing, table };
+      }
+      return { count: count ?? 0, ok: true, table };
+    } catch (e) {
+      return { count: 0, ok: false, error: e instanceof Error ? e.message : 'unknown', table };
+    }
   },
 
   async updateCanonObject(id: string, patch: Partial<ActiveCanonObject>) {
@@ -164,55 +216,55 @@ export const supabaseService = {
     return { count: rows.length, rows };
   },
 
-  /** Aggregated counts used by Production Flow + Test Readiness. Each branch isolates failures so a single missing table doesn't break the whole call. */
+  /** Aggregated counts used by Production Flow + Test Readiness. */
   async getProductionCounts() {
-    const safeCount = async (table: string, filter?: (q: any) => any) => {
-      try {
-        let q = supabase.from(table as any).select('id', { count: 'exact', head: true });
-        if (filter) q = filter(q);
-        const { count, error } = await q;
-        if (error) return 0;
-        return count ?? 0;
-      } catch { return 0; }
-    };
     const [
-      canon_count, characters_count, chapters_count,
-      planned_beats_count, validated_beats_count,
-      open_rewrite_tasks_count, locked_chapters_count,
+      canon, chars, chs,
+      planned_beats, validated_beats,
+      open_rewrite_tasks, locked_chapters,
     ] = await Promise.all([
-      safeCount('canon_objects'),
-      safeCount('characters'),
-      safeCount('chapters'),
-      safeCount('beats', (q) => q.eq('beat_type', 'planned')),
-      safeCount('beats', (q) => q.eq('validation_status', 'validated')),
-      safeCount('rewrite_tasks', (q) => q.eq('status', 'pending')),
-      safeCount('chapters', (q) => q.eq('locked', true)),
+      this.countWithStatus('canon_objects'),
+      this.countWithStatus('characters'),
+      this.countWithStatus('chapters'),
+      this.countWithStatus('beats', (q) => q.eq('beat_type', 'planned')),
+      this.countWithStatus('beats', (q) => q.eq('validation_status', 'validated')),
+      this.countWithStatus('rewrite_tasks', (q) => q.eq('status', 'pending')),
+      this.countWithStatus('chapters', (q) => q.eq('locked', true)),
     ]);
-    // chapter_full_text_count: must scan since SQL filter on text length is awkward via PostgREST
     let chapter_full_text_count = 0;
     try {
       const { data } = await supabase.from('chapters').select('full_text').limit(500);
       chapter_full_text_count = (data ?? []).filter((r: any) => r.full_text && String(r.full_text).trim().length > 0).length;
     } catch {}
     return {
-      canon_count, characters_count, chapters_count,
-      planned_beats_count, validated_beats_count,
-      chapter_full_text_count, open_rewrite_tasks_count, locked_chapters_count,
+      canon_count: canon.count,
+      characters_count: chars.count,
+      chapters_count: chs.count,
+      planned_beats_count: planned_beats.count,
+      validated_beats_count: validated_beats.count,
+      chapter_full_text_count,
+      open_rewrite_tasks_count: open_rewrite_tasks.count,
+      locked_chapters_count: locked_chapters.count,
+      canon_ok: canon.ok, canon_error: canon.error,
+      characters_ok: chars.ok, characters_error: chars.error,
+      chapters_ok: chs.ok, chapters_error: chs.error,
     };
   },
 };
 
 export type ProductionCounts = Awaited<ReturnType<typeof supabaseService.getProductionCounts>>;
 
-/** Derive a dynamic ProductionFlowPanel stages array from real Supabase counts. */
+/** Derive ProductionFlowPanel stages from real Supabase counts. In Production Test, never emits "mock". */
 export function deriveProductionStages(c: ProductionCounts | null) {
-  const k = c ?? { canon_count: 0, characters_count: 0, chapters_count: 0, planned_beats_count: 0, validated_beats_count: 0, chapter_full_text_count: 0, open_rewrite_tasks_count: 0, locked_chapters_count: 0 };
+  const k = c ?? ({ canon_count: 0, characters_count: 0, chapters_count: 0, planned_beats_count: 0, validated_beats_count: 0, chapter_full_text_count: 0, open_rewrite_tasks_count: 0, locked_chapters_count: 0, canon_ok: true, characters_ok: true, chapters_ok: true } as ProductionCounts);
   type S = 'live' | 'pending' | 'blocked' | 'future' | 'mock' | 'active';
   const stage = (step: number, name: string, status: S, extras: Record<string, any> = {}) => ({ step, name, status, ...extras });
+  const canonStatus: S = (c && c.canon_ok === false) ? 'blocked' : (k.canon_count > 0 ? 'live' : 'pending');
+  const archStatus: S = (c && c.chapters_ok === false) ? 'blocked' : (k.chapters_count > 0 ? 'live' : 'pending');
   return [
-    stage(1, 'Canon actif', k.canon_count > 0 ? 'live' : 'mock', { route: '/canon', mockFallback: k.canon_count === 0, blocker: k.canon_count === 0 ? 'Aucun canon_object Supabase.' : undefined, nextAction: k.canon_count === 0 ? 'Importer articulation.txt.' : undefined }),
-    stage(2, 'Architecture Tome', k.chapters_count > 0 ? 'live' : 'mock', { route: '/architecture', mockFallback: k.chapters_count === 0 }),
-    stage(3, 'Plan chapitre', k.chapters_count > 0 ? 'live' : 'mock', { route: '/architecture', mockFallback: k.chapters_count === 0 }),
+    stage(1, 'Canon actif', canonStatus, { route: '/canon', blocker: canonStatus === 'blocked' ? (c?.canon_error || 'Lecture canon_objects bloquée.') : (k.canon_count === 0 ? 'Aucun canon_object Supabase.' : undefined), nextAction: k.canon_count === 0 ? 'Importer articulation.txt.' : undefined }),
+    stage(2, 'Architecture Tome', archStatus, { route: '/architecture', blocker: archStatus === 'pending' ? 'Aucun chapitre planifié.' : undefined }),
+    stage(3, 'Plan chapitre', archStatus, { route: '/architecture', blocker: archStatus === 'pending' ? 'Aucun plan de chapitre.' : undefined }),
     stage(4, 'Beats prévus', k.planned_beats_count > 0 ? 'live' : 'pending', { route: '/production', blocker: k.planned_beats_count === 0 ? 'Beats prévus non générés.' : undefined }),
     stage(5, 'Validation beats', k.validated_beats_count > 0 ? 'live' : 'pending', { route: '/production', blocker: k.validated_beats_count === 0 ? 'Validation humaine requise.' : undefined }),
     stage(6, 'Génération chapitre', k.validated_beats_count > 0 ? 'pending' : 'blocked', { route: '/production', blocker: k.validated_beats_count === 0 ? 'Beats validés requis.' : 'Génération chapitre désactivée en Production Test.' }),
@@ -224,4 +276,3 @@ export function deriveProductionStages(c: ProductionCounts | null) {
     stage(12, 'Export', 'pending', { route: '/exports', blocker: 'Sélection de contenu requise.' }),
   ];
 }
-
