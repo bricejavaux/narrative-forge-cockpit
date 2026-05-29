@@ -3,6 +3,7 @@ import { indexes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import VectorPackagesPanel from '@/components/shared/VectorPackagesPanel';
 import VectorIngestionPanel from '@/components/shared/VectorIngestionPanel';
+import PgvectorReadinessPanel from '@/components/shared/PgvectorReadinessPanel';
 import { Database, AlertTriangle, RefreshCcw, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function IndexesPage() {
@@ -31,6 +32,8 @@ export default function IndexesPage() {
           </span>
         </div>
       </div>
+      <PgvectorReadinessPanel />
+
 
       {/* Vector source packages prepared on OneDrive */}
       <div className="space-y-3">

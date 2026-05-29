@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle } from 'lucide-react';
 import { agentsService, type AgentRow, type AgentVersionRow, type AgentBindingRow } from '@/services/agentsService';
+import { supabase } from '@/integrations/supabase/client';
+import { classifyAgentTestability, TESTABILITY_LABEL } from '@/lib/agentTestability';
 
 export default function PersistedAgentsPanel() {
   const [loading, setLoading] = useState(false);
@@ -18,11 +20,29 @@ export default function PersistedAgentsPanel() {
   const [editScript, setEditScript] = useState('[]');
   const [reason, setReason] = useState('');
 
+  // env for testability classification
+  const [env, setEnv] = useState<{ hasChapters: boolean; hasCanon: boolean; pgvectorActive: boolean; bindingsByAgent: Record<string, AgentBindingRow[]> }>({
+    hasChapters: false, hasCanon: false, pgvectorActive: false, bindingsByAgent: {},
+  });
+
   const load = async () => {
     setLoading(true); setErr(null);
     try {
       const list = await agentsService.list();
       setAgents(list);
+      // load env context
+      const [chCount, caCount, allBindings] = await Promise.all([
+        supabase.from('chapters').select('id', { count: 'exact', head: true }),
+        supabase.from('canon_objects').select('id', { count: 'exact', head: true }),
+        supabase.from('agent_index_bindings').select('id,agent_id,index_name,corpus_name,required,top_k,similarity_threshold,status'),
+      ]);
+      const map: Record<string, AgentBindingRow[]> = {};
+      ((allBindings.data ?? []) as any[]).forEach((b) => {
+        if (!map[b.agent_id]) map[b.agent_id] = [];
+        map[b.agent_id].push(b as AgentBindingRow);
+      });
+      const anyActive = ((allBindings.data ?? []) as any[]).some((b) => b.status === 'active');
+      setEnv({ hasChapters: (chCount.count ?? 0) > 0, hasCanon: (caCount.count ?? 0) > 0, pgvectorActive: anyActive, bindingsByAgent: map });
       if (!selected && list.length) await pick(list[0]);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
@@ -110,21 +130,30 @@ export default function PersistedAgentsPanel() {
       ) : (
         <div className="grid grid-cols-12 gap-3">
           <div className="col-span-4 space-y-1 max-h-80 overflow-auto pr-1">
-            {agents.map((a) => (
+            {agents.map((a) => {
+              const t = classifyAgentTestability(a, { ...env, bindings: env.bindingsByAgent[a.id] });
+              const meta = TESTABILITY_LABEL[t.status];
+              return (
               <button
                 key={a.id}
                 onClick={() => pick(a)}
                 className={`w-full text-left rounded border px-2 py-1.5 text-xs transition-colors ${selected?.id === a.id ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-primary/30'}`}
               >
-                <div className="flex items-center gap-1.5">
-                  <Bot size={10} className="text-primary" />
-                  <span className="text-foreground">{a.name}</span>
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Bot size={10} className="text-primary shrink-0" />
+                    <span className="text-foreground truncate">{a.name}</span>
+                  </div>
+                  <span className={`text-[9px] font-mono px-1 py-0.5 rounded border shrink-0 ${meta.classes}`} title={t.reason}>
+                    {meta.label}
+                  </span>
                 </div>
                 <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
                   {a.selected_model ?? a.default_model ?? '—'} · {a.persistence_status ?? 'suggestions_only'}
                 </p>
               </button>
-            ))}
+              );
+            })}
           </div>
 
           {selected && (
