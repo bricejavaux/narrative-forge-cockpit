@@ -30,6 +30,19 @@ export default function PersistedAgentsPanel() {
     try {
       const list = await agentsService.list();
       setAgents(list);
+      // load env context
+      const [chCount, caCount, allBindings] = await Promise.all([
+        supabase.from('chapters').select('id', { count: 'exact', head: true }),
+        supabase.from('canon_objects').select('id', { count: 'exact', head: true }),
+        supabase.from('agent_index_bindings').select('id,agent_id,index_name,corpus_name,required,top_k,similarity_threshold,status'),
+      ]);
+      const map: Record<string, AgentBindingRow[]> = {};
+      ((allBindings.data ?? []) as any[]).forEach((b) => {
+        if (!map[b.agent_id]) map[b.agent_id] = [];
+        map[b.agent_id].push(b as AgentBindingRow);
+      });
+      const anyActive = ((allBindings.data ?? []) as any[]).some((b) => b.status === 'active');
+      setEnv({ hasChapters: (chCount.count ?? 0) > 0, hasCanon: (caCount.count ?? 0) > 0, pgvectorActive: anyActive, bindingsByAgent: map });
       if (!selected && list.length) await pick(list[0]);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
