@@ -116,7 +116,25 @@ export type ReadStatus<T> = {
   checked_at: string;
 };
 
-export type CountStatus = { count: number; ok: boolean; error?: string; missing?: boolean; table: string };
+export type CountStatusValue = 'active' | 'empty' | 'missing_table' | 'rls_blocked' | 'not_created_yet' | 'unknown_error' | 'phase_next';
+export type CountStatus = {
+  table: string;
+  count: number;
+  ok: boolean;
+  status: CountStatusValue;
+  error?: string;
+  error_message?: string;
+  error_code?: string;
+  error_details?: string;
+  error_hint?: string;
+  missing?: boolean;
+  required?: boolean;
+};
+
+/** Tables required for current Production Test. Others fall back to "phase suivante" classification when blocked. */
+export const PRODUCTION_TEST_REQUIRED_TABLES = new Set<string>([
+  'canon_objects', 'characters', 'import_jobs',
+]);
 
 export const supabaseService = {
   client: supabase,
@@ -130,25 +148,17 @@ export const supabaseService = {
     return { ok: !error, error: error?.message };
   },
 
-  /** @deprecated Use getCanonObjectsWithStatus(). Returns [] on error which hides RLS issues. */
-  async getActiveCanonObjects(): Promise<ActiveCanonObject[]> {
-    const r = await this.getCanonObjectsWithStatus();
-    return r.rows;
-  },
+  /** @deprecated Use getCanonObjectsWithStatus(). */
+  async getActiveCanonObjects(): Promise<ActiveCanonObject[]> { return (await this.getCanonObjectsWithStatus()).rows; },
+  /** @deprecated Use getCharactersWithStatus(). */
+  async getActiveCharacters(): Promise<ActiveCharacter[]> { return (await this.getCharactersWithStatus()).rows; },
 
-  /** @deprecated Use getCharactersWithStatus(). Returns [] on error which hides RLS issues. */
-  async getActiveCharacters(): Promise<ActiveCharacter[]> {
-    const r = await this.getCharactersWithStatus();
-    return r.rows;
-  },
-
-  /** Diagnostic read for canon — never silently returns [] on error. */
   async getCanonObjectsWithStatus(): Promise<ReadStatus<ActiveCanonObject>> {
     const checked_at = new Date().toISOString();
     try {
       const { data, error, count } = await supabase
         .from('canon_objects')
-        .select('id,external_id,title,category,summary,description,exceptions,criticality,rigidity,status,version,validation_status,needs_review,needs_index_refresh,source_reference,index_associated,updated_at', { count: 'exact' })
+        .select('id,external_id,title,category,summary,description,exceptions,criticality,rigidity,status,version,validation_status,needs_review,needs_index_refresh,source_reference,index_associated,updated_at,metadata', { count: 'exact' })
         .order('updated_at', { ascending: false })
         .limit(500);
       if (error) return { rows: [], count: 0, ok: false, error: error.message, source: 'supabase', table: 'canon_objects', checked_at };
@@ -158,13 +168,12 @@ export const supabaseService = {
     }
   },
 
-  /** Diagnostic read for characters — never silently returns [] on error. */
   async getCharactersWithStatus(): Promise<ReadStatus<ActiveCharacter>> {
     const checked_at = new Date().toISOString();
     try {
       const { data, error, count } = await supabase
         .from('characters')
-        .select('id,external_id,name,role,function,apparent_goal,real_goal,flaw,secret,forbidden,emotional_trajectory,breaking_point,narrative_weight,exposure_level,validation_status,needs_review,updated_at', { count: 'exact' })
+        .select('id,external_id,name,role,function,apparent_goal,real_goal,flaw,secret,forbidden,emotional_trajectory,breaking_point,narrative_weight,exposure_level,validation_status,needs_review,updated_at,metadata', { count: 'exact' })
         .order('updated_at', { ascending: false })
         .limit(500);
       if (error) return { rows: [], count: 0, ok: false, error: error.message, source: 'supabase', table: 'characters', checked_at };
@@ -174,31 +183,71 @@ export const supabaseService = {
     }
   },
 
-  /** Diagnostic count — distinguishes ok=0, RLS error, missing table. */
+  /** Diagnostic count — classified error, never returns ok=false with empty error. */
   async countWithStatus(table: string, filter?: (q: any) => any): Promise<CountStatus> {
+    const required = PRODUCTION_TEST_REQUIRED_TABLES.has(table);
     try {
       let q = supabase.from(table as any).select('id', { count: 'exact', head: true });
       if (filter) q = filter(q);
       const { count, error } = await q;
       if (error) {
-        const msg = error.message || '';
-        const missing = /relation .* does not exist|not found|schema cache/i.test(msg);
-        return { count: 0, ok: false, error: msg, missing, table };
+        const anyErr = error as any;
+        const message = anyErr?.message || '';
+        const code = anyErr?.code || '';
+        const details = anyErr?.details || '';
+        const hint = anyErr?.hint || '';
+        const raw = message || details || JSON.stringify(error) || 'unknown error';
+        const missing = /relation .* does not exist|does not exist|not found|schema cache|PGRST20[125]/i.test(raw) || code === 'PGRST205' || code === '42P01';
+        let status: CountStatusValue = 'unknown_error';
+        if (missing) status = required ? 'missing_table' : 'not_created_yet';
+        else if (/permission denied|RLS|policy|insufficient_privilege|42501/i.test(raw)) status = 'rls_blocked';
+        else if (!required) status = 'phase_next';
+        return { table, count: 0, ok: false, status, error: raw, error_message: message, error_code: code, error_details: details, error_hint: hint, missing, required };
       }
-      return { count: count ?? 0, ok: true, table };
+      const c = count ?? 0;
+      return { table, count: c, ok: true, status: c > 0 ? 'active' : 'empty', required };
     } catch (e) {
-      return { count: 0, ok: false, error: e instanceof Error ? e.message : 'unknown', table };
+      const msg = e instanceof Error ? e.message : 'unknown';
+      return { table, count: 0, ok: false, status: required ? 'unknown_error' : 'phase_next', error: msg, error_message: msg, required };
     }
   },
 
+  /** @deprecated frontend UPDATE may fail under RLS. Use validateCanonObjects(). */
   async updateCanonObject(id: string, patch: Partial<ActiveCanonObject>) {
     const { error } = await supabase.from('canon_objects').update(patch).eq('id', id);
     return { ok: !error, error: error?.message };
   },
-
+  /** @deprecated frontend UPDATE may fail under RLS. Use validateCharacters(). */
   async updateCharacter(id: string, patch: Partial<ActiveCharacter>) {
     const { error } = await supabase.from('characters').update(patch).eq('id', id);
     return { ok: !error, error: error?.message };
+  },
+
+  // ---- Governance-controlled writes (Edge Function with service role) ----
+  async governanceUpdate(params: {
+    target_table: 'canon_objects' | 'characters';
+    record_ids: string[];
+    action: 'mark_validated' | 'mark_reviewed' | 'mark_index_refresh_required' | 'apply_note_patch';
+    patch?: Record<string, any>;
+    note_context?: Record<string, any>;
+  }): Promise<{ ok: boolean; updated: number; failed: number; errors?: any; error?: string; raw?: any }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('governance-update', { body: params });
+      if (error) return { ok: false, updated: 0, failed: params.record_ids.length, error: error.message };
+      const updated = Number((data as any)?.updated ?? 0);
+      const failed = Number((data as any)?.failed ?? 0);
+      return { ok: updated > 0 && failed === 0, updated, failed, errors: (data as any)?.errors, raw: data };
+    } catch (e) {
+      return { ok: false, updated: 0, failed: params.record_ids.length, error: e instanceof Error ? e.message : 'unknown' };
+    }
+  },
+  validateCanonObjects(ids: string[]) { return this.governanceUpdate({ target_table: 'canon_objects', record_ids: ids, action: 'mark_validated' }); },
+  validateCharacters(ids: string[]) { return this.governanceUpdate({ target_table: 'characters', record_ids: ids, action: 'mark_validated' }); },
+  markCanonReviewed(ids: string[]) { return this.governanceUpdate({ target_table: 'canon_objects', record_ids: ids, action: 'mark_reviewed' }); },
+  markCharactersReviewed(ids: string[]) { return this.governanceUpdate({ target_table: 'characters', record_ids: ids, action: 'mark_reviewed' }); },
+  markCanonIndexRefresh(ids: string[]) { return this.governanceUpdate({ target_table: 'canon_objects', record_ids: ids, action: 'mark_index_refresh_required' }); },
+  applyStructuredNotePatch(target_table: 'canon_objects' | 'characters', id: string, patch: Record<string, any>, note_context?: Record<string, any>) {
+    return this.governanceUpdate({ target_table, record_ids: [id], action: 'apply_note_patch', patch, note_context });
   },
 
   async getActiveChapters(): Promise<{ count: number; rows: Array<{ id: string; number: number; title: string; status: string; production_status: string; locked: boolean; full_text_present: boolean }> }> {
