@@ -20,6 +20,11 @@ export default function PersistedAgentsPanel() {
   const [editScript, setEditScript] = useState('[]');
   const [reason, setReason] = useState('');
 
+  // env for testability classification
+  const [env, setEnv] = useState<{ hasChapters: boolean; hasCanon: boolean; pgvectorActive: boolean; bindingsByAgent: Record<string, AgentBindingRow[]> }>({
+    hasChapters: false, hasCanon: false, pgvectorActive: false, bindingsByAgent: {},
+  });
+
   const load = async () => {
     setLoading(true); setErr(null);
     try {
