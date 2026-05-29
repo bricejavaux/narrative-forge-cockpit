@@ -17,6 +17,7 @@ import ProductionFlowPanel from '@/components/shared/ProductionFlowPanel';
 import SupabaseRepositoryPanel from '@/components/shared/SupabaseRepositoryPanel';
 import { project, chapters, arcs, recentActivity, runs } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness, type ProductionCounts, deriveProductionStages } from '@/services/supabaseService';
+import { isDemoMode } from '@/lib/productionMode';
 
 
 function buildWarnings(r: ConnectionReadiness | null) {
