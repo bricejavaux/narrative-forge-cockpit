@@ -130,21 +130,30 @@ export default function PersistedAgentsPanel() {
       ) : (
         <div className="grid grid-cols-12 gap-3">
           <div className="col-span-4 space-y-1 max-h-80 overflow-auto pr-1">
-            {agents.map((a) => (
+            {agents.map((a) => {
+              const t = classifyAgentTestability(a, { ...env, bindings: env.bindingsByAgent[a.id] });
+              const meta = TESTABILITY_LABEL[t.status];
+              return (
               <button
                 key={a.id}
                 onClick={() => pick(a)}
                 className={`w-full text-left rounded border px-2 py-1.5 text-xs transition-colors ${selected?.id === a.id ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-primary/30'}`}
               >
-                <div className="flex items-center gap-1.5">
-                  <Bot size={10} className="text-primary" />
-                  <span className="text-foreground">{a.name}</span>
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Bot size={10} className="text-primary shrink-0" />
+                    <span className="text-foreground truncate">{a.name}</span>
+                  </div>
+                  <span className={`text-[9px] font-mono px-1 py-0.5 rounded border shrink-0 ${meta.classes}`} title={t.reason}>
+                    {meta.label}
+                  </span>
                 </div>
                 <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
                   {a.selected_model ?? a.default_model ?? '—'} · {a.persistence_status ?? 'suggestions_only'}
                 </p>
               </button>
-            ))}
+              );
+            })}
           </div>
 
           {selected && (
