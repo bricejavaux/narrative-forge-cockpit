@@ -9,6 +9,7 @@ import { getRuntimeMode, setRuntimeMode, type RuntimeMode } from '@/lib/runtimeM
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import QAActionRegistryPanel from '@/components/shared/QAActionRegistryPanel';
 import TestReadinessPanel from '@/components/shared/TestReadinessPanel';
+import BuildAlignmentPanel from '@/components/shared/BuildAlignmentPanel';
 import { Sliders, Mic } from 'lucide-react';
 
 function deriveConnectorStatus(id: string, r: ConnectionReadiness | null): { status: ConnectorStatus; note: string } {
@@ -114,6 +115,7 @@ function RuntimeModeSwitch() {
 
 const sections = [
   'Connecteurs',
+  'Alignement Build / GitHub',
   'Readiness Supabase / OpenAI / OneDrive',
   'QA actions & boutons',
   'Prêt pour premiers tests ?',
@@ -199,6 +201,8 @@ git push`}
           ))}
         </div>
       )}
+
+      {activeSection === 'Alignement Build / GitHub' && <BuildAlignmentPanel />}
 
       {activeSection === 'Readiness Supabase / OpenAI / OneDrive' && (
         <div className="space-y-5">
@@ -330,7 +334,7 @@ git push`}
       )}
 
       {![
-        'Connecteurs', 'Readiness Supabase / OpenAI / OneDrive',
+        'Connecteurs', 'Alignement Build / GitHub', 'Readiness Supabase / OpenAI / OneDrive',
         'QA actions & boutons', 'Prêt pour premiers tests ?',
         'Paramètres narratifs',
         'Gouvernance réécriture', 'Indexes & sync', 'Audio & transcription',
