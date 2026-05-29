@@ -68,6 +68,7 @@ export default function DashboardPage() {
   }, []);
 
 
+  const demo = isDemoMode();
   const weakChapters = chapters.filter(c => c.score < 60);
   const riskArcs = arcs.filter(a => a.status === 'warning' || a.status === 'critical');
   const criticalWarnings = buildWarnings(readiness);
@@ -86,9 +87,10 @@ export default function DashboardPage() {
   gaps.push('autonomous rewrite disabled (intentional)');
   const gapsCount = gaps.length;
   const modeLabel = !readiness ? 'Vérification…'
-    : liveCount >= 3 ? 'Live partiel — mock résiduel'
-    : liveCount >= 1 ? 'Mode hybride : live + mock'
-    : 'Mock fallback';
+    : demo ? 'Demo fixtures'
+    : liveCount >= 3 ? 'Production Test — live'
+    : liveCount >= 1 ? 'Production Test — partiel'
+    : 'Production Test — non branché';
   const lastChecked = readiness?.checked_at ? new Date(readiness.checked_at) : new Date();
 
   return (
