@@ -263,14 +263,19 @@ export default function RunsPage() {
         {/* Historique runs */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="editorial-eyebrow">Exemples de runs — mock</h2>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">non exécutés / design examples</span>
+            <h2 className="editorial-eyebrow">Historique des runs</h2>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">
+              {demo ? 'Demo fixtures' : 'Phase 2 — persistance pending'}
+            </span>
           </div>
-          <p className="text-[11px] text-muted-foreground italic">
-            L'historique réel apparaîtra ici dès que la persistance des runs sera activée.
-          </p>
           <NoteComposer target="run en préparation" compact />
-          {runs.map(run => (
+          {!demo && (
+            <div className="cockpit-card space-y-2 text-xs">
+              <p className="text-foreground">Aucun run réel exécuté.</p>
+              <p className="text-muted-foreground">Run persistence — Phase 2. Dry run disponible. Live OpenAI test disponible pour agents sans écriture.</p>
+            </div>
+          )}
+          {demo && runs.map(run => (
             <div key={run.id} className="cockpit-card space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-display font-semibold text-sm text-foreground">{run.name}</span>
