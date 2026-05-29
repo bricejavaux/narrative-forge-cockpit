@@ -46,11 +46,12 @@ export default function ArchitecturePage() {
           <h1 className="text-3xl editorial-heading text-foreground mt-1">Architecture Tome</h1>
         </div>
         <ChapterPlanFromArticulationPanel />
+        <BeatsPlanPanel />
         <NoteComposer target="architecture · plan chapitres" />
-
       </div>
     );
   }
+
 
   return (
     <div className="space-y-6 animate-slide-in">
