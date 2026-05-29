@@ -105,6 +105,7 @@ export type ActiveCharacter = {
   validation_status: string;
   needs_review: boolean;
   updated_at: string;
+  metadata?: any;
 };
 
 export type ReadStatus<T> = {
