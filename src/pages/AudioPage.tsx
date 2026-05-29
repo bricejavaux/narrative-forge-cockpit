@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { audioNotes } from '@/data/dummyData';
+import { isDemoMode } from '@/lib/productionMode';
 import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
