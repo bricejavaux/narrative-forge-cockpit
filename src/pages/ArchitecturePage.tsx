@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ChapterPlanFromArticulationPanel from '@/components/shared/ChapterPlanFromArticulationPanel';
+import BeatsPlanPanel from '@/components/shared/BeatsPlanPanel';
 import { Mic, Check, X, AlertTriangle } from 'lucide-react';
 import { isDemoMode } from '@/lib/productionMode';
 
