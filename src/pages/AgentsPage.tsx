@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { agents } from '@/data/dummyData';
+import { isDemoMode } from '@/lib/productionMode';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import PersistedAgentsPanel from '@/components/shared/PersistedAgentsPanel';
