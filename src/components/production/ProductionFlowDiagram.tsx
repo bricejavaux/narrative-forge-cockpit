@@ -36,7 +36,7 @@ export default function ProductionFlowDiagram({
                 <span className="text-xs font-display font-medium text-foreground">{stage.label}</span>
                 {s && <ProductionStatusBadge status={s.status as any} />}
                 {s?.source === 'mock' && (
-                  <span className="text-[9px] font-mono text-muted-foreground">design target</span>
+                  <span className="text-[9px] font-mono text-muted-foreground">phase suivante</span>
                 )}
               </button>
               {i < STAGE_ORDER.length - 1 && <ChevronRight size={14} className="text-muted-foreground/60" />}

@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Mic, Check, X, AlertTriangle } from 'lucide-react';
+import { isDemoMode } from '@/lib/productionMode';
 
 const tabs = ['Arcs globaux', 'Chapitres', 'Beats', 'Révélations', 'Payoffs', 'Conséquences', 'Timeline réelle', 'Ordre du récit'];
 
@@ -31,9 +32,31 @@ function PhraseCouteauIcon({ status }: { status?: string }) {
 export default function ArchitecturePage() {
   const [activeTab, setActiveTab] = useState('Chapitres');
   const [selectedChapterForBeats, setSelectedChapterForBeats] = useState('ch01');
+  const demo = isDemoMode();
 
   const beatsForChapter = beats.filter((b) => b.chapterId === selectedChapterForBeats);
   const chaptersWithBeats = chapters.filter((c) => beats.some((b) => b.chapterId === c.id));
+
+  if (!demo) {
+    return (
+      <div className="space-y-6 animate-slide-in">
+        <div>
+          <p className="editorial-eyebrow">Pilotage narratif</p>
+          <h1 className="text-3xl editorial-heading text-foreground mt-1">Architecture Tome</h1>
+        </div>
+        <div className="cockpit-card p-8 space-y-3">
+          <p className="editorial-eyebrow">Phase 2A — Plan chapitres</p>
+          <p className="text-sm text-foreground">Aucune donnée chapitre / arc / beat persistée en Supabase.</p>
+          <p className="text-xs text-muted-foreground">
+            Étape suivante : créer ou importer le plan des chapitres depuis <span className="font-mono">articulation.txt</span>.
+            La génération complète des chapitres et l'extraction des beats observés interviennent ensuite.
+          </p>
+          <a href="/assets" className="inline-block text-xs text-primary hover:underline">→ Importer architecture depuis articulation.txt</a>
+        </div>
+        <NoteComposer target="architecture · plan chapitres" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-slide-in">

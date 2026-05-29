@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import { isDemoMode } from '@/lib/productionMode';
 
 type ModeDef = { id: string; label: string; live?: boolean; blockers?: string[] };
 
@@ -43,6 +44,7 @@ const ALL_MODES = [...PRODUCTION_CHAIN, ...PRESETS, ...LEGACY];
 
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState<ModeDef>(PRODUCTION_CHAIN[0]);
+  const demo = isDemoMode();
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [loadingReadiness, setLoadingReadiness] = useState(true);
 
@@ -61,7 +63,7 @@ export default function RunsPage() {
     { label: 'OpenAI disponible', ok: openaiOk, note: openaiOk ? readiness?.openai?.model ?? undefined : 'clé absente' },
     { label: 'Supabase disponible', ok: supabaseOk },
     { label: 'OneDrive disponible', ok: onedriveOk, note: onedriveOk ? undefined : 'optionnel' },
-    { label: 'Indexes requis disponibles', ok: true, note: 'mock — pgvector pending' },
+    { label: 'Indexes requis disponibles', ok: !!readiness?.indexes?.pgvector_ready, note: readiness?.indexes?.pgvector_ready ? undefined : 'pgvector pending — phase 2' },
     { label: 'Objets cibles sélectionnés', ok: true },
     { label: 'Format de sortie sélectionné', ok: true },
   ];
@@ -261,14 +263,19 @@ export default function RunsPage() {
         {/* Historique runs */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="editorial-eyebrow">Exemples de runs — mock</h2>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">non exécutés / design examples</span>
+            <h2 className="editorial-eyebrow">Historique des runs</h2>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">
+              {demo ? 'Demo fixtures' : 'Phase 2 — persistance pending'}
+            </span>
           </div>
-          <p className="text-[11px] text-muted-foreground italic">
-            L'historique réel apparaîtra ici dès que la persistance des runs sera activée.
-          </p>
           <NoteComposer target="run en préparation" compact />
-          {runs.map(run => (
+          {!demo && (
+            <div className="cockpit-card space-y-2 text-xs">
+              <p className="text-foreground">Aucun run réel exécuté.</p>
+              <p className="text-muted-foreground">Run persistence — Phase 2. Dry run disponible. Live OpenAI test disponible pour agents sans écriture.</p>
+            </div>
+          )}
+          {demo && runs.map(run => (
             <div key={run.id} className="cockpit-card space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-display font-semibold text-sm text-foreground">{run.name}</span>

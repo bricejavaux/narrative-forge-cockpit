@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { audioNotes } from '@/data/dummyData';
+import { isDemoMode } from '@/lib/productionMode';
 import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
@@ -90,7 +91,7 @@ export default function AudioPage() {
                 </tr>
               </thead>
               <tbody>
-                {audioNotes.map(note => (
+                {isDemoMode() ? audioNotes.map(note => (
                   <tr key={note.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
                     <td className="py-2 px-3 text-foreground">{note.target}</td>
                     <td className="py-2 px-3"><StatusBadge status={note.targetType} /></td>
@@ -101,7 +102,9 @@ export default function AudioPage() {
                     <td className="py-2 px-3 text-xs text-muted-foreground max-w-[200px] truncate">{note.proposedAction}</td>
                     <td className="py-2 px-3"><StatusBadge status={note.treatmentStatus} /></td>
                   </tr>
-                ))}
+                )) : (
+                  <tr><td colSpan={8} className="py-6 text-center text-xs text-muted-foreground">Aucune note audio persistée — Phase 2 (audio_notes).</td></tr>
+                )}
               </tbody>
             </table>
           </div>

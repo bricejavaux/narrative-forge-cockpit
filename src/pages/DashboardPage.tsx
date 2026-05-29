@@ -17,6 +17,7 @@ import ProductionFlowPanel from '@/components/shared/ProductionFlowPanel';
 import SupabaseRepositoryPanel from '@/components/shared/SupabaseRepositoryPanel';
 import { project, chapters, arcs, recentActivity, runs } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness, type ProductionCounts, deriveProductionStages } from '@/services/supabaseService';
+import { isDemoMode } from '@/lib/productionMode';
 
 
 function buildWarnings(r: ConnectionReadiness | null) {
@@ -67,6 +68,7 @@ export default function DashboardPage() {
   }, []);
 
 
+  const demo = isDemoMode();
   const weakChapters = chapters.filter(c => c.score < 60);
   const riskArcs = arcs.filter(a => a.status === 'warning' || a.status === 'critical');
   const criticalWarnings = buildWarnings(readiness);
@@ -85,9 +87,10 @@ export default function DashboardPage() {
   gaps.push('autonomous rewrite disabled (intentional)');
   const gapsCount = gaps.length;
   const modeLabel = !readiness ? 'Vérification…'
-    : liveCount >= 3 ? 'Live partiel — mock résiduel'
-    : liveCount >= 1 ? 'Mode hybride : live + mock'
-    : 'Mock fallback';
+    : demo ? 'Demo fixtures'
+    : liveCount >= 3 ? 'Production Test — live'
+    : liveCount >= 1 ? 'Production Test — partiel'
+    : 'Production Test — non branché';
   const lastChecked = readiness?.checked_at ? new Date(readiness.checked_at) : new Date();
 
   return (
@@ -116,21 +119,29 @@ export default function DashboardPage() {
 
       <ImportReconcilePanel />
 
-      {/* KPIs — narrative metrics still mock until Supabase populated */}
+      {/* KPIs — Demo fixtures only (operational metrics deferred until Supabase populated) */}
+      {demo && (
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <KpiCard label="Score Tome" value={project.globalScore} icon={BarChart3} color="cyan" subtitle="/ 100 · mock" />
-        <KpiCard label="Chapitres" value={project.totalChapters} icon={BookOpen} color="violet" subtitle="mock" />
-        <KpiCard label="Alertes" value={project.criticalAlerts} icon={AlertTriangle} color="destructive" subtitle="mock" />
-        <KpiCard label="Dette Narrative" value={project.narrativeDebt} icon={TrendingDown} color="amber" subtitle="mock" />
-        <KpiCard label="Audio non traités" value={project.untreatedAudioComments} icon={Mic} color="rose" subtitle="mock" />
+        <KpiCard label="Score Tome" value={project.globalScore} icon={BarChart3} color="cyan" subtitle="/ 100 · demo" />
+        <KpiCard label="Chapitres" value={project.totalChapters} icon={BookOpen} color="violet" subtitle="demo" />
+        <KpiCard label="Alertes" value={project.criticalAlerts} icon={AlertTriangle} color="destructive" subtitle="demo" />
+        <KpiCard label="Dette Narrative" value={project.narrativeDebt} icon={TrendingDown} color="amber" subtitle="demo" />
+        <KpiCard label="Audio non traités" value={project.untreatedAudioComments} icon={Mic} color="rose" subtitle="demo" />
         <button onClick={() => setCapsOpen(true)} className="text-left">
           <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live · cliquer`} />
         </button>
       </div>
+      )}
+      {!demo && (
+        <button onClick={() => setCapsOpen(true)} className="text-left w-full md:w-auto inline-block">
+          <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live · cliquer pour détails`} />
+        </button>
+      )}
       <CapabilitiesModal open={capsOpen} onClose={() => setCapsOpen(false)} />
 
+      {demo && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Santé narrative */}
+        {/* Santé narrative — Demo fixtures */}
         <div className="lg:col-span-2 space-y-4">
           <h2 className="font-display font-semibold text-sm text-foreground flex items-center gap-2">
             <Activity size={16} className="text-cyan" />
@@ -313,6 +324,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
