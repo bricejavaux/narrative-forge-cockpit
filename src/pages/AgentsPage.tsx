@@ -135,13 +135,35 @@ export default function AgentsPage() {
         </p>
         <div className="mt-2 flex items-center gap-2 text-[11px]">
           <span className={`px-2 py-0.5 rounded-full border font-mono ${openaiReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
-            {openaiReady ? 'OpenAI : clé détectée — exécution live possible' : 'OpenAI : clé absente — mode mock'}
+            {openaiReady ? 'OpenAI : clé détectée — exécution live possible' : 'OpenAI : clé absente — exécution live indisponible'}
           </span>
           {readiness?.openai?.model && (
             <span className="text-muted-foreground font-mono">défaut Edge: {readiness.openai.model}</span>
           )}
+          {!isDemoMode() && (
+            <span className="px-2 py-0.5 rounded-full border font-mono bg-slate-500/10 text-slate-600 border-slate-500/30">
+              Catalogue ci-dessous = Demo fixtures (registry persisté = panneau du haut)
+            </span>
+          )}
         </div>
       </div>
+
+      <PersistedAgentsPanel />
+
+      <AgentVersionEditorPanel />
+
+      {!isDemoMode() && (
+        <div className="cockpit-card p-6 space-y-2">
+          <p className="editorial-eyebrow">Catalogue agents — Phase 2</p>
+          <p className="text-xs text-muted-foreground">
+            Le catalogue dummy (filtres, tuning, presets) reste accessible en Demo Mode. En Production Test,
+            seul le registry persisté ci-dessus est opérationnel. Classification Testable-now / Requires chapter plan / Requires pgvector arrive en Phase 2.
+          </p>
+        </div>
+      )}
+
+      {isDemoMode() && (<>
+      <div className="flex gap-2 flex-wrap">
 
       <PersistedAgentsPanel />
 
