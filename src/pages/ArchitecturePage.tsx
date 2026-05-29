@@ -3,6 +3,7 @@ import { chapters, arcs, beats, payoffs, consequences } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import NoteComposer from '@/components/shared/NoteComposer';
+import ChapterPlanFromArticulationPanel from '@/components/shared/ChapterPlanFromArticulationPanel';
 import { Mic, Check, X, AlertTriangle } from 'lucide-react';
 import { isDemoMode } from '@/lib/productionMode';
 
