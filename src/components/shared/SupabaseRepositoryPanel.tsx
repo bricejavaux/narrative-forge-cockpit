@@ -1,100 +1,57 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Database, RefreshCw, CheckCircle2, AlertCircle, Minus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { supabaseService } from '@/services/supabaseService';
+import { Database, RefreshCw, CheckCircle2, AlertCircle, Minus, XCircle, ChevronDown } from 'lucide-react';
+import { supabaseService, type CountStatus } from '@/services/supabaseService';
 
-type Row = {
-  key: string;
-  label: string;
-  count: number | null;
-  status: 'active' | 'empty' | 'missing';
-  route?: string;
-  error?: string;
-};
-
+type Row = CountStatus & { label: string; route?: string };
 type Section = { id: string; title: string; rows: Row[] };
 
-async function safeCount(table: string): Promise<{ count: number | null; missing: boolean; error?: string }> {
-  try {
-    const { count, error } = await supabase.from(table as any).select('id', { count: 'exact', head: true });
-    if (error) {
-      const msg = error.message || '';
-      const missing = /relation .* does not exist|not found|schema cache/i.test(msg);
-      return { count: null, missing, error: msg };
-    }
-    return { count: count ?? 0, missing: false };
-  } catch (e) {
-    return { count: null, missing: true, error: e instanceof Error ? e.message : 'unknown' };
-  }
+const TABLES: Array<{ key: string; label: string; route?: string; section: string; filter?: (q: any) => any }> = [
+  { key: 'canon_objects', label: 'canon_objects', route: '/canon', section: 'core' },
+  { key: 'characters', label: 'characters', route: '/characters', section: 'core' },
+  { key: 'chapters', label: 'chapters', route: '/architecture', section: 'core' },
+  { key: 'beats', label: 'beats', route: '/production', section: 'core' },
+  { key: 'rewrite_tasks', label: 'rewrite_tasks', route: '/production', section: 'prod' },
+  { key: 'runs', label: 'runs', route: '/runs', section: 'prod' },
+  { key: 'run_outputs', label: 'run_outputs', route: '/runs', section: 'prod' },
+  { key: 'vector_source_packages', label: 'vector_source_packages', route: '/indexes', section: 'assets' },
+  { key: 'exports', label: 'exports', route: '/exports', section: 'assets' },
+  { key: 'import_jobs', label: 'import_jobs', route: '/settings', section: 'assets' },
+  { key: 'audio_notes', label: 'audio_notes', route: '/audio', section: 'assets' },
+];
+
+const SECTIONS: Array<{ id: string; title: string }> = [
+  { id: 'core', title: 'Noyau narratif' },
+  { id: 'prod', title: 'État de production' },
+  { id: 'assets', title: 'Assets & index' },
+];
+
+function RowIcon({ s }: { s: Row }) {
+  if (!s.ok && s.missing) return <AlertCircle className="w-3 h-3 text-amber-500" />;
+  if (!s.ok) return <XCircle className="w-3 h-3 text-rose-500" />;
+  if (s.count > 0) return <CheckCircle2 className="w-3 h-3 text-emerald-500" />;
+  return <Minus className="w-3 h-3 text-muted-foreground" />;
+}
+
+function rowState(s: Row): { tag: string; cls: string } {
+  if (!s.ok && s.missing) return { tag: 'table manquante', cls: 'text-amber-600' };
+  if (!s.ok) return { tag: 'lecture bloquée', cls: 'text-rose-600' };
+  if (s.count === 0) return { tag: 'vide', cls: 'text-muted-foreground' };
+  return { tag: '', cls: 'text-emerald-600' };
 }
 
 export default function SupabaseRepositoryPanel() {
   const [sections, setSections] = useState<Section[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showDiag, setShowDiag] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
-    const counts = await supabaseService.getProductionCounts().catch(() => null);
-    const tables = await Promise.all([
-      ['vector_source_packages', 'Paquets vectoriels', '/indexes'],
-      ['exports', 'Exports', '/exports'],
-      ['import_jobs', 'Jobs d\'import', '/settings'],
-      ['audio_notes', 'Notes audio', '/audio'],
-      ['runs', 'Runs', '/runs'],
-      ['run_outputs', 'Run outputs', '/runs'],
-      ['rewrite_tasks', 'Tâches de réécriture', '/production'],
-    ].map(async ([t, label, route]) => {
-      const r = await safeCount(t);
-      return { key: t, label, route, ...r };
+    const results = await Promise.all(TABLES.map(async (t) => {
+      const r = await supabaseService.countWithStatus(t.key, t.filter);
+      return { ...r, label: t.label, route: t.route, section: t.section };
     }));
-
-    const mk = (key: string, label: string, route?: string, n?: number): Row => ({
-      key, label, route,
-      count: n ?? 0,
-      status: (n ?? 0) > 0 ? 'active' : 'empty',
-    });
-
-    const c = counts ?? { canon_count: 0, characters_count: 0, chapters_count: 0, planned_beats_count: 0, validated_beats_count: 0, chapter_full_text_count: 0, open_rewrite_tasks_count: 0, locked_chapters_count: 0 };
-
-    const tableRow = (key: string, label: string, route?: string): Row => {
-      const r = tables.find(x => x.key === key);
-      if (!r) return { key, label, count: 0, status: 'empty', route };
-      if (r.missing) return { key, label, count: null, status: 'missing', route, error: r.error };
-      return { key, label, count: r.count ?? 0, status: (r.count ?? 0) > 0 ? 'active' : 'empty', route };
-    };
-
-    setSections([
-      {
-        id: 'core', title: 'Noyau narratif',
-        rows: [
-          mk('canon_objects', 'canon_objects', '/canon', c.canon_count),
-          mk('characters', 'characters', '/characters', c.characters_count),
-          mk('chapters', 'chapters', '/architecture', c.chapters_count),
-          mk('beats', 'beats (total prévus)', '/production', c.planned_beats_count),
-          mk('beats_validated', 'beats validés', '/production', c.validated_beats_count),
-        ],
-      },
-      {
-        id: 'prod', title: 'État de production',
-        rows: [
-          mk('chapter_full_text', 'chapitres avec full_text', '/architecture', c.chapter_full_text_count),
-          mk('open_rewrites', 'rewrite_tasks ouvertes', '/production', c.open_rewrite_tasks_count),
-          mk('locked', 'chapitres verrouillés', '/production', c.locked_chapters_count),
-          tableRow('runs', 'runs', '/runs'),
-          tableRow('run_outputs', 'run_outputs', '/runs'),
-        ],
-      },
-      {
-        id: 'assets', title: 'Assets & index',
-        rows: [
-          tableRow('vector_source_packages', 'vector_source_packages', '/indexes'),
-          tableRow('exports', 'exports', '/exports'),
-          tableRow('import_jobs', 'import_jobs', '/settings'),
-          tableRow('audio_notes', 'audio_notes', '/audio'),
-        ],
-      },
-    ]);
+    setSections(SECTIONS.map(s => ({ id: s.id, title: s.title, rows: results.filter(r => (r as any).section === s.id) })));
     setLoading(false);
   };
 
@@ -116,6 +73,9 @@ export default function SupabaseRepositoryPanel() {
     try { window.dispatchEvent(new CustomEvent('supabase-records-refresh')); } catch {}
   };
 
+  const allRows = sections?.flatMap(s => s.rows) ?? [];
+  const blockedCount = allRows.filter(r => !r.ok).length;
+
   return (
     <div className="rounded-lg border border-border/60 bg-card/40 p-4 space-y-4">
       <div className="flex items-start justify-between">
@@ -124,14 +84,18 @@ export default function SupabaseRepositoryPanel() {
           <h3 className="text-lg editorial-heading text-foreground flex items-center gap-2">
             <Database className="w-4 h-4" /> Couche narrative active
           </h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            Objets importés, validés, modifiés et utilisés par les agents.
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">Comptes diagnostiqués · une lecture bloquée n'est pas un compte zéro.</p>
         </div>
         <button onClick={triggerRefresh} className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground">
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Rafraîchir Supabase
+          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Rafraîchir
         </button>
       </div>
+
+      {blockedCount > 0 && (
+        <div className="text-[11px] text-rose-700 border border-rose-500/30 bg-rose-500/5 p-2 rounded">
+          {blockedCount} table(s) en erreur de lecture — voir diagnostic technique ci-dessous.
+        </div>
+      )}
 
       {!sections && <p className="text-sm text-muted-foreground">Lecture des tables…</p>}
 
@@ -140,31 +104,38 @@ export default function SupabaseRepositoryPanel() {
           <p className="editorial-eyebrow mb-2">{s.title}</p>
           <div className="space-y-1">
             {s.rows.map((r) => {
-              const Icon = r.status === 'active' ? CheckCircle2 : r.status === 'missing' ? AlertCircle : Minus;
-              const color = r.status === 'active' ? 'text-emerald-500' : r.status === 'missing' ? 'text-rose-500' : 'text-muted-foreground';
+              const st = rowState(r);
               const body = (
                 <div className="flex items-center justify-between text-xs py-0.5">
-                  <div className="flex items-center gap-2">
-                    <Icon className={`w-3 h-3 ${color}`} />
-                    <span className="font-mono text-foreground">{r.label}</span>
-                    {r.status === 'missing' && <span className="text-[10px] text-rose-600">table absente</span>}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <RowIcon s={r} />
+                    <span className="font-mono text-foreground truncate">{r.label}</span>
+                    {st.tag && <span className={`text-[10px] ${st.cls}`}>{st.tag}</span>}
                   </div>
-                  <span className={`font-mono text-[11px] ${r.status === 'active' ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                    {r.count === null ? '—' : r.count}
+                  <span className={`font-mono text-[11px] ${r.ok && r.count > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                    {r.ok ? r.count : '—'}
                   </span>
                 </div>
               );
               return r.route ? (
-                <Link key={r.key} to={r.route} className="block hover:bg-secondary/40 rounded px-1" title={r.error}>
-                  {body}
-                </Link>
+                <Link key={r.label} to={r.route} className="block hover:bg-secondary/40 rounded px-1" title={r.error || ''}>{body}</Link>
               ) : (
-                <div key={r.key} title={r.error}>{body}</div>
+                <div key={r.label} title={r.error || ''}>{body}</div>
               );
             })}
           </div>
         </div>
       ))}
+
+      <button onClick={() => setShowDiag(s => !s)} className="text-[11px] flex items-center gap-1 text-muted-foreground hover:text-foreground">
+        <ChevronDown className={`w-3 h-3 transition-transform ${showDiag ? 'rotate-180' : ''}`} />
+        Afficher diagnostic technique
+      </button>
+      {showDiag && (
+        <pre className="text-[10px] bg-secondary/30 p-2 rounded max-h-60 overflow-auto whitespace-pre-wrap">
+{JSON.stringify(allRows.map(r => ({ table: r.label, ok: r.ok, count: r.count, missing: r.missing, error: r.error })), null, 2)}
+        </pre>
+      )}
     </div>
   );
 }
