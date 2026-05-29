@@ -52,8 +52,12 @@ export default function CharactersPage() {
       ) : (
       <>
       {supaRecords !== null && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800">
-          <span className="font-mono">mock_fallback</span> — aucun personnage Supabase actif. Lancez l'import <span className="font-mono">personnages.txt</span> pour activer les personnages Supabase.
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-3 text-[12px] text-amber-800 space-y-2">
+          <div><span className="font-mono">mock_fallback</span> — aucun personnage Supabase actif dans <span className="font-mono">characters</span>.</div>
+          <div className="flex flex-wrap gap-2">
+            <a href="/" className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-600/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 text-xs">Importer personnages.txt →</a>
+            <span className="text-[11px] text-amber-700/80 self-center">Le panneau Import &amp; Réconciliation se trouve sur le Dashboard.</span>
+          </div>
         </div>
       )}
 
