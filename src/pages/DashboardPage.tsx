@@ -139,8 +139,9 @@ export default function DashboardPage() {
       )}
       <CapabilitiesModal open={capsOpen} onClose={() => setCapsOpen(false)} />
 
+      {demo && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Santé narrative */}
+        {/* Santé narrative — Demo fixtures */}
         <div className="lg:col-span-2 space-y-4">
           <h2 className="font-display font-semibold text-sm text-foreground flex items-center gap-2">
             <Activity size={16} className="text-cyan" />
