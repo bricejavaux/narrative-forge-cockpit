@@ -14,8 +14,8 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
 import ProductionFlowPanel from '@/components/shared/ProductionFlowPanel';
-import NextBestActionPanel from '@/components/shared/NextBestActionPanel';
-import { project, connectors, chapters, arcs, recentActivity, audioNotes, runs } from '@/data/dummyData';
+import SupabaseRepositoryPanel from '@/components/shared/SupabaseRepositoryPanel';
+import { project, chapters, arcs, recentActivity, runs } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness, type ProductionCounts, deriveProductionStages } from '@/services/supabaseService';
 
 
@@ -107,8 +107,8 @@ export default function DashboardPage() {
       <ConnectionReadinessPanel compact />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <NextBestActionPanel />
         <OneDriveRepositoryPanel />
+        <SupabaseRepositoryPanel />
       </div>
 
       <ProductionFlowPanel compact stages={deriveProductionStages(counts)} />
