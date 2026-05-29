@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ChapterPlanFromArticulationPanel from '@/components/shared/ChapterPlanFromArticulationPanel';
+import BeatsPlanPanel from '@/components/shared/BeatsPlanPanel';
 import { Mic, Check, X, AlertTriangle } from 'lucide-react';
 import { isDemoMode } from '@/lib/productionMode';
 
@@ -46,11 +47,12 @@ export default function ArchitecturePage() {
           <h1 className="text-3xl editorial-heading text-foreground mt-1">Architecture Tome</h1>
         </div>
         <ChapterPlanFromArticulationPanel />
+        <BeatsPlanPanel />
         <NoteComposer target="architecture · plan chapitres" />
-
       </div>
     );
   }
+
 
   return (
     <div className="space-y-6 animate-slide-in">
