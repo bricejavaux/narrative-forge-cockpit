@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import { isDemoMode } from '@/lib/productionMode';
 
 type ModeDef = { id: string; label: string; live?: boolean; blockers?: string[] };
 
