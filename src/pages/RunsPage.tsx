@@ -44,6 +44,7 @@ const ALL_MODES = [...PRODUCTION_CHAIN, ...PRESETS, ...LEGACY];
 
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState<ModeDef>(PRODUCTION_CHAIN[0]);
+  const demo = isDemoMode();
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [loadingReadiness, setLoadingReadiness] = useState(true);
 
