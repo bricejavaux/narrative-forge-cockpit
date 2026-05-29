@@ -279,7 +279,7 @@ export default function CharactersPage() {
         </div>
       )}
       </>
-      ) : null}
+      )}
     </div>
 
   );
