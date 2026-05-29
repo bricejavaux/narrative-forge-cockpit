@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, AlertTriangle, RefreshCw, BookOpen, Loader2, ChevronRight, ChevronDown, Save } from 'lucide-react';
+import { toast } from 'sonner';
+import { CheckCircle2, AlertTriangle, RefreshCw, BookOpen, Loader2, ChevronRight, ChevronDown, Save, History } from 'lucide-react';
 import { supabaseService, type ActiveCanonObject } from '@/services/supabaseService';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
@@ -7,11 +8,10 @@ import NoteComposer from '@/components/shared/NoteComposer';
 export default function SupabaseCanonView({ records, onRefresh }: { records: ActiveCanonObject[]; onRefresh: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(records[0]?.id ?? null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [batchBusy, setBatchBusy] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (!selectedId && records.length) setSelectedId(records[0].id);
-  }, [records, selectedId]);
+  useEffect(() => { if (!selectedId && records.length) setSelectedId(records[0].id); }, [records, selectedId]);
 
   const grouped = useMemo(() => {
     const m: Record<string, ActiveCanonObject[]> = {};
@@ -20,18 +20,40 @@ export default function SupabaseCanonView({ records, onRefresh }: { records: Act
   }, [records]);
 
   const selected = records.find((r) => r.id === selectedId);
+  const pendingIds = useMemo(() => records.filter(r => r.validation_status !== 'validated' || r.needs_review).map(r => r.id), [records]);
 
-  const markReviewed = async (id: string) => {
-    setBusy(id);
-    await supabaseService.updateCanonObject(id, { needs_review: false, validation_status: 'validated' });
-    setBusy(null);
+  const runAction = async (label: string, ids: string[], fn: (ids: string[]) => Promise<{ ok: boolean; updated: number; failed: number; error?: string; errors?: any }>, key: string) => {
+    if (!ids.length) { toast.info('Aucun objet ciblé.'); return; }
+    setBatchBusy(key);
+    const r = await fn(ids);
+    setBatchBusy(null);
+    if (r.updated > 0) toast.success(`${label} — ${r.updated} mis à jour${r.failed ? ` · ${r.failed} échec(s)` : ''}`);
+    else toast.error(`${label} échoué : ${r.error || JSON.stringify(r.errors) || 'aucune ligne modifiée'}`);
     onRefresh();
+    try { window.dispatchEvent(new CustomEvent('supabase-records-refresh')); } catch {}
   };
-  const markIndexRefresh = async (id: string) => {
-    setBusy(id);
-    await supabaseService.updateCanonObject(id, { needs_index_refresh: true });
-    setBusy(null);
-    onRefresh();
+
+  const validateOne = (id: string) => runAction('Validation', [id], (ids) => supabaseService.validateCanonObjects(ids), `v-${id}`);
+  const validateCategory = () => {
+    if (!selected) return;
+    const ids = (grouped[selected.category] || []).filter(r => r.validation_status !== 'validated').map(r => r.id);
+    if (!window.confirm(`Valider ${ids.length} objet(s) canon de la catégorie « ${selected.category} » ?`)) return;
+    runAction(`Validation ${selected.category}`, ids, (x) => supabaseService.validateCanonObjects(x), 'v-cat');
+  };
+  const validateAllPending = () => {
+    if (!window.confirm(`Valider ${pendingIds.length} objet(s) canon en attente ?`)) return;
+    runAction('Validation globale', pendingIds, (x) => supabaseService.validateCanonObjects(x), 'v-all');
+  };
+  const refreshOne = (id: string) => runAction('Index refresh', [id], (ids) => supabaseService.markCanonIndexRefresh(ids), `i-${id}`);
+  const refreshCategory = () => {
+    if (!selected) return;
+    const ids = (grouped[selected.category] || []).map(r => r.id);
+    if (!window.confirm(`Marquer ${ids.length} objet(s) de « ${selected.category} » pour refresh d'index ?`)) return;
+    runAction('Index refresh catégorie', ids, (x) => supabaseService.markCanonIndexRefresh(x), 'i-cat');
+  };
+  const refreshAll = () => {
+    if (!window.confirm(`Marquer ${records.length} objet(s) canon pour refresh d'index ?`)) return;
+    runAction('Index refresh global', records.map(r => r.id), (x) => supabaseService.markCanonIndexRefresh(x), 'i-all');
   };
 
   return (
@@ -44,7 +66,19 @@ export default function SupabaseCanonView({ records, onRefresh }: { records: Act
               <RefreshCw size={11} /> Rafraîchir
             </button>
           </div>
-          <div className="space-y-0.5 max-h-[calc(100vh-260px)] overflow-y-auto">
+          <div className="flex flex-col gap-1">
+            <button disabled={!pendingIds.length || !!batchBusy} onClick={validateAllPending}
+              className="text-[11px] px-2 py-1 rounded bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 disabled:opacity-40 inline-flex items-center gap-1.5">
+              {batchBusy === 'v-all' ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />}
+              Valider tous les objets à valider ({pendingIds.length})
+            </button>
+            <button disabled={!records.length || !!batchBusy} onClick={refreshAll}
+              className="text-[11px] px-2 py-1 rounded border border-border hover:bg-secondary/60 disabled:opacity-40 inline-flex items-center gap-1.5">
+              {batchBusy === 'i-all' ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
+              Index refresh — tous ({records.length})
+            </button>
+          </div>
+          <div className="space-y-0.5 max-h-[calc(100vh-320px)] overflow-y-auto">
             {Object.entries(grouped).map(([cat, items]) => {
               const open = expanded[cat] ?? true;
               return (
@@ -108,13 +142,21 @@ export default function SupabaseCanonView({ records, onRefresh }: { records: Act
               <div className="soft-divider" />
 
               <div className="flex flex-wrap gap-2">
-                <button disabled={busy === selected.id} onClick={() => markReviewed(selected.id)}
+                <button disabled={!!batchBusy} onClick={() => validateOne(selected.id)}
                   className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 inline-flex items-center gap-1.5">
-                  {busy === selected.id ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />} Marquer validé
+                  {batchBusy === `v-${selected.id}` ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />} Valider l'objet sélectionné
                 </button>
-                <button disabled={busy === selected.id} onClick={() => markIndexRefresh(selected.id)}
+                <button disabled={!!batchBusy} onClick={validateCategory}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-secondary/60 disabled:opacity-40 inline-flex items-center gap-1.5">
+                  Valider toute la catégorie
+                </button>
+                <button disabled={!!batchBusy} onClick={() => refreshOne(selected.id)}
                   className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-secondary/60 disabled:opacity-40 inline-flex items-center gap-1.5">
-                  <Save size={11} /> Marquer index refresh requis
+                  <Save size={11} /> Index refresh — sélection
+                </button>
+                <button disabled={!!batchBusy} onClick={refreshCategory}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-secondary/60 disabled:opacity-40 inline-flex items-center gap-1.5">
+                  Index refresh — catégorie
                 </button>
                 <span className="text-[10px] text-muted-foreground font-mono self-center">
                   maj · {new Date(selected.updated_at).toLocaleString('fr-FR')}
@@ -122,7 +164,8 @@ export default function SupabaseCanonView({ records, onRefresh }: { records: Act
               </div>
             </div>
 
-            <NoteComposer target={selected.title} targetType="canon_object" targetId={selected.id} />
+            <HistoryPanel record={selected} />
+            <NoteComposer target={selected.title} targetType="canon_object" targetId={selected.id} onApplied={onRefresh} />
           </>
         ) : (
           <div className="cockpit-card p-12 text-center text-muted-foreground">
@@ -131,6 +174,26 @@ export default function SupabaseCanonView({ records, onRefresh }: { records: Act
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function HistoryPanel({ record }: { record: ActiveCanonObject }) {
+  const meta = (record.metadata && typeof record.metadata === 'object') ? record.metadata as any : {};
+  const lastPatch = meta.last_note_patch;
+  const lastImport = meta.last_import;
+  const pending = meta.pending_actions;
+  return (
+    <div className="rounded-lg border border-border/60 bg-card/40 p-4 space-y-2">
+      <div className="flex items-center gap-2"><History className="w-4 h-4 text-muted-foreground" /><p className="editorial-eyebrow">Historique</p></div>
+      <div className="text-xs text-foreground/80 space-y-1">
+        <div>updated_at : <span className="font-mono text-muted-foreground">{new Date(record.updated_at).toLocaleString('fr-FR')}</span></div>
+        <div>validation_status : <span className="font-mono">{record.validation_status}</span></div>
+        {lastPatch && <div>dernier patch : <span className="font-mono text-muted-foreground">{new Date(lastPatch.applied_at).toLocaleString('fr-FR')}</span> — {Object.keys(lastPatch.patch || {}).join(', ') || '∅'}</div>}
+        {lastImport && <div>dernier import : <span className="font-mono text-muted-foreground">{JSON.stringify(lastImport).slice(0, 120)}</span></div>}
+        {Array.isArray(pending) && pending.length > 0 && <div>pending_actions : {pending.length}</div>}
+        {!lastPatch && !lastImport && !pending && <div className="text-muted-foreground italic">Aucun événement enregistré dans metadata.</div>}
+      </div>
     </div>
   );
 }
