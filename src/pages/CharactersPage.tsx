@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { characters, chapters, audioNotes } from '@/data/dummyData';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
@@ -6,7 +7,8 @@ import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import ActiveRecordsBanner from '@/components/shared/ActiveRecordsBanner';
 import SupabaseCharactersView from '@/components/shared/SupabaseCharactersView';
-import { supabaseService, type ActiveCharacter } from '@/services/supabaseService';
+import { supabaseService, type ActiveCharacter, type ReadStatus } from '@/services/supabaseService';
+import { isDemoMode } from '@/lib/productionMode';
 import { User, X, Heart, Sparkles, Mic, MessageSquare, History } from 'lucide-react';
 
 const views = ['Liste', 'Matrice de relations', 'Timeline émotionnelle', 'Présence par chapitre', 'Alertes de continuité'];
@@ -14,8 +16,9 @@ const views = ['Liste', 'Matrice de relations', 'Timeline émotionnelle', 'Prés
 export default function CharactersPage() {
   const [activeView, setActiveView] = useState(views[0]);
   const [selectedChar, setSelectedChar] = useState<string | null>(characters[0]?.id ?? null);
-  const [supaRecords, setSupaRecords] = useState<ActiveCharacter[] | null>(null);
-  const loadSupa = async () => setSupaRecords(await supabaseService.getActiveCharacters());
+  const [supa, setSupa] = useState<ReadStatus<ActiveCharacter> | null>(null);
+  const demo = isDemoMode();
+  const loadSupa = async () => setSupa(await supabaseService.getCharactersWithStatus());
   useEffect(() => {
     loadSupa();
     const h = (e: Event) => { const d = (e as CustomEvent).detail; if (!d || d.target === 'characters' || d.target === undefined) loadSupa(); };
@@ -28,7 +31,8 @@ export default function CharactersPage() {
   }, []);
 
 
-  const supaActive = (supaRecords?.length ?? 0) > 0;
+  const supaActive = (supa?.rows?.length ?? 0) > 0;
+  const supaError = supa && !supa.ok;
 
   const char = characters.find((c) => c.id === selectedChar);
   const charChapters = char ? chapters.filter((c) => char.linkedChapterIds?.includes(c.id) || c.linkedCharacterIds?.includes(char.id)) : [];
@@ -47,19 +51,31 @@ export default function CharactersPage() {
 
       <ActiveRecordsBanner mode="characters" onSelect={(id) => setSelectedChar(id)} />
 
-      {supaActive && supaRecords ? (
-        <SupabaseCharactersView records={supaRecords} onRefresh={loadSupa} />
+      {supaActive && supa ? (
+        <SupabaseCharactersView records={supa.rows} onRefresh={loadSupa} />
+      ) : supaError ? (
+        <div className="rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-3 text-[12px] text-rose-800 space-y-2">
+          <div><span className="font-mono">Lecture characters impossible</span> — {supa?.error}</div>
+          <div className="text-rose-700/80">Cause probable : policy RLS SELECT manquante pour anon/authenticated.</div>
+        </div>
+      ) : !demo ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-6 text-[12px] text-amber-800 space-y-3">
+          <div className="font-display text-sm">Aucun personnage actif dans Supabase.</div>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/" className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-600/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 text-xs">Importer personnages.txt →</Link>
+            <button onClick={loadSupa} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-600/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 text-xs">Rafraîchir Supabase</button>
+          </div>
+          <div className="text-[11px] text-amber-700/80">Mode Production Test : aucune donnée fictive. Active Demo Mode pour voir les exemples.</div>
+        </div>
       ) : (
       <>
-      {supaRecords !== null && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-3 text-[12px] text-amber-800 space-y-2">
-          <div><span className="font-mono">mock_fallback</span> — aucun personnage Supabase actif dans <span className="font-mono">characters</span>.</div>
-          <div className="flex flex-wrap gap-2">
-            <a href="/" className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-600/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 text-xs">Importer personnages.txt →</a>
-            <span className="text-[11px] text-amber-700/80 self-center">Le panneau Import &amp; Réconciliation se trouve sur le Dashboard.</span>
-          </div>
+      {supa !== null && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-3 text-[12px] text-amber-800">
+          <span className="font-mono">demo_mode</span> — aucun personnage Supabase, exemples affichés.
         </div>
       )}
+
+
 
       <div className="flex gap-1 border-b border-border">
         {views.map((v) => (
@@ -263,7 +279,7 @@ export default function CharactersPage() {
         </div>
       )}
       </>
-      )}
+      ) : null}
     </div>
 
   );
