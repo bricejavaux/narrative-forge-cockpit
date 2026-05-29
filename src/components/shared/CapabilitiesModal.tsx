@@ -33,32 +33,66 @@ const STATUS_STYLE: Record<CapabilityStatus, string> = {
   inactive: 'bg-slate-500/10 text-slate-600 border-slate-500/30',
 };
 
-export function buildCapabilities(r: ConnectionReadiness | null): Capability[] {
-
+export function buildCapabilities(r: ConnectionReadiness | null, counts?: { canon: number; characters: number } | null): Capability[] {
   const pgvOk = !!r?.indexes?.pgvector_ready;
   const audioPipelineOk = r?.openai?.transcription_pipeline_status === 'transcription_live';
   const exportsPersist = !!r?.exports?.supabase_export_persistence_available;
   const pdfFuture = r?.exports?.pdf_epub_future ?? true;
+  const canonCount = counts?.canon ?? 0;
+  const charCount = counts?.characters ?? 0;
+  const openaiOk = !!r?.openai?.api_key_configured;
 
   return [
-    // -- Blocks Production Test --
+    // -- Production Test blockers (only) --
     {
-      key: 'env_tracked',
-      name: '.env retiré du dépôt GitHub',
+      key: 'import_canon',
+      name: 'Import articulation.txt → canon_objects',
+      status: canonCount > 0 ? 'live' : 'pending',
+      phase: 'production_test',
+      blocker: canonCount > 0 ? undefined : 'Aucun canon_object Supabase. Import à tester.',
+      nextAction: canonCount > 0 ? undefined : 'Lancer preview puis persister depuis le Dashboard.',
+      relatedRoute: '/',
+    },
+    {
+      key: 'import_characters',
+      name: 'Import personnages.txt → characters',
+      status: charCount > 0 ? 'live' : 'pending',
+      phase: 'production_test',
+      blocker: charCount > 0 ? undefined : 'Aucun personnage Supabase. Import à tester.',
+      nextAction: charCount > 0 ? undefined : 'Lancer preview puis persister depuis le Dashboard.',
+      relatedRoute: '/',
+    },
+    {
+      key: 'note_structuring',
+      name: 'Structuration de note texte (OpenAI)',
+      status: openaiOk ? 'pending' : 'pending',
+      phase: 'production_test',
+      blocker: openaiOk ? 'À tester via NoteComposer.' : 'OPENAI_API_KEY non confirmée.',
+      relatedRoute: '/canon',
+    },
+    {
+      key: 'exports_txt',
+      name: 'Export txt/md/json',
       status: 'pending',
       phase: 'production_test',
-      blocker: 'Fichier .env encore tracké — Lovable ne peut pas le retirer.',
-      nextAction: 'Exécuter git rm --cached .env localement, puis commit + push.',
-      relatedRoute: '/settings',
+      blocker: 'À tester via /exports.',
+      relatedRoute: '/exports',
     },
-    // -- Blocks Chapter Production --
+    {
+      key: 'vector_sync',
+      name: 'Sync paquets vectoriels (metadata)',
+      status: 'pending',
+      phase: 'production_test',
+      blocker: 'Vérifier cohérence Assets ↔ Indexes.',
+      relatedRoute: '/indexes',
+    },
+    // -- Chapter Production blockers --
     {
       key: 'run_persistence',
       name: 'Persistance des runs',
       status: 'pending',
       phase: 'chapter_production',
-      blocker: 'Edge function de run live + écriture dans runs/run_outputs non implémentée.',
-      nextAction: 'Implémenter orchestrateur + écritures.',
+      blocker: 'Orchestrateur runs/run_outputs non implémenté.',
       relatedRoute: '/runs',
     },
     {
@@ -66,8 +100,7 @@ export function buildCapabilities(r: ConnectionReadiness | null): Capability[] {
       name: 'Import chapter full_text',
       status: 'pending',
       phase: 'chapter_production',
-      blocker: 'Aucun full_text chapitre importé en Supabase.',
-      nextAction: 'Importer depuis OneDrive ou coller le texte.',
+      blocker: 'Aucun full_text chapitre importé.',
       relatedRoute: '/architecture',
     },
     {
@@ -75,8 +108,7 @@ export function buildCapabilities(r: ConnectionReadiness | null): Capability[] {
       name: 'pgvector ingestion',
       status: pgvOk ? 'live' : 'pending',
       phase: 'chapter_production',
-      blocker: pgvOk ? undefined : 'pgvector extension non activée — paquets vectoriels prêts.',
-      nextAction: pgvOk ? undefined : 'Activer pgvector + lancer vector-ingest-package.',
+      blocker: pgvOk ? undefined : 'pgvector non activé.',
       relatedRoute: '/indexes',
     },
     {
@@ -84,38 +116,34 @@ export function buildCapabilities(r: ConnectionReadiness | null): Capability[] {
       name: 'Embeddings vectoriels',
       status: pgvOk ? 'live' : 'pending',
       phase: 'chapter_production',
-      blocker: pgvOk ? undefined : 'Embeddings non générés tant que pgvector pending.',
       relatedRoute: '/indexes',
     },
-    // -- Future / intentionally disabled --
+    // -- Future / intentional --
     {
       key: 'audio_pipeline',
       name: 'Pipeline audio (Whisper)',
-      status: audioPipelineOk ? 'live' : 'pending',
+      status: audioPipelineOk ? 'live' : 'future',
       phase: 'future',
-      blocker: audioPipelineOk ? undefined : 'Upload audio + edge function transcription pas câblés bout-en-bout.',
       relatedRoute: '/audio',
-      notes: 'Notes texte fonctionnent sans Whisper.',
     },
     {
       key: 'autonomous_rewrite',
       name: 'Réécriture autonome',
       status: 'inactive',
       phase: 'future',
-      blocker: 'Désactivé intentionnellement — validation humaine requise.',
+      blocker: 'Désactivé intentionnellement — validation humaine.',
     },
     {
       key: 'pdf_docx_epub',
       name: 'Exports PDF / DOCX / EPUB',
       status: pdfFuture ? 'future' : 'live',
       phase: 'future',
-      blocker: pdfFuture ? 'Moteurs PDF/DOCX/EPUB non implémentés (txt/md/json OK).' : undefined,
       relatedRoute: '/exports',
     },
     {
       key: 'export_persistence',
       name: 'Persistance des exports',
-      status: exportsPersist ? 'live' : 'pending',
+      status: exportsPersist ? 'live' : 'future',
       phase: 'future',
       relatedRoute: '/exports',
     },
@@ -136,11 +164,17 @@ const PHASE_STYLE: Record<CapabilityPhase, string> = {
 
 export default function CapabilitiesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  const [counts, setCounts] = useState<{ canon: number; characters: number } | null>(null);
   useEffect(() => {
-    if (open) supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
+    if (open) {
+      supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
+      supabaseService.getProductionCounts()
+        .then(c => setCounts({ canon: c.canon_count, characters: c.characters_count }))
+        .catch(() => setCounts(null));
+    }
   }, [open]);
 
-  const caps = buildCapabilities(readiness);
+  const caps = buildCapabilities(readiness, counts);
   const ptBlocking = caps.filter(c => c.phase === 'production_test' && c.status !== 'live');
   const chBlocking = caps.filter(c => c.phase === 'chapter_production' && c.status !== 'live');
 

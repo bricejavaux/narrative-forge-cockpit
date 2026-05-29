@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, ChevronDown, Plug, User, Sparkles, FlaskConical } from 'lucide-react';
+import { Bell, ChevronDown, Plug, Sparkles, FlaskConical } from 'lucide-react';
 import { project } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
@@ -97,19 +97,9 @@ export default function Header() {
 
         <button
           className="relative p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          title="Aucune activité persistée — alertes futures (runs, validations, réécritures)"
+          title="Alertes futures — non bloquant"
         >
           <Bell size={15} />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
-        </button>
-
-        <button
-          className="flex items-center gap-2 p-1 rounded-full hover:bg-secondary transition-colors"
-          title="Profil utilisateur — future (Supabase Auth optionnel/non configuré)"
-        >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-border flex items-center justify-center">
-            <User size={14} className="text-foreground/70" />
-          </div>
         </button>
       </div>
     </header>
