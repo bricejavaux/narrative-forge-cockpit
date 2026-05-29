@@ -370,8 +370,8 @@ export default function CanonPage() {
           )}
         </aside>
       </div>
-      </>
-      ) : null}
+        </>
+      )}
 
     </div>
   );
