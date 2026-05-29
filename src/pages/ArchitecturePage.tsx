@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import ScoreBar from '@/components/shared/ScoreBar';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Mic, Check, X, AlertTriangle } from 'lucide-react';
+import { isDemoMode } from '@/lib/productionMode';
 
 const tabs = ['Arcs globaux', 'Chapitres', 'Beats', 'Révélations', 'Payoffs', 'Conséquences', 'Timeline réelle', 'Ordre du récit'];
 
