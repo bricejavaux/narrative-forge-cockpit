@@ -84,6 +84,7 @@ export type ActiveCanonObject = {
   source_reference: string | null;
   index_associated: string | null;
   updated_at: string;
+  metadata?: any;
 };
 
 export type ActiveCharacter = {
