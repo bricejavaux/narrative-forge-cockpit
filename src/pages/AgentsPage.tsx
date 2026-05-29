@@ -164,12 +164,6 @@ export default function AgentsPage() {
 
       {isDemoMode() && (<>
       <div className="flex gap-2 flex-wrap">
-
-      <PersistedAgentsPanel />
-
-      <AgentVersionEditorPanel />
-
-      <div className="flex gap-2 flex-wrap">
         {categories.map((cat) => (
           <button
             key={cat}
