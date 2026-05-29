@@ -119,17 +119,24 @@ export default function DashboardPage() {
 
       <ImportReconcilePanel />
 
-      {/* KPIs — narrative metrics still mock until Supabase populated */}
+      {/* KPIs — Demo fixtures only (operational metrics deferred until Supabase populated) */}
+      {demo && (
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <KpiCard label="Score Tome" value={project.globalScore} icon={BarChart3} color="cyan" subtitle="/ 100 · mock" />
-        <KpiCard label="Chapitres" value={project.totalChapters} icon={BookOpen} color="violet" subtitle="mock" />
-        <KpiCard label="Alertes" value={project.criticalAlerts} icon={AlertTriangle} color="destructive" subtitle="mock" />
-        <KpiCard label="Dette Narrative" value={project.narrativeDebt} icon={TrendingDown} color="amber" subtitle="mock" />
-        <KpiCard label="Audio non traités" value={project.untreatedAudioComments} icon={Mic} color="rose" subtitle="mock" />
+        <KpiCard label="Score Tome" value={project.globalScore} icon={BarChart3} color="cyan" subtitle="/ 100 · demo" />
+        <KpiCard label="Chapitres" value={project.totalChapters} icon={BookOpen} color="violet" subtitle="demo" />
+        <KpiCard label="Alertes" value={project.criticalAlerts} icon={AlertTriangle} color="destructive" subtitle="demo" />
+        <KpiCard label="Dette Narrative" value={project.narrativeDebt} icon={TrendingDown} color="amber" subtitle="demo" />
+        <KpiCard label="Audio non traités" value={project.untreatedAudioComments} icon={Mic} color="rose" subtitle="demo" />
         <button onClick={() => setCapsOpen(true)} className="text-left">
           <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live · cliquer`} />
         </button>
       </div>
+      )}
+      {!demo && (
+        <button onClick={() => setCapsOpen(true)} className="text-left w-full md:w-auto inline-block">
+          <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live · cliquer pour détails`} />
+        </button>
+      )}
       <CapabilitiesModal open={capsOpen} onClose={() => setCapsOpen(false)} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
