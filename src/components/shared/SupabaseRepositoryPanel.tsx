@@ -150,7 +150,7 @@ export default function SupabaseRepositoryPanel() {
 
       <button onClick={() => setShowDiag(s => !s)} className="text-[11px] flex items-center gap-1 text-muted-foreground hover:text-foreground">
         <ChevronDown className={`w-3 h-3 transition-transform ${showDiag ? 'rotate-180' : ''}`} />
-        Afficher diagnostic technique
+        Diagnostic technique avancé
       </button>
       {showDiag && (
         <pre className="text-[10px] bg-secondary/30 p-2 rounded max-h-60 overflow-auto whitespace-pre-wrap">
