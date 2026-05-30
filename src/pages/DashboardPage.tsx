@@ -1,57 +1,18 @@
 import { useEffect, useState } from 'react';
-import {
-  BarChart3, BookOpen, AlertTriangle, Plug, Play, TrendingDown,
-  FileText, Mic, Download, Upload, DollarSign, Clock, Activity, Zap
-} from 'lucide-react';
-import WarningBanner from '@/components/shared/WarningBanner';
+import { Plug } from 'lucide-react';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
 import ImportReconcilePanel from '@/components/shared/ImportReconcilePanel';
 import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
-import DataFlowDoctrineBanner from '@/components/shared/DataFlowDoctrineBanner';
-import KpiCard from '@/components/shared/KpiCard';
-import ConnectorStatusCard from '@/components/shared/ConnectorStatusCard';
-import StatusBadge from '@/components/shared/StatusBadge';
-import ScoreBar from '@/components/shared/ScoreBar';
 import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
 import ProductionFlowPanel from '@/components/shared/ProductionFlowPanel';
 import SupabaseRepositoryPanel from '@/components/shared/SupabaseRepositoryPanel';
-import { project, chapters, arcs, recentActivity, runs } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness, type ProductionCounts, deriveProductionStages } from '@/services/supabaseService';
-import { isDemoMode } from '@/lib/productionMode';
-
-
-function buildWarnings(r: ConnectionReadiness | null) {
-  const w: Array<{ text: string; severity: 'info' | 'warning' | 'critical' }> = [];
-  if (!r) return w;
-  if (r.onedrive.oauth_configured) {
-    w.push({ text: 'OneDrive — connecté en lecture. Téléchargement réel des sources actif.', severity: 'info' });
-  } else {
-    w.push({ text: 'OneDrive non branché — sources en mode mock/fallback.', severity: 'warning' });
-  }
-  if (r.openai.api_key_configured) {
-    w.push({ text: `OpenAI runtime live — model: ${r.openai.model ?? 'défaut'}.`, severity: 'info' });
-  } else {
-    w.push({ text: 'OPENAI_API_KEY — à configurer en secret Edge Function pour activer extraction, structuration et diagnostics.', severity: 'warning' });
-  }
-  if (r.supabase.project_connected && r.supabase.tables_created) {
-    w.push({ text: 'Supabase actif — tables créées. Écritures sensibles via Edge Functions (service role).', severity: 'info' });
-  }
-  if (!r.supabase.rls_policies_configured) {
-    w.push({ text: 'RLS activé sans policies frontend — lectures/écritures directes limitées, sensible passe par Edge Functions.', severity: 'warning' });
-  }
-  if (!r.indexes.pgvector_ready) {
-    w.push({ text: 'pgvector — pending. Paquets vectoriels OneDrive prêts, ingestion non activée.', severity: 'warning' });
-  }
-  if (!r.openai.transcription_available) {
-    w.push({ text: 'Pipeline audio (Whisper) — pending tant que l\'upload/download audio n\'est pas câblé.', severity: 'warning' });
-  }
-  return w;
-}
 
 export default function DashboardPage() {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
-  const [capsOpen, setCapsOpen] = useState(false);
   const [counts, setCounts] = useState<ProductionCounts | null>(null);
+  const [capsOpen, setCapsOpen] = useState(false);
+
   useEffect(() => {
     supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
     const loadCounts = () => supabaseService.getProductionCounts().then(setCounts).catch(() => setCounts(null));
@@ -67,31 +28,36 @@ export default function DashboardPage() {
     };
   }, []);
 
+  const openai = !!readiness?.openai?.api_key_configured;
+  const onedrive = !!readiness?.onedrive?.oauth_configured;
+  const supaOk = !!readiness?.supabase?.project_connected && !!readiness?.supabase?.tables_created;
+  const pgv = !!readiness?.indexes?.pgvector_ready;
+  const audioLive = readiness?.openai?.transcription_pipeline_status === 'transcription_live';
 
-  const demo = isDemoMode();
-  const weakChapters = chapters.filter(c => c.score < 60);
-  const riskArcs = arcs.filter(a => a.status === 'warning' || a.status === 'critical');
-  const criticalWarnings = buildWarnings(readiness);
-
-  const liveCount =
-    (readiness?.openai?.api_key_configured ? 1 : 0) +
-    (readiness?.onedrive?.oauth_configured ? 1 : 0) +
-    (readiness?.supabase?.project_connected && readiness?.supabase?.tables_created ? 1 : 0);
-  // Real pending capabilities only (excludes OneDrive/OpenAI/Supabase when live, and excludes auth/notifications/profile)
-  const gaps: string[] = [];
-  if (!readiness?.indexes?.pgvector_ready) gaps.push('pgvector ingestion');
-  if (readiness?.openai?.transcription_pipeline_status &&
-      readiness.openai.transcription_pipeline_status !== 'transcription_live') gaps.push('audio transcription pipeline');
-  if (!readiness?.exports?.supabase_export_persistence_available) gaps.push('run / export persistence');
-  if (readiness?.exports && !readiness.exports.pdf_epub_future) gaps.push('PDF/DOCX/EPUB exports');
-  gaps.push('autonomous rewrite disabled (intentional)');
-  const gapsCount = gaps.length;
-  const modeLabel = !readiness ? 'Vérification…'
-    : demo ? 'Demo fixtures'
+  const liveCount = (openai ? 1 : 0) + (onedrive ? 1 : 0) + (supaOk ? 1 : 0);
+  const modeLabel = !readiness
+    ? 'Vérification…'
     : liveCount >= 3 ? 'Production Test — live'
     : liveCount >= 1 ? 'Production Test — partiel'
     : 'Production Test — non branché';
-  const lastChecked = readiness?.checked_at ? new Date(readiness.checked_at) : new Date();
+
+  // Blockers grouped
+  const blocksProdTest: string[] = [];
+  const blocksChapterProd: string[] = [];
+  const futureIntentional: string[] = [];
+
+  if (!openai) blocksProdTest.push('OpenAI API key non configurée');
+  if (!supaOk) blocksProdTest.push('Supabase tables non créées');
+  if (!onedrive) blocksProdTest.push('OneDrive non connecté');
+
+  blocksChapterProd.push('Beats validés requis avant génération chapitre');
+  if (!audioLive) blocksChapterProd.push('Pipeline audio (Whisper) — pending');
+
+  if (!pgv) futureIntentional.push('pgvector — ingestion non activée');
+  futureIntentional.push('Réécriture autonome — désactivée intentionnellement');
+  futureIntentional.push('Export PDF/DOCX/EPUB — futur');
+
+  const totalGaps = blocksProdTest.length + blocksChapterProd.length + futureIntentional.length;
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -100,230 +66,86 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-display font-bold text-foreground">Dashboard</h1>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border bg-primary/5 border-primary/30 text-primary">{modeLabel}</span>
         </div>
-        <span className="text-xs font-mono text-muted-foreground">Vérifié : {lastChecked.toLocaleString()}</span>
+        <span className="text-xs font-mono text-muted-foreground">
+          {readiness?.checked_at ? `Vérifié : ${new Date(readiness.checked_at).toLocaleString()}` : ''}
+        </span>
       </div>
 
-      <WarningBanner warnings={criticalWarnings} />
-
-      <DataFlowDoctrineBanner compact />
-
+      {/* Readiness des connexions (compact) */}
       <ConnectionReadinessPanel compact />
 
+      {/* Référentiels live */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <OneDriveRepositoryPanel />
         <SupabaseRepositoryPanel />
       </div>
 
+      {/* Chaîne de production unique, cliquable */}
       <ProductionFlowPanel compact stages={deriveProductionStages(counts)} />
 
-
+      {/* Imports réels (réconciliation) */}
       <ImportReconcilePanel />
 
-      {/* KPIs — Demo fixtures only (operational metrics deferred until Supabase populated) */}
-      {demo && (
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <KpiCard label="Score Tome" value={project.globalScore} icon={BarChart3} color="cyan" subtitle="/ 100 · demo" />
-        <KpiCard label="Chapitres" value={project.totalChapters} icon={BookOpen} color="violet" subtitle="demo" />
-        <KpiCard label="Alertes" value={project.criticalAlerts} icon={AlertTriangle} color="destructive" subtitle="demo" />
-        <KpiCard label="Dette Narrative" value={project.narrativeDebt} icon={TrendingDown} color="amber" subtitle="demo" />
-        <KpiCard label="Audio non traités" value={project.untreatedAudioComments} icon={Mic} color="rose" subtitle="demo" />
-        <button onClick={() => setCapsOpen(true)} className="text-left">
-          <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live · cliquer`} />
-        </button>
+      {/* Blockers / capacités à finaliser */}
+      <div className="cockpit-card space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-display font-semibold text-foreground flex items-center gap-2">
+            <Plug size={14} /> Capacités à finaliser
+          </h3>
+          <button
+            onClick={() => setCapsOpen(true)}
+            className="text-[11px] font-mono text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+          >
+            {totalGaps} · détails
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <BlockerGroup
+            title="Bloque Production Test"
+            tone="rose"
+            items={blocksProdTest}
+            emptyLabel="Aucun blocker — Production Test opérationnel"
+          />
+          <BlockerGroup
+            title="Bloque Chapter Production"
+            tone="amber"
+            items={blocksChapterProd}
+          />
+          <BlockerGroup
+            title="Futur / intentionnel"
+            tone="violet"
+            items={futureIntentional}
+          />
+        </div>
       </div>
-      )}
-      {!demo && (
-        <button onClick={() => setCapsOpen(true)} className="text-left w-full md:w-auto inline-block">
-          <KpiCard label="Capacités à finaliser" value={gapsCount} icon={Plug} color={gapsCount > 0 ? 'amber' : 'cyan'} subtitle={`${liveCount} live · cliquer pour détails`} />
-        </button>
-      )}
+
       <CapabilitiesModal open={capsOpen} onClose={() => setCapsOpen(false)} />
+    </div>
+  );
+}
 
-      {demo && (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Santé narrative — Demo fixtures */}
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="font-display font-semibold text-sm text-foreground flex items-center gap-2">
-            <Activity size={16} className="text-cyan" />
-            Santé Narrative
-          </h2>
-          
-          {/* Arcs à risque */}
-          <div className="cockpit-card space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Arcs à risque</h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">mock fallback — démo</span>
-            </div>
-            {riskArcs.map(arc => (
-              <div key={arc.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={arc.status} />
-                  <span className="text-sm text-foreground">{arc.name}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-24"><ScoreBar value={arc.progress} /></div>
-                  <span className="text-xs text-muted-foreground">{arc.riskLevel}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Chapitres faibles */}
-          <div className="cockpit-card space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Chapitres faibles (score &lt; 60)</h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">mock fallback</span>
-            </div>
-            {weakChapters.map(ch => (
-              <div key={ch.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-muted-foreground w-8">Ch.{ch.number}</span>
-                  <span className="text-sm text-foreground">{ch.title}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-20"><ScoreBar value={ch.score} /></div>
-                  {ch.mainAlert && <span className="text-xs text-destructive">{ch.mainAlert}</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Derniers runs */}
-          <div className="cockpit-card space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Derniers Runs</h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">historique mock</span>
-            </div>
-            {runs.slice(0, 4).map(run => (
-              <div key={run.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <div className="flex items-center gap-3">
-                  <Play size={12} className="text-cyan" />
-                  <span className="text-sm text-foreground">{run.name}</span>
-                  <StatusBadge status={run.status} />
-                </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span>{run.findings} findings</span>
-                  <span className="font-mono">{run.cost}</span>
-                  <span>{run.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Capabilities to finalize */}
-          <details className="cockpit-card">
-            <summary className="text-xs uppercase tracking-wider text-muted-foreground cursor-pointer flex items-center justify-between">
-              <span>Capacités à finaliser</span>
-              <span className="font-mono text-[10px] text-amber">{gapsCount}</span>
-            </summary>
-            <ul className="mt-2 space-y-1 text-xs text-foreground">
-              {gaps.map((g, i) => (
-                <li key={i} className="flex items-center gap-2"><span className="w-1 h-1 rounded-full bg-amber" /> {g}</li>
-              ))}
-            </ul>
-          </details>
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-4">
-          {/* Système */}
-          <h2 className="font-display font-semibold text-sm text-foreground flex items-center gap-2">
-            <Zap size={16} className="text-amber" />
-            Santé Système
-          </h2>
-
-          <div className="cockpit-card space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Système</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">estimations mock</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Coût estimé — mock</span>
-              <span className="font-mono text-foreground">{project.simulatedCost}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Latence estimée — mock</span>
-              <span className="font-mono text-foreground">{project.simulatedLatency}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Dernier import</span>
-              <span className="font-mono text-foreground">{project.lastImport}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Dernier export</span>
-              <span className="font-mono text-foreground">{project.lastExport}</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground italic">Sera remplacé par les coûts/latences réels dès que des runs seront persistés.</p>
-          </div>
-
-          {/* Connecteurs résumé — dérivés de connection-status (truthful) */}
-          <div className="cockpit-card space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Connecteurs (readiness)</h3>
-              <span className="text-[10px] font-mono text-muted-foreground">live · pending · future</span>
-            </div>
-            {(() => {
-              const r = readiness;
-              const openai = !!r?.openai?.api_key_configured;
-              const onedrive = !!r?.onedrive?.oauth_configured;
-              const dbOk = !!r?.supabase?.tables_created;
-              const storageOk = !!r?.supabase?.storage_buckets_created;
-              const audioLive = r?.openai?.transcription_pipeline_status === 'transcription_live';
-              const pgv = !!r?.indexes?.pgvector_ready;
-              const items: Array<{ name: string; status: 'live' | 'pending' | 'degraded' | 'future' | 'archived'; note?: string }> = [
-                { name: 'OpenAI runtime', status: openai ? 'live' : 'pending' },
-                { name: 'Supabase DB', status: dbOk ? 'live' : 'pending' },
-                { name: 'Supabase Storage', status: storageOk ? 'live' : 'pending' },
-                { name: 'OneDrive', status: onedrive ? 'live' : 'pending' },
-                { name: 'pgvector', status: pgv ? 'live' : 'pending', note: pgv ? undefined : 'extension non activée' },
-                { name: 'Audio transcription', status: audioLive ? 'live' : 'pending' },
-                { name: 'Exports txt/md/json', status: 'live' },
-                { name: 'Chroma archive', status: 'archived', note: 'conservé, non interrogé' },
-              ];
-              const STYLE: Record<string, string> = {
-                live: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30',
-                pending: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
-                degraded: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
-                future: 'bg-violet-500/10 text-violet-700 border-violet-500/30',
-                archived: 'bg-slate-500/10 text-slate-600 border-slate-500/30',
-              };
-              return items.map((i) => (
-                <div key={i.name} className="flex items-center justify-between py-1">
-                  <span className="text-xs text-muted-foreground truncate" title={i.note}>{i.name}</span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${STYLE[i.status]}`}>{i.status}</span>
-                </div>
-              ));
-            })()}
-          </div>
-
-          {/* Activité récente */}
-          <div className="cockpit-card space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Activité récente — exemple</h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">design example</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground italic">
-              Les liens seront activés lorsque les runs, imports et notes seront persistés.
-            </p>
-            {recentActivity.slice(0, 6).map(a => (
-              <div key={a.id} className="flex items-start gap-2 py-1.5 border-b border-border/50 last:border-0 opacity-80" title="Persistance non implémentée — lien désactivé">
-                <div className="mt-0.5">
-                  {a.type === 'run' && <Play size={10} className="text-cyan" />}
-                  {a.type === 'audio' && <Mic size={10} className="text-rose" />}
-                  {a.type === 'edit' && <FileText size={10} className="text-violet" />}
-                  {a.type === 'import' && <Upload size={10} className="text-emerald" />}
-                  {a.type === 'export' && <Download size={10} className="text-primary" />}
-                  {a.type === 'alert' && <AlertTriangle size={10} className="text-destructive" />}
-                </div>
-                <div>
-                  <p className="text-xs text-foreground">{a.action}</p>
-                  <p className="text-[10px] text-muted-foreground">{a.target} · {a.date}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+function BlockerGroup({
+  title, tone, items, emptyLabel,
+}: { title: string; tone: 'rose' | 'amber' | 'violet'; items: string[]; emptyLabel?: string }) {
+  const toneCls = tone === 'rose'
+    ? 'border-rose-500/30 bg-rose-500/5 text-rose-700'
+    : tone === 'amber'
+      ? 'border-amber-500/30 bg-amber-500/5 text-amber-700'
+      : 'border-violet-500/30 bg-violet-500/5 text-violet-700';
+  return (
+    <div className={`rounded border p-3 ${toneCls}`}>
+      <p className="text-[10px] font-mono uppercase tracking-wider opacity-80 mb-2">{title}</p>
+      {items.length === 0 ? (
+        <p className="text-[11px] opacity-80 italic">{emptyLabel ?? '—'}</p>
+      ) : (
+        <ul className="space-y-1">
+          {items.map((g, i) => (
+            <li key={i} className="text-[11px] flex items-start gap-2">
+              <span className="w-1 h-1 rounded-full bg-current mt-1.5 shrink-0" />
+              <span>{g}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
