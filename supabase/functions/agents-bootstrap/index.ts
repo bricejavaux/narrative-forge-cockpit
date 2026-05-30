@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
             criticality: tpl.criticality,
             simulated_cost: tpl.simulated_cost,
             status: tpl.status,
-            is_active: true,
+            is_active: (tpl as any).is_active ?? true,
           })
           .select('id')
           .single();
