@@ -41,21 +41,11 @@ export default function DashboardPage() {
     : liveCount >= 1 ? 'Production Test — partiel'
     : 'Production Test — non branché';
 
-  // Blockers grouped
-  const blocksProdTest: string[] = [];
-  const blocksChapterProd: string[] = [];
-  const futureIntentional: string[] = [];
-
-  if (!openai) blocksProdTest.push('OpenAI API key non configurée');
-  if (!supaOk) blocksProdTest.push('Supabase tables non créées');
-  if (!onedrive) blocksProdTest.push('OneDrive non connecté');
-
-  blocksChapterProd.push('Beats validés requis avant génération chapitre');
-  if (!audioLive) blocksChapterProd.push('Pipeline audio (Whisper) — pending');
-
-  if (!pgv) futureIntentional.push('pgvector — ingestion non activée');
-  futureIntentional.push('Réécriture autonome — désactivée intentionnellement');
-  futureIntentional.push('Export PDF/DOCX/EPUB — futur');
+  // Single source of truth — same helper used by the modal
+  const caps = buildCapabilities(readiness, counts ? { canon: counts.canon_count, characters: counts.characters_count } : null);
+  const blocksProdTest = caps.filter(c => c.phase === 'production_test' && c.status !== 'live').map(c => c.name);
+  const blocksChapterProd = caps.filter(c => c.phase === 'chapter_production' && c.status !== 'live').map(c => c.name);
+  const futureIntentional = caps.filter(c => c.phase === 'future').map(c => c.name);
 
   const totalGaps = blocksProdTest.length + blocksChapterProd.length + futureIntentional.length;
 
