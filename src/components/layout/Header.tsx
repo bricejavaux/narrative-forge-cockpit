@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, ChevronDown, Plug, Sparkles, FlaskConical } from 'lucide-react';
+import { ChevronDown, Plug, Sparkles, FlaskConical } from 'lucide-react';
 import { project } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
