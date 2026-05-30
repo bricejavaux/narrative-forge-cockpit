@@ -1,5 +1,9 @@
-import { Lock, Unlock } from 'lucide-react';
+import { Lock, Unlock, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
+
+const LOCK_DOCTRINE =
+  "Verrouillé = stable pour les étapes suivantes. Cela ne signifie pas final publication. " +
+  "Un élément verrouillé peut être rouvert avec une justification ; les dépendances aval deviennent alors potentiellement obsolètes (stale_after_upstream_change).";
 
 export default function LockReopenButton({
   locked,
@@ -16,7 +20,7 @@ export default function LockReopenButton({
   const [reason, setReason] = useState('');
 
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-flex items-center gap-1.5">
       <button
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
@@ -29,11 +33,12 @@ export default function LockReopenButton({
         {locked ? <Lock size={11} /> : <Unlock size={11} />}
         {locked ? 'Verrouillé' : 'Verrouiller'}
       </button>
+      <span title={LOCK_DOCTRINE} className="text-muted-foreground/70 hover:text-foreground cursor-help">
+        <HelpCircle size={12} />
+      </span>
       {open && (
-        <div className="absolute right-0 mt-1 w-64 p-3 bg-card border border-border rounded shadow-lg z-20 space-y-2">
-          <p className="text-[11px] text-muted-foreground">
-            {locked ? 'Réouvrir — déclenche une analyse d’impact' : 'Verrouiller — stable pour l’étape suivante'}
-          </p>
+        <div className="absolute right-0 top-full mt-1 w-72 p-3 bg-card border border-border rounded shadow-lg z-20 space-y-2">
+          <p className="text-[11px] text-muted-foreground leading-snug">{LOCK_DOCTRINE}</p>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
