@@ -95,12 +95,6 @@ export default function Header() {
         </button>
         <CapabilitiesModal open={capsOpen} onClose={() => setCapsOpen(false)} />
 
-        <button
-          className="relative p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          title="Alertes futures — non bloquant"
-        >
-          <Bell size={15} />
-        </button>
       </div>
     </header>
   );
