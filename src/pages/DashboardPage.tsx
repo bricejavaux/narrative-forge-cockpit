@@ -3,7 +3,7 @@ import { Plug } from 'lucide-react';
 import ConnectionReadinessPanel from '@/components/shared/ConnectionReadinessPanel';
 import ImportReconcilePanel from '@/components/shared/ImportReconcilePanel';
 import OneDriveRepositoryPanel from '@/components/shared/OneDriveRepositoryPanel';
-import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
+import CapabilitiesModal, { buildCapabilities } from '@/components/shared/CapabilitiesModal';
 import ProductionFlowPanel from '@/components/shared/ProductionFlowPanel';
 import SupabaseRepositoryPanel from '@/components/shared/SupabaseRepositoryPanel';
 import { supabaseService, type ConnectionReadiness, type ProductionCounts, deriveProductionStages } from '@/services/supabaseService';
