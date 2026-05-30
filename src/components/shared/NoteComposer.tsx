@@ -56,7 +56,7 @@ export default function NoteComposer({ target, compact = false, targetType, targ
 
   const steps: WorkflowStep[] = [
     { key: 'captured', label: 'Capturé', status: hasInput ? 'done' : 'pending' },
-    { key: 'transcribed', label: 'Transcrit (Whisper)', status: tab === 'voice' ? 'pending' : 'done' },
+    { key: 'transcribed', label: 'Transcrit (Whisper)', status: tab === 'voice' ? (transcript ? 'done' : transcribing ? 'active' : 'pending') : 'done' },
     { key: 'structured', label: 'Structuré (OpenAI)', status: result ? 'done' : busy ? 'active' : 'pending' },
     { key: 'validation', label: 'Validation humaine', status: applied ? 'done' : (result ? 'active' : 'pending') },
     { key: 'integrated', label: 'Intégré', status: applied ? 'done' : 'pending' },
