@@ -227,23 +227,24 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="cockpit-card space-y-4">
             <h3 className="editorial-eyebrow flex items-center gap-2"><Sliders size={12} /> Structure & rythme</h3>
-            <NarrativeSlider label="Longueur cible (mots)" value={3500} min={1000} max={6000} />
-            <NarrativeSlider label="Amplitude de variation" value={15} />
-            <NarrativeSlider label="Tempo" value={65} />
-            <NarrativeSlider label="Respiration" value={40} />
-            <NarrativeSlider label="Compression" value={30} />
-            <NarrativeSlider label="Fragmentation temporelle" value={25} />
-            <NarrativeSlider label="Fragmentation POV" value={35} />
+            <NarrativeSlider label="Longueur cible (mots)" storageKey="length" defaultValue={3500} min={1000} max={6000} />
+            <NarrativeSlider label="Amplitude de variation" storageKey="length_variation" defaultValue={15} />
+            <NarrativeSlider label="Tempo" storageKey="tempo" defaultValue={65} />
+            <NarrativeSlider label="Respiration" storageKey="breathing" defaultValue={40} />
+            <NarrativeSlider label="Compression" storageKey="compression" defaultValue={30} />
+            <NarrativeSlider label="Fragmentation temporelle" storageKey="time_frag" defaultValue={25} />
+            <NarrativeSlider label="Fragmentation POV" storageKey="pov_frag" defaultValue={35} />
           </div>
           <div className="cockpit-card space-y-4">
             <h3 className="editorial-eyebrow flex items-center gap-2"><Sliders size={12} /> Tonalité & densité</h3>
-            <NarrativeSlider label="Densité scientifique" value={55} />
-            <NarrativeSlider label="Densité émotionnelle" value={70} />
-            <NarrativeSlider label="Niveau de mystère" value={72} />
-            <NarrativeSlider label="Charge personnages" value={60} />
-            <NarrativeSlider label="Délai avant payoff" value={60} />
-            <NarrativeSlider label="Brutalité des bascules" value={45} />
-            <NarrativeSlider label="Répétition max. tolérée" value={20} />
+            <NarrativeSlider label="Densité scientifique" storageKey="sci_density" defaultValue={55} />
+            <NarrativeSlider label="Densité émotionnelle" storageKey="emo_density" defaultValue={70} />
+            <NarrativeSlider label="Niveau de mystère" storageKey="mystery" defaultValue={72} />
+            <NarrativeSlider label="Charge personnages" storageKey="char_load" defaultValue={60} />
+            <NarrativeSlider label="Délai avant payoff" storageKey="payoff_delay" defaultValue={60} />
+            <NarrativeSlider label="Brutalité des bascules" storageKey="shift_brutality" defaultValue={45} />
+            <NarrativeSlider label="Répétition max. tolérée" storageKey="repetition_max" defaultValue={20} />
+
           </div>
         </div>
       )}
