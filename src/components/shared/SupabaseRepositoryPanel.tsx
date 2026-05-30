@@ -73,7 +73,12 @@ export default function SupabaseRepositoryPanel() {
   };
 
   const allRows = sections?.flatMap(s => s.rows) ?? [];
+  const CORE_KEYS = ['canon_objects', 'characters', 'import_jobs', 'chapters'];
+  const coreRows = allRows.filter(r => CORE_KEYS.includes(r.label));
+  const coreReadable = coreRows.length > 0 && coreRows.every(r => r.status === 'active' || r.status === 'empty');
+  const coreBlocked = coreRows.filter(r => r.status === 'rls_blocked' || r.status === 'unknown_error');
   const requiredBlocked = allRows.filter(r => r.required && !r.ok).length;
+  const liveOk = sections && coreReadable && coreBlocked.length === 0;
 
   return (
     <div className="rounded-lg border border-border/60 bg-card/40 p-4 space-y-4">
@@ -82,15 +87,29 @@ export default function SupabaseRepositoryPanel() {
           <p className="editorial-eyebrow">Référentiel Supabase</p>
           <h3 className="text-lg editorial-heading text-foreground flex items-center gap-2">
             <Database className="w-4 h-4" /> Couche narrative active
+            {liveOk && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Supabase live
+              </span>
+            )}
+            {sections && !liveOk && coreBlocked.length > 0 && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-700">
+                Supabase — lecture core bloquée
+              </span>
+            )}
           </h3>
-          <p className="text-xs text-muted-foreground mt-1">Diagnostic classé : vide ≠ lecture bloquée ≠ table non créée ≠ phase suivante.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {liveOk
+              ? 'Tables noyau (canon, personnages, imports, chapitres) lisibles. Tables optionnelles ci-dessous.'
+              : 'Diagnostic classé : vide ≠ lecture bloquée ≠ table non créée ≠ phase suivante.'}
+          </p>
         </div>
         <button onClick={triggerRefresh} className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground">
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Rafraîchir
         </button>
       </div>
 
-      {requiredBlocked > 0 && (
+      {!liveOk && requiredBlocked > 0 && (
         <div className="text-[11px] text-rose-700 border border-rose-500/30 bg-rose-500/5 p-2 rounded">
           {requiredBlocked} table(s) requises pour Production Test en erreur — voir diagnostic technique ci-dessous.
         </div>
