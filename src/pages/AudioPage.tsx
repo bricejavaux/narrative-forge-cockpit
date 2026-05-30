@@ -34,17 +34,36 @@ export default function AudioPage() {
           </p>
         </div>
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono ${
-          audioPipelineReady ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700'
-          : openaiReady ? 'border-amber/30 bg-amber/5 text-amber'
+          openaiReady ? 'border-amber/30 bg-amber/5 text-amber'
           : 'border-rose/30 bg-rose/5 text-rose'
         }`}>
           <Mic size={12} />
-          {audioPipelineReady
-            ? 'Whisper actif'
-            : openaiReady
-              ? 'OpenAI configuré — pipeline fichier audio en attente'
-              : 'Whisper simulé — clé OpenAI absente'}
+          {openaiReady
+            ? 'OpenAI configuré — upload audio + capture micro : pending'
+            : 'OpenAI absent — transcription indisponible'}
         </div>
+      </div>
+
+      {/* Pipeline status — honest breakdown */}
+      <div className="cockpit-card p-3">
+        <p className="editorial-eyebrow mb-2">Capacités audio (réelles)</p>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-[11px]">
+          {[
+            { name: 'Structuration texte (OpenAI)', status: openaiReady ? 'live' : 'pending' },
+            { name: 'Upload fichier audio', status: 'pending' },
+            { name: 'Capture micro navigateur', status: 'pending' },
+            { name: 'Transcription Whisper', status: 'pending' },
+            { name: 'Application note → patch', status: 'pending' },
+          ].map((c) => (
+            <div key={c.name} className={`rounded border p-2 ${c.status === 'live' ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700' : 'border-amber-500/30 bg-amber-500/5 text-amber-700'}`}>
+              <p className="font-display text-[11px] leading-tight">{c.name}</p>
+              <p className="font-mono text-[10px] mt-1 opacity-80">{c.status}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2 italic">
+          Le bouton micro n'est pas câblé à MediaRecorder. Utiliser pour l'instant la note texte. Upload audio à venir.
+        </p>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 border-b border-border">
@@ -63,12 +82,12 @@ export default function AudioPage() {
 
           <div className="cockpit-card">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="editorial-eyebrow">Cibles rapides</h3>
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${audioPipelineReady ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
-                {audioPipelineReady ? 'audio live' : 'pending_audio_pipeline'}
+              <h3 className="editorial-eyebrow">Cibles rapides — capture micro pending</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/30">
+                micro non câblé
               </span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 opacity-50 pointer-events-none" title="Capture micro navigateur non implémentée">
               {recordVariants.map(v => (
                 <MicButton key={v} label={v} size="md" />
               ))}
