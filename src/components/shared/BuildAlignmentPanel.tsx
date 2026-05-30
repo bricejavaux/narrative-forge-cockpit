@@ -9,14 +9,13 @@ const BUILD_TIME = (import.meta as any).env?.VITE_BUILD_TIME || new Date().toISO
 const COMMIT_SHA = (import.meta as any).env?.VITE_COMMIT_SHA || 'unknown';
 
 async function pingFunction(name: string): Promise<Check> {
+  // Use OPTIONS (CORS preflight) to verify reachability without triggering
+  // app-level 4xx errors from missing required params.
   try {
-    const { error } = await supabase.functions.invoke(name, { body: { __ping: true } });
-    // Most of our functions return 400/200 on a ping body; an "error" from invoke
-    // only fires on network/boot failure. A normal app-level 4xx still counts as reachable.
-    if (error && /Failed to fetch|NetworkError|FunctionsFetchError/i.test(String(error.message))) {
-      return { label: name, status: 'fail', detail: error.message };
-    }
-    return { label: name, status: 'ok', detail: 'reachable' };
+    const url = `https://${(import.meta as any).env?.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/${name}`;
+    const res = await fetch(url, { method: 'OPTIONS' });
+    if (res.ok || res.status === 204) return { label: name, status: 'ok', detail: 'reachable' };
+    return { label: name, status: 'warn', detail: `HTTP ${res.status}` };
   } catch (e) {
     return { label: name, status: 'fail', detail: e instanceof Error ? e.message : 'unknown' };
   }
