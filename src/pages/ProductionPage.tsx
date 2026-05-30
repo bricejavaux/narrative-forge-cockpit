@@ -7,17 +7,16 @@ import BeatValidationPanel from '@/components/production/BeatValidationPanel';
 import BeatComparisonPanel from '@/components/production/BeatComparisonPanel';
 import RewriteTasksPanel from '@/components/production/RewriteTasksPanel';
 import LockReopenButton from '@/components/production/LockReopenButton';
+import BeatsPlanPanel from '@/components/shared/BeatsPlanPanel';
 import { chapterProductionService } from '@/services/chapterProductionService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { chapters as mockChapters } from '@/data/dummyData';
 
 export default function ProductionPage() {
   const [stages, setStages] = useState<StageState[]>([]);
   const [loading, setLoading] = useState(true);
   const [chapters, setChapters] = useState<any[]>([]);
   const [selectedChapter, setSelectedChapter] = useState<any | null>(null);
-  const [chapterSource, setChapterSource] = useState<'live' | 'mock'>('mock');
 
   const refresh = async () => {
     setLoading(true);
@@ -26,15 +25,10 @@ export default function ProductionPage() {
       supabase.from('chapters').select('id, number, title, locked, production_status, metadata').order('number', { ascending: true }).limit(50),
     ]);
     setStages(s);
-    if (ch.data && ch.data.length > 0) {
-      setChapters(ch.data);
-      setChapterSource('live');
-      if (!selectedChapter) setSelectedChapter(ch.data[0]);
-    } else {
-      const mock = mockChapters.slice(0, 6).map((c) => ({ id: c.id, number: c.number, title: c.title, locked: false }));
-      setChapters(mock);
-      setChapterSource('mock');
-    }
+    const live = ch.data ?? [];
+    setChapters(live);
+    if (live.length > 0 && !selectedChapter) setSelectedChapter(live[0]);
+    if (live.length === 0) setSelectedChapter(null);
     setLoading(false);
   };
 
