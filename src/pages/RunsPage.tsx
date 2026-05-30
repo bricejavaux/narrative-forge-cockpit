@@ -62,34 +62,36 @@ export default function RunsPage() {
   return (
     <div className="space-y-6 animate-slide-in">
       <div>
-        <p className="editorial-eyebrow">Orchestration</p>
-        <h1 className="text-3xl editorial-heading text-foreground mt-1">Run Designer</h1>
+        <p className="editorial-eyebrow">Intelligence · Page technique</p>
+        <h1 className="text-3xl editorial-heading text-foreground mt-1">Runs</h1>
+        <p className="text-xs text-muted-foreground mt-1 max-w-3xl">
+          Historique, exécutions techniques avancées et tests dry-run / live. Les actions de production
+          (génération beats, validation, audit, génération chapitre, réécriture, verrouillage) se font dans <strong>Production</strong>.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Configuration */}
         <div className="lg:col-span-2 space-y-4">
           <div className="cockpit-card space-y-4">
-            <h2 className="font-display font-semibold text-sm text-foreground">Configuration du Run</h2>
+            <h2 className="font-display font-semibold text-sm text-foreground">Exécution technique</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Mode (chaîne de production)</label>
+                <label className="text-xs text-muted-foreground uppercase tracking-wider">Type de run</label>
                 <select
                   value={selectedMode.id}
-                  onChange={e => setSelectedMode(ALL_MODES.find(m => m.id === e.target.value) || PRODUCTION_CHAIN[0])}
+                  onChange={e => setSelectedMode(ALL_MODES.find(m => m.id === e.target.value) || ALLOWED_MODES[0])}
                   className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground"
                 >
-                  <optgroup label="Chaîne de production (numérotée)">
-                    {PRODUCTION_CHAIN.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  <optgroup label="Disponible maintenant">
+                    {ALLOWED_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </optgroup>
-                  <optgroup label="Presets opérationnels">
-                    {PRESETS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </optgroup>
-                  <optgroup label="Presets avancés / legacy">
-                    {LEGACY.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  <optgroup label="Futur / bloqué">
+                    {FUTURE_MODES.map(m => <option key={m.id} value={m.id} disabled>{m.label}</option>)}
                   </optgroup>
                 </select>
+
                 {selectedMode.blockers && selectedMode.blockers.length > 0 && (
                   <div className="mt-2 rounded border border-amber/30 bg-amber/5 p-2 text-[11px] text-amber-700">
                     <p className="font-display font-semibold mb-1">Conditions requises :</p>
