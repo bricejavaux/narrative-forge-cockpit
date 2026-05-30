@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { productionFlowService, type StageState } from '@/services/productionFlowService';
 import ProductionFlowDiagram from '@/components/production/ProductionFlowDiagram';
-import StageCard from '@/components/production/StageCard';
+// StageCard duplicate grid removed — single chain via ProductionFlowDiagram
 import ChapterProductionBoard from '@/components/production/ChapterProductionBoard';
 import BeatValidationPanel from '@/components/production/BeatValidationPanel';
 import BeatComparisonPanel from '@/components/production/BeatComparisonPanel';
@@ -49,9 +49,6 @@ export default function ProductionPage() {
 
       <ProductionFlowDiagram stages={stages} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {stages.map((s) => <StageCard key={s.stage} state={s} />)}
-      </div>
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
