@@ -51,8 +51,9 @@ export default function ProductionPage() {
 
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="font-display font-semibold text-sm text-foreground">Chapter Production Board</h2>
+          <ChapterBoardLegend />
           <span className="text-[10px] font-mono text-muted-foreground">
             {chapters.length} chapitre(s) en base
           </span>
