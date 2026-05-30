@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Mic, Type, Square, CheckCircle2, Loader2, Sparkles, AlertTriangle, Send, X, Copy } from 'lucide-react';
+import { Mic, Type, CheckCircle2, Loader2, Sparkles, AlertTriangle, Send, X, Copy } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { openaiService } from '@/services/openaiService';
+import { audioTranscriptionService } from '@/services/audioTranscriptionService';
+import MicRecorder from './MicRecorder';
+
 
 interface NoteComposerProps {
   target: string;
@@ -32,19 +35,20 @@ function buildProposedPatch(targetType: string | undefined, structured: any): Re
 export default function NoteComposer({ target, compact = false, targetType, targetId, onApplied }: NoteComposerProps) {
   const [tab, setTab] = useState<'text' | 'voice'>('text');
   const [text, setText] = useState('');
-  const [recording, setRecording] = useState(false);
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcript, setTranscript] = useState<string>('');
 
   useEffect(() => { supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
 
   const openaiOk = !!readiness?.openai?.api_key_configured;
-  const audioLive = readiness?.openai?.transcription_pipeline_status === 'transcription_live';
-  const hasInput = text.trim().length > 0 || recording;
+  const hasInput = text.trim().length > 0 || transcript.length > 0;
+
   const canStructureText = openaiOk && text.trim().length > 0 && tab === 'text';
   const canApply = !!targetId && (targetType === 'canon_object' || targetType === 'character') && !!result;
   const proposed = canApply ? buildProposedPatch(targetType, result.structured ?? result) : {};
@@ -60,12 +64,35 @@ export default function NoteComposer({ target, compact = false, targetType, targ
   ];
 
   const submit = async () => {
-    if (!canStructureText) return;
+    const payload = text.trim() || transcript.trim();
+    if (!openaiOk || !payload) return;
     setBusy(true); setErr(null); setResult(null); setApplied(false);
-    try { setResult(await openaiService.structureNote(text, targetType, targetId)); }
+    try { setResult(await openaiService.structureNote(payload, targetType, targetId)); }
     catch (e) { setErr(e instanceof Error ? e.message : 'unknown error'); }
     finally { setBusy(false); }
   };
+
+  const handleMicSubmit = async (blob: Blob, durationMs: number) => {
+    if (!openaiOk) { setErr('OpenAI requis pour transcription.'); return; }
+    setTranscribing(true); setErr(null); setTranscript('');
+    try {
+      const file = new File([blob], `note-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+      const up = await audioTranscriptionService.uploadAudio(file, targetType || 'generic', targetId);
+      if (!up.ok) throw new Error('Upload audio échoué: ' + up.error);
+      const tr: any = await audioTranscriptionService.transcribe(up.audio_path, up.audio_note_id);
+      if (tr?.mode === 'live' && typeof tr.transcript === 'string') {
+        setTranscript(tr.transcript);
+        toast.success(`Transcrit (${Math.round(durationMs / 1000)}s)`);
+      } else {
+        throw new Error(tr?.reason || tr?.error || 'Transcription échouée');
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Transcription échouée');
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
 
   const applyPatch = async () => {
     if (!canApply || !targetId) return;
