@@ -68,9 +68,13 @@ export default function ProductionPage() {
               <button
                 key={c.id}
                 onClick={() => setSelectedChapter(c)}
-                className={`text-left ${selectedChapter?.id === c.id ? 'ring-2 ring-primary/40 rounded-lg' : ''}`}
+                className="text-left"
               >
-                <ChapterProductionBoard chapter={c} stageStatuses={(c.metadata as any) ?? {}} />
+                <ChapterProductionBoard
+                  chapter={c}
+                  stageStatuses={(c.metadata as any) ?? {}}
+                  selected={selectedChapter?.id === c.id}
+                />
               </button>
             ))}
           </div>
