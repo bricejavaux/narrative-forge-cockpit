@@ -2,68 +2,75 @@ import { useEffect, useState } from 'react';
 import { audioNotes } from '@/data/dummyData';
 import { isDemoMode } from '@/lib/productionMode';
 import StatusBadge from '@/components/shared/StatusBadge';
-import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import AudioReviewTypesPanel from '@/components/shared/AudioReviewTypesPanel';
-import { Mic, Play } from 'lucide-react';
+import { Mic } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import { supabase } from '@/integrations/supabase/client';
 
-const subSections = ['Notes audio', 'Types de relecture', 'Relectures chapitres', 'Commentaires beats', 'Revues cross-chapitres', 'Sessions de lecture', 'Historique vocal', 'Traçabilité'];
-
-const recordVariants = [
-  'Sur le canon', 'Sur un personnage', 'Sur un arc', 'Sur un beat',
-  'Sur un brouillon', 'Sur un chapitre', 'Sur un audit', 'Sur un run'
-];
+const subSections = ['Notes audio', 'Types de relecture', 'Sessions de lecture'];
 
 export default function AudioPage() {
   const [activeSection, setActiveSection] = useState(subSections[0]);
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
-  useEffect(() => { supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
+  const [persistedNotes, setPersistedNotes] = useState<any[]>([]);
+  const demo = isDemoMode();
+
+  useEffect(() => {
+    supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
+    supabase.from('audio_notes').select('id, target, target_type, transcription_status, treatment_status, created_at, duration').order('created_at', { ascending: false }).limit(50)
+      .then(({ data }) => setPersistedNotes(data ?? []));
+  }, []);
+
   const openaiReady = !!readiness?.openai?.api_key_configured;
-  const audioPipelineReady = !!readiness?.openai?.transcription_pipeline_status && readiness.openai.transcription_pipeline_status !== 'no_key' && readiness.openai.transcription_pipeline_status !== 'pending_audio_pipeline';
+  const micSupported = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined';
+
+  const caps: { name: string; status: 'live' | 'pending' | 'blocked'; reason?: string }[] = [
+    { name: 'Notes texte', status: 'live' },
+    { name: 'Structuration OpenAI', status: openaiReady ? 'live' : 'blocked', reason: openaiReady ? undefined : 'OPENAI_API_KEY absent' },
+    { name: 'Capture micro navigateur', status: micSupported ? 'live' : 'blocked', reason: micSupported ? undefined : 'MediaRecorder non supporté' },
+    { name: 'Upload Supabase Storage (audio)', status: 'live' },
+    { name: 'Transcription Whisper', status: openaiReady ? 'live' : 'blocked', reason: openaiReady ? undefined : 'OPENAI_API_KEY absent' },
+    { name: 'Application note → patch (canon/personnages)', status: 'live' },
+  ];
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between flex-wrap gap-3">
         <div>
-          <p className="editorial-eyebrow">Intelligence</p>
-          <h1 className="text-3xl editorial-heading text-foreground mt-1">Audio & Reviews</h1>
+          <p className="editorial-eyebrow">Atelier</p>
+          <h1 className="text-3xl editorial-heading text-foreground mt-1">Audio & relectures</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-            Vue transverse des notes vocales et lectures commentées. Le composer audio/texte
-            apparaît également dans chaque page (canon, personnages, chapitres, agents, runs, diagnostics).
+            Notes texte, voix (MediaRecorder), transcriptions Whisper et retours de lecture. Le composer
+            est disponible partout dans l'app.
           </p>
         </div>
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono ${
-          openaiReady ? 'border-amber/30 bg-amber/5 text-amber'
-          : 'border-rose/30 bg-rose/5 text-rose'
+          openaiReady && micSupported ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700'
+          : openaiReady ? 'border-amber-500/30 bg-amber-500/5 text-amber-700'
+          : 'border-rose-500/30 bg-rose-500/5 text-rose-700'
         }`}>
           <Mic size={12} />
-          {openaiReady
-            ? 'OpenAI configuré — upload audio + capture micro : pending'
-            : 'OpenAI absent — transcription indisponible'}
+          {openaiReady && micSupported ? 'Pipeline audio : capture + Whisper opérationnel'
+            : openaiReady ? 'OpenAI prêt — micro à autoriser au premier usage'
+            : 'OpenAI absent — transcription désactivée'}
         </div>
       </div>
 
-      {/* Pipeline status — honest breakdown */}
       <div className="cockpit-card p-3">
         <p className="editorial-eyebrow mb-2">Capacités audio (réelles)</p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-[11px]">
-          {[
-            { name: 'Structuration texte (OpenAI)', status: openaiReady ? 'live' : 'pending' },
-            { name: 'Upload fichier audio', status: 'pending' },
-            { name: 'Capture micro navigateur', status: 'pending' },
-            { name: 'Transcription Whisper', status: 'pending' },
-            { name: 'Application note → patch', status: 'pending' },
-          ].map((c) => (
-            <div key={c.name} className={`rounded border p-2 ${c.status === 'live' ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700' : 'border-amber-500/30 bg-amber-500/5 text-amber-700'}`}>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-[11px]">
+          {caps.map((c) => (
+            <div key={c.name} className={`rounded border p-2 ${
+              c.status === 'live' ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700'
+              : c.status === 'pending' ? 'border-amber-500/30 bg-amber-500/5 text-amber-700'
+              : 'border-rose-500/30 bg-rose-500/5 text-rose-700'
+            }`}>
               <p className="font-display text-[11px] leading-tight">{c.name}</p>
-              <p className="font-mono text-[10px] mt-1 opacity-80">{c.status}</p>
+              <p className="font-mono text-[10px] mt-1 opacity-80">{c.status}{c.reason ? ` · ${c.reason}` : ''}</p>
             </div>
           ))}
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2 italic">
-          Le bouton micro n'est pas câblé à MediaRecorder. Utiliser pour l'instant la note texte. Upload audio à venir.
-        </p>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 border-b border-border">
@@ -77,25 +84,13 @@ export default function AudioPage() {
 
       {activeSection === 'Notes audio' && (
         <div className="space-y-4">
-          {/* Unified composer */}
-          <NoteComposer target="nouvelle note transverse" />
+          <NoteComposer target="nouvelle note transverse" targetType="generic" />
 
-          <div className="cockpit-card">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="editorial-eyebrow">Cibles rapides — capture micro pending</h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/30">
-                micro non câblé
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2 opacity-50 pointer-events-none" title="Capture micro navigateur non implémentée">
-              {recordVariants.map(v => (
-                <MicButton key={v} label={v} size="md" />
-              ))}
-            </div>
-          </div>
-
-          {/* Table */}
           <div className="cockpit-card overflow-x-auto">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="editorial-eyebrow">Notes persistées (Supabase)</h3>
+              <span className="text-[10px] font-mono text-muted-foreground">{persistedNotes.length} note(s)</span>
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
@@ -104,98 +99,52 @@ export default function AudioPage() {
                   <th className="text-left py-2 px-3">Date</th>
                   <th className="text-left py-2 px-3">Durée</th>
                   <th className="text-left py-2 px-3">Transcription</th>
-                  <th className="text-left py-2 px-3">Impact</th>
-                  <th className="text-left py-2 px-3">Action proposée</th>
                   <th className="text-left py-2 px-3">Traitement</th>
                 </tr>
               </thead>
               <tbody>
-                {isDemoMode() ? audioNotes.map(note => (
-                  <tr key={note.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
-                    <td className="py-2 px-3 text-foreground">{note.target}</td>
-                    <td className="py-2 px-3"><StatusBadge status={note.targetType} /></td>
-                    <td className="py-2 px-3 text-xs text-muted-foreground font-mono">{note.date}</td>
-                    <td className="py-2 px-3 text-xs font-mono text-foreground">{note.duration}</td>
-                    <td className="py-2 px-3"><StatusBadge status={note.transcriptionStatus} /></td>
-                    <td className="py-2 px-3"><StatusBadge status={note.impact} /></td>
-                    <td className="py-2 px-3 text-xs text-muted-foreground max-w-[200px] truncate">{note.proposedAction}</td>
-                    <td className="py-2 px-3"><StatusBadge status={note.treatmentStatus} /></td>
+                {persistedNotes.length > 0 ? persistedNotes.map(n => (
+                  <tr key={n.id} className="border-b border-border/50 hover:bg-surface-2">
+                    <td className="py-2 px-3 text-foreground">{n.target}</td>
+                    <td className="py-2 px-3"><StatusBadge status={n.target_type} /></td>
+                    <td className="py-2 px-3 text-xs text-muted-foreground font-mono">{new Date(n.created_at).toLocaleString()}</td>
+                    <td className="py-2 px-3 text-xs font-mono text-foreground">{n.duration ?? '—'}</td>
+                    <td className="py-2 px-3"><StatusBadge status={n.transcription_status} /></td>
+                    <td className="py-2 px-3"><StatusBadge status={n.treatment_status} /></td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={8} className="py-6 text-center text-xs text-muted-foreground">Aucune note audio persistée — Phase 2 (audio_notes).</td></tr>
+                  <tr><td colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
+                    Aucune note audio persistée — utiliser le composer ci-dessus pour en créer.
+                  </td></tr>
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* Audio card detail */}
-          <div className="cockpit-card space-y-3">
-            <h3 className="text-sm font-display font-semibold text-foreground">Détail note audio — <span className="font-mono text-xs text-muted-foreground">exemple démo</span></h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-xs text-muted-foreground uppercase">Audio brut</span>
-                <div className="mt-1 flex items-center gap-2 p-3 bg-surface-2 rounded">
-                  <button className="text-rose cursor-not-allowed"><Play size={16} /></button>
-                  <div className="flex-1 h-1 bg-surface-3 rounded-full"><div className="w-1/3 h-full bg-rose rounded-full" /></div>
-                  <span className="text-xs font-mono text-muted-foreground">2:34</span>
-                </div>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground uppercase">Transcription brute</span>
-                <p className="mt-1 text-xs text-muted-foreground italic bg-surface-2 p-3 rounded">
-                  "Sur le Ch.6 Anvers — Brice ne doit pas expliquer la doctrine. Il la tient. Resserrer le dialogue avec le leader syndical, garder la sobriété."
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground uppercase">Structuration future</span>
-                <p className="mt-1 text-xs text-muted-foreground font-mono bg-surface-2 p-3 rounded">→ Tâche: réécriture beat 8.5 · Priorité: haute · Agent: Réécriture Ciblée</p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground uppercase">Impact & agent</span>
-                <p className="mt-1 text-xs text-muted-foreground bg-surface-2 p-3 rounded">Impact élevé · Agent associé: Réécriture Ciblée · Version: v5</p>
-              </div>
+          {demo && (
+            <div className="cockpit-card">
+              <p className="editorial-eyebrow mb-2">Demo only — exemples</p>
+              <table className="w-full text-xs">
+                <tbody>
+                  {audioNotes.map(note => (
+                    <tr key={note.id} className="border-b border-border/50">
+                      <td className="py-1.5 px-2 text-foreground">{note.target}</td>
+                      <td className="py-1.5 px-2 font-mono text-muted-foreground">{note.date}</td>
+                      <td className="py-1.5 px-2"><StatusBadge status={note.transcriptionStatus} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </div>
-      )}
-
-      {activeSection === 'Relectures chapitres' && (
-        <div className="cockpit-card space-y-4">
-          <h3 className="font-display font-semibold text-foreground">Lecture commentée — Ch.5 Walvis Bay : « Nous avons ouvert. » (simulé)</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-surface-2 rounded p-4 text-sm text-muted-foreground leading-relaxed max-h-[400px] overflow-y-auto">
-              <p className="text-foreground mb-4">[Extrait simulé — Ch.5]</p>
-              <p>À 04:17, la fenêtre s'était ouverte sans eux. Brice apprit la nouvelle par un canal latéral, dans la voix neutre de Jonas : « Walvis Bay vient de coupler. » Pas d'autorisation du Trust, pas de latence consentie. Juste un État qui avait décidé que sa vitesse ne se discutait plus.</p>
-              <p className="mt-3">Sur l'écran, ΔS oscillait à la limite haute de la fenêtre. R montait. Personne ne parlait, parce qu'il n'y avait rien à dire qui n'aurait pas l'air d'une plainte.</p>
-              <p className="mt-3">Amina, depuis le SAS, transmit une seule ligne : « Nous avons ouvert. » Brice reposa la tasse. C'était le monde qui venait de basculer, dans une cuisine, à mi-voix.</p>
-            </div>
-            <div className="space-y-3">
-              <h4 className="text-xs text-muted-foreground uppercase tracking-wider">Commentaires oraux</h4>
-              {[
-                { time: '0:45', text: 'Garder la sobriété du « 04:17 » — pas de dramatisation', status: 'done' },
-                { time: '1:20', text: 'Jonas est trop neutre — un détail de corps suffirait', status: 'open' },
-                { time: '2:10', text: 'La cuisine en clôture est juste — phrase-couteau à resserrer', status: 'in_progress' },
-              ].map((c, i) => (
-                <div key={i} className="flex items-start gap-2 p-2 bg-surface-2 rounded">
-                  <span className="font-mono text-[10px] text-rose w-10 shrink-0">{c.time}</span>
-                  <p className="text-xs text-foreground flex-1">{c.text}</p>
-                  <StatusBadge status={c.status} />
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       )}
 
       {activeSection === 'Types de relecture' && <AudioReviewTypesPanel />}
 
-      {!['Notes audio', 'Relectures chapitres', 'Types de relecture'].includes(activeSection) && (
-        <div className="cockpit-card p-8 text-center">
-          <p className="text-muted-foreground text-sm">Section « {activeSection} » — <span className="font-mono">design target</span></p>
-          <p className="text-xs text-muted-foreground mt-2 font-mono">
-            Nécessite : upload audio Supabase Storage + persistance audio_notes / audio_transcripts.
-            Whisper : {audioPipelineReady ? 'live' : 'pending_audio_pipeline'}.
-          </p>
+      {activeSection === 'Sessions de lecture' && (
+        <div className="cockpit-card p-8 text-center text-xs text-muted-foreground">
+          Sessions de lecture commentée — Phase 2 (review_sessions). Aucune session démarrée.
         </div>
       )}
     </div>

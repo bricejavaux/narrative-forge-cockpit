@@ -8,42 +8,29 @@ import { isDemoMode } from '@/lib/productionMode';
 
 type ModeDef = { id: string; label: string; live?: boolean; blockers?: string[] };
 
-const PRODUCTION_CHAIN: ModeDef[] = [
-  { id: 'p1', label: '1. Préparer / générer les beats prévus', blockers: ['plan chapitre requis'] },
-  { id: 'p2', label: '2. Auditer les beats prévus', blockers: ['beats prévus requis'] },
-  { id: 'p3', label: '3. Valider les beats', blockers: ['beats prévus requis · validation humaine'] },
-  { id: 'p4', label: '4. Générer chapitre depuis beats validés', blockers: ['beats validés', 'canon non stale', 'personnages disponibles', 'chapitre cible sélectionné'] },
-  { id: 'p5', label: '5. Extraire beats observés', blockers: ['chapter full_text requis'] },
-  { id: 'p6', label: '6. Auditer chapitre vs beats prévus', blockers: ['beats observés requis'] },
-  { id: 'p7', label: '7. Créer réécritures ciblées', blockers: ['audit chapitre requis'] },
-  { id: 'p8', label: '8. Valider / intégrer réécritures', blockers: ['rewrite_tasks pending'] },
-  { id: 'p9', label: '9. Verrouiller chapitre', blockers: ['rewrite_tasks resolved'] },
-  { id: 'p10', label: '10. Lancer audit méta-tome', blockers: ['au moins 3 chapitres verrouillés'] },
-  { id: 'p11', label: '11. Analyser impact canon', blockers: ['changement canon récent'] },
-  { id: 'p12', label: '12. Préparer export', blockers: ['chapitres sélectionnés'] },
+// Runs page is a *technical* page only. Production actions (beats generation,
+// validation, chapter generation, rewrite, lock) belong to /production.
+const ALLOWED_MODES: ModeDef[] = [
+  { id: 'r_audit_plan', label: 'Audit du plan chapitre (live)', blockers: ['plan chapitre requis'] },
+  { id: 'r_audit_beats', label: 'Audit des beats prévus (live)', blockers: ['beats prévus requis'] },
+  { id: 'r_structure_note', label: 'Structurer une note texte (live)' },
+  { id: 'r_export_test', label: 'Test export (live)' },
+  { id: 'r_dry_run', label: 'Dry run (simulation)' },
 ];
 
-const PRESETS: ModeDef[] = [
-  { id: 's1', label: 'Dry run (simulation seule)' },
-  { id: 's2', label: 'SAFE_BATCH' },
-  { id: 's3', label: 'Audit complet' },
-  { id: 's4', label: 'Pré-export' },
-  { id: 's5', label: 'Vérification notes audio' },
+const FUTURE_MODES: ModeDef[] = [
+  { id: 'f_generate_chapter', label: 'Génération chapitre — futur (beats validés requis)' },
+  { id: 'f_observed_beats', label: 'Extraction beats observés — futur' },
+  { id: 'f_chapter_audit', label: 'Audit chapitre vs beats — futur' },
+  { id: 'f_rewrite', label: 'Réécriture ciblée — futur' },
+  { id: 'f_pgvector', label: 'Retrieval pgvector — futur' },
 ];
 
-const LEGACY: ModeDef[] = [
-  { id: 'l1', label: 'Génération chapitre (legacy)' },
-  { id: 'l2', label: 'Audit tome (legacy)' },
-  { id: 'l3', label: 'Réécriture ciblée (legacy)' },
-  { id: 'l4', label: 'Réécriture profonde (legacy — désactivé)' },
-  { id: 'l5', label: 'Export final (legacy)' },
-  { id: 'l6', label: 'Vérification cross-chapitres (legacy)' },
-];
-
-const ALL_MODES = [...PRODUCTION_CHAIN, ...PRESETS, ...LEGACY];
+const ALL_MODES = [...ALLOWED_MODES, ...FUTURE_MODES];
 
 export default function RunsPage() {
-  const [selectedMode, setSelectedMode] = useState<ModeDef>(PRODUCTION_CHAIN[0]);
+  const [selectedMode, setSelectedMode] = useState<ModeDef>(ALLOWED_MODES[0]);
+
   const demo = isDemoMode();
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [loadingReadiness, setLoadingReadiness] = useState(true);
@@ -69,39 +56,42 @@ export default function RunsPage() {
   ];
   const required = [openaiOk, supabaseOk]; // OneDrive optional
   const ready = required.every(Boolean);
-  const isDryRun = selectedMode.id === 's1';
+  const isDryRun = selectedMode.id === 'r_dry_run';
+
 
   return (
     <div className="space-y-6 animate-slide-in">
       <div>
-        <p className="editorial-eyebrow">Orchestration</p>
-        <h1 className="text-3xl editorial-heading text-foreground mt-1">Run Designer</h1>
+        <p className="editorial-eyebrow">Intelligence · Page technique</p>
+        <h1 className="text-3xl editorial-heading text-foreground mt-1">Runs</h1>
+        <p className="text-xs text-muted-foreground mt-1 max-w-3xl">
+          Historique, exécutions techniques avancées et tests dry-run / live. Les actions de production
+          (génération beats, validation, audit, génération chapitre, réécriture, verrouillage) se font dans <strong>Production</strong>.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Configuration */}
         <div className="lg:col-span-2 space-y-4">
           <div className="cockpit-card space-y-4">
-            <h2 className="font-display font-semibold text-sm text-foreground">Configuration du Run</h2>
+            <h2 className="font-display font-semibold text-sm text-foreground">Exécution technique</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Mode (chaîne de production)</label>
+                <label className="text-xs text-muted-foreground uppercase tracking-wider">Type de run</label>
                 <select
                   value={selectedMode.id}
-                  onChange={e => setSelectedMode(ALL_MODES.find(m => m.id === e.target.value) || PRODUCTION_CHAIN[0])}
+                  onChange={e => setSelectedMode(ALL_MODES.find(m => m.id === e.target.value) || ALLOWED_MODES[0])}
                   className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground"
                 >
-                  <optgroup label="Chaîne de production (numérotée)">
-                    {PRODUCTION_CHAIN.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  <optgroup label="Disponible maintenant">
+                    {ALLOWED_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </optgroup>
-                  <optgroup label="Presets opérationnels">
-                    {PRESETS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </optgroup>
-                  <optgroup label="Presets avancés / legacy">
-                    {LEGACY.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  <optgroup label="Futur / bloqué">
+                    {FUTURE_MODES.map(m => <option key={m.id} value={m.id} disabled>{m.label}</option>)}
                   </optgroup>
                 </select>
+
                 {selectedMode.blockers && selectedMode.blockers.length > 0 && (
                   <div className="mt-2 rounded border border-amber/30 bg-amber/5 p-2 text-[11px] text-amber-700">
                     <p className="font-display font-semibold mb-1">Conditions requises :</p>

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Mic, Type, Square, CheckCircle2, Loader2, Sparkles, AlertTriangle, Send, X, Copy } from 'lucide-react';
+import { Mic, Type, CheckCircle2, Loader2, Sparkles, AlertTriangle, Send, X, Copy } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { openaiService } from '@/services/openaiService';
+import { audioTranscriptionService } from '@/services/audioTranscriptionService';
+import MicRecorder from './MicRecorder';
+
 
 interface NoteComposerProps {
   target: string;
@@ -32,19 +35,20 @@ function buildProposedPatch(targetType: string | undefined, structured: any): Re
 export default function NoteComposer({ target, compact = false, targetType, targetId, onApplied }: NoteComposerProps) {
   const [tab, setTab] = useState<'text' | 'voice'>('text');
   const [text, setText] = useState('');
-  const [recording, setRecording] = useState(false);
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcript, setTranscript] = useState<string>('');
 
   useEffect(() => { supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
 
   const openaiOk = !!readiness?.openai?.api_key_configured;
-  const audioLive = readiness?.openai?.transcription_pipeline_status === 'transcription_live';
-  const hasInput = text.trim().length > 0 || recording;
+  const hasInput = text.trim().length > 0 || transcript.length > 0;
+
   const canStructureText = openaiOk && text.trim().length > 0 && tab === 'text';
   const canApply = !!targetId && (targetType === 'canon_object' || targetType === 'character') && !!result;
   const proposed = canApply ? buildProposedPatch(targetType, result.structured ?? result) : {};
@@ -52,7 +56,7 @@ export default function NoteComposer({ target, compact = false, targetType, targ
 
   const steps: WorkflowStep[] = [
     { key: 'captured', label: 'Capturé', status: hasInput ? 'done' : 'pending' },
-    { key: 'transcribed', label: 'Transcrit (Whisper)', status: tab === 'voice' ? 'pending' : 'done' },
+    { key: 'transcribed', label: 'Transcrit (Whisper)', status: tab === 'voice' ? (transcript ? 'done' : transcribing ? 'active' : 'pending') : 'done' },
     { key: 'structured', label: 'Structuré (OpenAI)', status: result ? 'done' : busy ? 'active' : 'pending' },
     { key: 'validation', label: 'Validation humaine', status: applied ? 'done' : (result ? 'active' : 'pending') },
     { key: 'integrated', label: 'Intégré', status: applied ? 'done' : 'pending' },
@@ -60,12 +64,35 @@ export default function NoteComposer({ target, compact = false, targetType, targ
   ];
 
   const submit = async () => {
-    if (!canStructureText) return;
+    const payload = text.trim() || transcript.trim();
+    if (!openaiOk || !payload) return;
     setBusy(true); setErr(null); setResult(null); setApplied(false);
-    try { setResult(await openaiService.structureNote(text, targetType, targetId)); }
+    try { setResult(await openaiService.structureNote(payload, targetType, targetId)); }
     catch (e) { setErr(e instanceof Error ? e.message : 'unknown error'); }
     finally { setBusy(false); }
   };
+
+  const handleMicSubmit = async (blob: Blob, durationMs: number) => {
+    if (!openaiOk) { setErr('OpenAI requis pour transcription.'); return; }
+    setTranscribing(true); setErr(null); setTranscript('');
+    try {
+      const file = new File([blob], `note-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+      const up = await audioTranscriptionService.uploadAudio(file, targetType || 'generic', targetId);
+      if (!up.ok) throw new Error('Upload audio échoué: ' + up.error);
+      const tr: any = await audioTranscriptionService.transcribe(up.audio_path, up.audio_note_id);
+      if (tr?.mode === 'live' && typeof tr.transcript === 'string') {
+        setTranscript(tr.transcript);
+        toast.success(`Transcrit (${Math.round(durationMs / 1000)}s)`);
+      } else {
+        throw new Error(tr?.reason || tr?.error || 'Transcription échouée');
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Transcription échouée');
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
 
   const applyPatch = async () => {
     if (!canApply || !targetId) return;
@@ -98,8 +125,10 @@ export default function NoteComposer({ target, compact = false, targetType, targ
   const statusMessage = !openaiOk
     ? 'OpenAI requis pour structuration / transcription.'
     : tab === 'voice'
-      ? (audioLive ? 'Transcription audio disponible — upload de fichier requis.' : 'OpenAI configuré — pipeline upload/transcription audio en attente.')
+      ? 'Capture micro navigateur → upload Supabase → Whisper.'
       : 'Structuration de texte via OpenAI disponible.';
+
+  const canSubmit = openaiOk && (text.trim().length > 0 || transcript.trim().length > 0);
 
   return (
     <div className={`rounded-xl border border-border bg-card ${compact ? 'p-3' : 'p-4'} space-y-3`}>
@@ -119,14 +148,21 @@ export default function NoteComposer({ target, compact = false, targetType, targ
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Saisir un commentaire, une directive, une intuition…"
           className="w-full min-h-[72px] resize-none rounded-lg border border-border bg-background/60 px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/30" />
       ) : (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-background/60 px-3 py-3">
-          <button onClick={() => setRecording(!recording)} disabled={!audioLive}
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-all ${recording ? 'bg-rose/15 text-rose' : 'bg-secondary text-muted-foreground hover:text-foreground'} disabled:opacity-40 disabled:cursor-not-allowed`}>
-            {recording ? <Square size={14} fill="currentColor" /> : <Mic size={16} />}
-          </button>
-          <p className="text-[10px] text-muted-foreground font-mono">
-            {audioLive ? 'Whisper actif — upload de fichier audio requis' : 'Pipeline upload audio en attente'}
-          </p>
+        <div className="space-y-2">
+          <MicRecorder onSubmit={handleMicSubmit} busy={transcribing} disabled={!openaiOk}
+            submitLabel={transcribing ? 'Transcription…' : 'Uploader & transcrire'} />
+          {transcript && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
+              <p className="editorial-eyebrow mb-1">Transcription Whisper</p>
+              <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)}
+                className="w-full min-h-[60px] resize-none bg-transparent text-xs text-foreground focus:outline-none" />
+            </div>
+          )}
+          {!openaiOk && (
+            <p className="text-[10px] text-amber-600 font-mono inline-flex items-center gap-1">
+              <AlertTriangle size={10} /> OpenAI absent — transcription désactivée. Notes texte restent disponibles.
+            </p>
+          )}
         </div>
       )}
 
@@ -151,7 +187,7 @@ export default function NoteComposer({ target, compact = false, targetType, targ
           {openaiOk ? <Sparkles size={10} /> : <AlertTriangle size={10} />}
           {statusMessage}
         </span>
-        <button disabled={!canStructureText || busy} onClick={submit}
+        <button disabled={!canSubmit || busy} onClick={submit}
           className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center gap-1.5">
           {busy && <Loader2 size={11} className="animate-spin" />}
           Structurer via OpenAI

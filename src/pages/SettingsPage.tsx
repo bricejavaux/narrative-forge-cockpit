@@ -56,7 +56,17 @@ function deriveConnectorStatus(id: string, r: ConnectionReadiness | null): { sta
   }
 }
 
-function NarrativeSlider({ label, value, min = 0, max = 100 }: { label: string; value: number; min?: number; max?: number }) {
+function NarrativeSlider({ label, storageKey, defaultValue, min = 0, max = 100 }: { label: string; storageKey: string; defaultValue: number; min?: number; max?: number }) {
+  const [value, setValue] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem(`narrative_setting_${storageKey}`);
+      return raw ? Number(raw) : defaultValue;
+    } catch { return defaultValue; }
+  });
+  const onChange = (v: number) => {
+    setValue(v);
+    try { localStorage.setItem(`narrative_setting_${storageKey}`, String(v)); } catch {}
+  };
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
@@ -64,12 +74,14 @@ function NarrativeSlider({ label, value, min = 0, max = 100 }: { label: string; 
         <span className="font-mono text-foreground">{value}</span>
       </div>
       <input
-        type="range" min={min} max={max} value={value} readOnly
-        className="w-full h-1.5 bg-secondary rounded-full appearance-none cursor-not-allowed [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
+        type="range" min={min} max={max} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full h-1.5 bg-secondary rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
       />
     </div>
   );
 }
+
 
 function Toggle({ label, value, hint }: { label: string; value: boolean; hint?: string }) {
   return (
@@ -150,34 +162,16 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-rose-500/40 bg-rose-500/5 p-4 text-xs space-y-2">
-        <p className="font-display text-sm text-rose-700">Sécurité — action manuelle requise (Git)</p>
-        <p className="text-foreground/85">
-          Le fichier <span className="font-mono">.env</span> est encore suivi par le dépôt GitHub.
-          Lovable ne peut pas modifier l'historique Git depuis l'application. Exécutez dans votre terminal local :
-        </p>
-        <pre className="text-[11px] bg-secondary/60 border border-border rounded p-2 overflow-x-auto">
-{`git rm --cached .env
-git commit -m "Stop tracking .env"
-git push`}
-        </pre>
-        <p className="text-foreground/85">
-          Après cette opération : <span className="font-mono">.env</span> ne doit plus apparaître à la racine du dépôt
-          GitHub, <span className="font-mono">.env.example</span> reste public, <span className="font-mono">.env</span> reste
-          listé dans <span className="font-mono">.gitignore</span>.
-        </p>
-        <div className="soft-divider" />
-        <p className="font-display text-sm text-emerald-700">Runtime secrets — non exposés côté client</p>
+      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs space-y-1">
+        <p className="font-display text-sm text-emerald-700">Secrets runtime</p>
         <p className="text-foreground/85">
           <span className="font-mono">OPENAI_API_KEY</span>, <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span>,
           <span className="font-mono"> MICROSOFT_ONEDRIVE_API_KEY</span>, <span className="font-mono">LOVABLE_API_KEY</span> :
-          uniquement présents en secrets Edge Function / Lovable Cloud, jamais bundlés dans le frontend.
-        </p>
-        <p className="text-foreground/85">
-          <span className="text-foreground font-medium">RLS activé</span> — lectures/écritures directes depuis le frontend limitées
-          aux utilisateurs authentifiés. Les écritures sensibles passent par des Edge Functions (service role côté serveur).
+          stockés en secrets Edge Function Lovable Cloud — jamais bundlés côté client.
         </p>
       </div>
+
+
 
 
       <div className="flex gap-1 overflow-x-auto border-b border-border">
@@ -233,23 +227,24 @@ git push`}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="cockpit-card space-y-4">
             <h3 className="editorial-eyebrow flex items-center gap-2"><Sliders size={12} /> Structure & rythme</h3>
-            <NarrativeSlider label="Longueur cible (mots)" value={3500} min={1000} max={6000} />
-            <NarrativeSlider label="Amplitude de variation" value={15} />
-            <NarrativeSlider label="Tempo" value={65} />
-            <NarrativeSlider label="Respiration" value={40} />
-            <NarrativeSlider label="Compression" value={30} />
-            <NarrativeSlider label="Fragmentation temporelle" value={25} />
-            <NarrativeSlider label="Fragmentation POV" value={35} />
+            <NarrativeSlider label="Longueur cible (mots)" storageKey="length" defaultValue={3500} min={1000} max={6000} />
+            <NarrativeSlider label="Amplitude de variation" storageKey="length_variation" defaultValue={15} />
+            <NarrativeSlider label="Tempo" storageKey="tempo" defaultValue={65} />
+            <NarrativeSlider label="Respiration" storageKey="breathing" defaultValue={40} />
+            <NarrativeSlider label="Compression" storageKey="compression" defaultValue={30} />
+            <NarrativeSlider label="Fragmentation temporelle" storageKey="time_frag" defaultValue={25} />
+            <NarrativeSlider label="Fragmentation POV" storageKey="pov_frag" defaultValue={35} />
           </div>
           <div className="cockpit-card space-y-4">
             <h3 className="editorial-eyebrow flex items-center gap-2"><Sliders size={12} /> Tonalité & densité</h3>
-            <NarrativeSlider label="Densité scientifique" value={55} />
-            <NarrativeSlider label="Densité émotionnelle" value={70} />
-            <NarrativeSlider label="Niveau de mystère" value={72} />
-            <NarrativeSlider label="Charge personnages" value={60} />
-            <NarrativeSlider label="Délai avant payoff" value={60} />
-            <NarrativeSlider label="Brutalité des bascules" value={45} />
-            <NarrativeSlider label="Répétition max. tolérée" value={20} />
+            <NarrativeSlider label="Densité scientifique" storageKey="sci_density" defaultValue={55} />
+            <NarrativeSlider label="Densité émotionnelle" storageKey="emo_density" defaultValue={70} />
+            <NarrativeSlider label="Niveau de mystère" storageKey="mystery" defaultValue={72} />
+            <NarrativeSlider label="Charge personnages" storageKey="char_load" defaultValue={60} />
+            <NarrativeSlider label="Délai avant payoff" storageKey="payoff_delay" defaultValue={60} />
+            <NarrativeSlider label="Brutalité des bascules" storageKey="shift_brutality" defaultValue={45} />
+            <NarrativeSlider label="Répétition max. tolérée" storageKey="repetition_max" defaultValue={20} />
+
           </div>
         </div>
       )}
