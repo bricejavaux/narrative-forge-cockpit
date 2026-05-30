@@ -56,26 +56,33 @@ export default function ProductionPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-display font-semibold text-sm text-foreground">Chapter Production Board</h2>
-          {chapterSource === 'mock' && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">
-              design target — pas de chapitres en base
-            </span>
-          )}
+          <span className="text-[10px] font-mono text-muted-foreground">
+            {chapters.length} chapitre(s) en base
+          </span>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {chapters.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => chapterSource === 'live' && setSelectedChapter(c)}
-              className={`text-left ${selectedChapter?.id === c.id ? 'ring-2 ring-primary/40 rounded-lg' : ''}`}
-            >
-              <ChapterProductionBoard chapter={c} stageStatuses={(c.metadata as any) ?? {}} />
-            </button>
-          ))}
-        </div>
+        {chapters.length === 0 ? (
+          <div className="cockpit-card p-6 text-center text-xs text-muted-foreground">
+            Aucun chapitre persisté. Importer d'abord le plan depuis Architecture → « Plan depuis articulation.txt ».
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {chapters.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedChapter(c)}
+                className={`text-left ${selectedChapter?.id === c.id ? 'ring-2 ring-primary/40 rounded-lg' : ''}`}
+              >
+                <ChapterProductionBoard chapter={c} stageStatuses={(c.metadata as any) ?? {}} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {selectedChapter && chapterSource === 'live' && (
+      {/* Planned Beats workshop — always shown when chapters exist */}
+      {chapters.length > 0 && <BeatsPlanPanel />}
+
+      {selectedChapter && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-display font-semibold text-sm text-foreground">
