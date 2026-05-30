@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { productionFlowService, type StageState } from '@/services/productionFlowService';
 import ProductionFlowDiagram from '@/components/production/ProductionFlowDiagram';
 // StageCard duplicate grid removed — single chain via ProductionFlowDiagram
-import ChapterProductionBoard from '@/components/production/ChapterProductionBoard';
+import ChapterProductionBoard, { ChapterBoardLegend } from '@/components/production/ChapterProductionBoard';
 import BeatValidationPanel from '@/components/production/BeatValidationPanel';
 import BeatComparisonPanel from '@/components/production/BeatComparisonPanel';
 import RewriteTasksPanel from '@/components/production/RewriteTasksPanel';
@@ -51,8 +51,9 @@ export default function ProductionPage() {
 
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="font-display font-semibold text-sm text-foreground">Chapter Production Board</h2>
+          <ChapterBoardLegend />
           <span className="text-[10px] font-mono text-muted-foreground">
             {chapters.length} chapitre(s) en base
           </span>
@@ -67,9 +68,13 @@ export default function ProductionPage() {
               <button
                 key={c.id}
                 onClick={() => setSelectedChapter(c)}
-                className={`text-left ${selectedChapter?.id === c.id ? 'ring-2 ring-primary/40 rounded-lg' : ''}`}
+                className="text-left"
               >
-                <ChapterProductionBoard chapter={c} stageStatuses={(c.metadata as any) ?? {}} />
+                <ChapterProductionBoard
+                  chapter={c}
+                  stageStatuses={(c.metadata as any) ?? {}}
+                  selected={selectedChapter?.id === c.id}
+                />
               </button>
             ))}
           </div>

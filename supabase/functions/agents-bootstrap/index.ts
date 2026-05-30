@@ -167,6 +167,43 @@ const DEFAULT_AGENTS = [
       { index_name: 'character_index', corpus_name: 'characters', required: false },
     ],
   },
+  // --- Phase 2 doctrine agents (seeded inactive when not yet runnable) ---
+  ...[
+    { external_id: 'chapter_plan_from_articulation', name: 'Chapter Plan from Articulation', category: 'planning', objective: 'Construire le plan de chapitres depuis articulation.txt.', status: 'live_test_available', is_active: true },
+    { external_id: 'audit_chapter_plan', name: 'Audit Chapter Plan', category: 'audit', objective: 'Auditer le plan de chapitres (équilibre, arcs, charnières).', status: 'live_test_available', is_active: true },
+    { external_id: 'generate_planned_beats', name: 'Generate Planned Beats', category: 'planning', objective: 'Générer les beats prévus pour un chapitre.', status: 'live_test_available', is_active: true },
+    { external_id: 'audit_planned_beats', name: 'Audit Planned Beats', category: 'audit', objective: 'Auditer les beats prévus (cohérence, payoffs, densité).', status: 'live_test_available', is_active: true },
+    { external_id: 'validate_beat_quality', name: 'Validate Beat Quality', category: 'audit', objective: 'Valider la qualité de chaque beat avant verrouillage.', status: 'live_test_available', is_active: true },
+    { external_id: 'audit_macro_micro_balance', name: 'Audit Macro/Micro Balance', category: 'audit', objective: 'Équilibre macro vs micro sur le tome.', status: 'live_test_available', is_active: true },
+    { external_id: 'audit_arc_distribution', name: 'Audit Arc Distribution', category: 'audit', objective: 'Distribution des arcs sur le tome.', status: 'live_test_available', is_active: true },
+    { external_id: 'audit_canon_consistency', name: 'Audit Canon Consistency', category: 'audit', objective: 'Vérifier la cohérence canon globale.', status: 'live_test_available', is_active: false },
+    { external_id: 'audit_character_consistency', name: 'Audit Character Consistency', category: 'audit', objective: 'Vérifier la cohérence des personnages.', status: 'live_test_available', is_active: false },
+    { external_id: 'audit_scientific_density', name: 'Audit Scientific Density', category: 'audit', objective: 'Vérifier la densité scientifique par chapitre.', status: 'pending_pgvector', is_active: false },
+    { external_id: 'audit_revelation_distribution', name: 'Audit Revelation Distribution', category: 'audit', objective: 'Distribution des révélations et payoffs.', status: 'live_test_available', is_active: false },
+    { external_id: 'generate_chapter_draft', name: 'Generate Chapter Draft', category: 'generation', objective: 'Générer le brouillon complet d\'un chapitre.', status: 'future', is_active: false },
+    { external_id: 'extract_observed_beats', name: 'Extract Observed Beats', category: 'extraction', objective: 'Extraire les beats observés depuis full_text.', status: 'future', is_active: false },
+    { external_id: 'audit_chapter_vs_beats', name: 'Audit Chapter vs Beats', category: 'audit', objective: 'Comparer chapitre généré vs beats prévus.', status: 'future', is_active: false },
+    { external_id: 'targeted_rewrite', name: 'Targeted Rewrite', category: 'rewrite', objective: 'Proposer des réécritures ciblées par section.', status: 'future', is_active: false },
+    { external_id: 'style_polish', name: 'Style Polish', category: 'rewrite', objective: 'Polir le style d\'un chapitre.', status: 'future', is_active: false },
+    { external_id: 'meta_tome_audit', name: 'Meta-Tome Audit', category: 'audit', objective: 'Audit méta-tome tous les 3 chapitres.', status: 'future', is_active: false },
+    { external_id: 'export_preparation', name: 'Export Preparation', category: 'export', objective: 'Préparer les exports finaux (txt/md/json/PDF/EPUB).', status: 'future', is_active: false },
+  ].map((a) => ({
+    ...a,
+    description: a.objective,
+    default_model: 'gpt-4.1-mini',
+    selected_model: 'gpt-4.1-mini',
+    quality_profile: 'balanced',
+    permission_level: 'suggest_only',
+    persistence_status: 'suggestions_only',
+    vector_context_status: 'pending_pgvector',
+    rewrite_rights: false,
+    criticality: 'medium',
+    simulated_cost: 'low',
+    system_prompt: `Agent ${a.name}. Retourne JSON structuré strict. Pas d'écriture directe — validation humaine requise.`,
+    operating_script: [{ step: 'load_context', detail: 'Charge le contexte requis' }, { step: 'run', detail: 'Exécute la logique de l\'agent' }, { step: 'propose', detail: 'Propose des résultats sans appliquer' }],
+    model_recommendations: { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1', reasoning: 'o4-mini' },
+    bindings: [] as Array<{ index_name: string; corpus_name: string; required: boolean }>,
+  })),
 ];
 
 Deno.serve(async (req) => {
@@ -204,7 +241,7 @@ Deno.serve(async (req) => {
             criticality: tpl.criticality,
             simulated_cost: tpl.simulated_cost,
             status: tpl.status,
-            is_active: true,
+            is_active: (tpl as any).is_active ?? true,
           })
           .select('id')
           .single();
