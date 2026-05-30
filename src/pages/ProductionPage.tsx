@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { productionFlowService, type StageState } from '@/services/productionFlowService';
 import ProductionFlowDiagram from '@/components/production/ProductionFlowDiagram';
 // StageCard duplicate grid removed — single chain via ProductionFlowDiagram
-import ChapterProductionBoard from '@/components/production/ChapterProductionBoard';
+import ChapterProductionBoard, { ChapterBoardLegend } from '@/components/production/ChapterProductionBoard';
 import BeatValidationPanel from '@/components/production/BeatValidationPanel';
 import BeatComparisonPanel from '@/components/production/BeatComparisonPanel';
 import RewriteTasksPanel from '@/components/production/RewriteTasksPanel';
