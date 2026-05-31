@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react';
 import { productionFlowService, type StageState } from '@/services/productionFlowService';
 import ProductionFlowDiagram from '@/components/production/ProductionFlowDiagram';
-// StageCard duplicate grid removed — single chain via ProductionFlowDiagram
 import ChapterProductionBoard, { ChapterBoardLegend } from '@/components/production/ChapterProductionBoard';
-import BeatValidationPanel from '@/components/production/BeatValidationPanel';
-import BeatComparisonPanel from '@/components/production/BeatComparisonPanel';
-import RewriteTasksPanel from '@/components/production/RewriteTasksPanel';
 import LockReopenButton from '@/components/production/LockReopenButton';
-import BeatsPlanPanel from '@/components/shared/BeatsPlanPanel';
+import ProductionBeatsWorkshop from '@/components/production/ProductionBeatsWorkshop';
 import { chapterProductionService } from '@/services/chapterProductionService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -22,10 +18,12 @@ export default function ProductionPage() {
     setLoading(true);
     const [s, ch] = await Promise.all([
       productionFlowService.computeFlowState(),
-      supabase.from('chapters').select('id, number, title, locked, production_status, metadata').order('number', { ascending: true }).limit(50),
+      supabase.from('chapters')
+        .select('id, number, title, locked, production_status, metadata, full_text, scale, main_arc')
+        .order('number', { ascending: true }).limit(50),
     ]);
     setStages(s);
-    const live = ch.data ?? [];
+    const live = (ch.data ?? []) as any[];
     setChapters(live);
     if (live.length > 0 && !selectedChapter) setSelectedChapter(live[0]);
     if (live.length === 0) setSelectedChapter(null);
@@ -40,8 +38,7 @@ export default function ProductionPage() {
         <p className="editorial-eyebrow">Pipeline narrative</p>
         <h1 className="text-3xl editorial-heading text-foreground mt-1">Production Flow</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Canon → Architecture → Plan → Beats prévus → Validation → Génération → Beats observés → Audit → Réécriture ciblée → Verrouillage → Audit méta-tome → Export.
-          Les beats sont d'abord <strong>une entrée</strong> de la génération, puis <strong>une sortie</strong> de l'analyse.
+          Canon → Architecture → Plan → Beats prévus → Validation → Génération → Beats observés → Audit → Réécriture ciblée → Verrouillage → Export.
         </p>
       </div>
 
@@ -49,14 +46,11 @@ export default function ProductionPage() {
 
       <ProductionFlowDiagram stages={stages} />
 
-
       <div className="space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="font-display font-semibold text-sm text-foreground">Chapter Production Board</h2>
           <ChapterBoardLegend />
-          <span className="text-[10px] font-mono text-muted-foreground">
-            {chapters.length} chapitre(s) en base
-          </span>
+          <span className="text-[10px] font-mono text-muted-foreground">{chapters.length} chapitre(s) en base</span>
         </div>
         {chapters.length === 0 ? (
           <div className="cockpit-card p-6 text-center text-xs text-muted-foreground">
@@ -65,11 +59,7 @@ export default function ProductionPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {chapters.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedChapter(c)}
-                className="text-left"
-              >
+              <button key={c.id} onClick={() => setSelectedChapter(c)} className="text-left">
                 <ChapterProductionBoard
                   chapter={c}
                   stageStatuses={(c.metadata as any) ?? {}}
@@ -81,34 +71,42 @@ export default function ProductionPage() {
         )}
       </div>
 
-      {/* Planned Beats workshop — always shown when chapters exist */}
-      {chapters.length > 0 && <BeatsPlanPanel />}
+      {/* Unified Beats Workshop — single source of truth for beat workflow */}
+      {chapters.length > 0 && (
+        <ProductionBeatsWorkshop
+          chapters={chapters}
+          selectedChapter={selectedChapter}
+          onSelectChapter={setSelectedChapter}
+          chapterHasFullText={!!selectedChapter?.full_text}
+        />
+      )}
 
+      {/* Compact selected-chapter summary (read-only + lock control only) */}
       {selectedChapter && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-semibold text-sm text-foreground">
-              Chapitre sélectionné — Ch.{selectedChapter.number} {selectedChapter.title}
-            </h2>
-            <LockReopenButton
-              locked={!!selectedChapter.locked}
-              onLock={async (r) => {
-                await chapterProductionService.lock(selectedChapter.id, r);
-                toast({ title: 'Chapitre verrouillé', description: r });
-                refresh();
-              }}
-              onReopen={async (r) => {
-                await chapterProductionService.reopen(selectedChapter.id, r);
-                toast({ title: 'Chapitre réouvert', description: r });
-                refresh();
-              }}
-            />
+        <div className="cockpit-card p-4 flex items-center justify-between flex-wrap gap-2">
+          <div className="text-xs text-muted-foreground">
+            <span className="editorial-eyebrow mr-2">Chapitre sélectionné</span>
+            <span className="font-mono">#{selectedChapter.number}</span>{' '}
+            <span className="text-foreground">{selectedChapter.title}</span>
+            <span className="ml-2 text-[10px]">
+              · status: <span className="font-mono">{selectedChapter.production_status ?? '—'}</span>
+              {selectedChapter.locked && <span className="ml-2 text-destructive font-mono">verrouillé</span>}
+              {selectedChapter.full_text && <span className="ml-2 text-emerald-700 font-mono">full_text présent</span>}
+            </span>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <BeatValidationPanel chapterId={selectedChapter.id} />
-            <BeatComparisonPanel chapterId={selectedChapter.id} />
-            <RewriteTasksPanel chapterId={selectedChapter.id} />
-          </div>
+          <LockReopenButton
+            locked={!!selectedChapter.locked}
+            onLock={async (r) => {
+              await chapterProductionService.lock(selectedChapter.id, r);
+              toast({ title: 'Chapitre verrouillé', description: r });
+              refresh();
+            }}
+            onReopen={async (r) => {
+              await chapterProductionService.reopen(selectedChapter.id, r);
+              toast({ title: 'Chapitre réouvert', description: r });
+              refresh();
+            }}
+          />
         </div>
       )}
     </div>

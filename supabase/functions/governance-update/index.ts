@@ -12,6 +12,7 @@ type Action =
   | 'mark_reviewed'
   | 'mark_rejected'
   | 'mark_locked'
+  | 'mark_deleted'
   | 'mark_index_refresh_required'
   | 'apply_note_patch';
 
@@ -21,14 +22,20 @@ const PATCH_FIELDS: Record<TargetTable, Set<string>> = {
   canon_objects: new Set(['summary', 'description', 'exceptions', 'criticality', 'rigidity', 'index_associated', 'source_reference']),
   characters: new Set(['role', 'function', 'apparent_goal', 'real_goal', 'flaw', 'secret', 'forbidden', 'emotional_trajectory', 'breaking_point']),
   chapters: new Set(['title', 'scale', 'main_arc', 'cost_type', 'technical_detail', 'phrase_couteau']),
-  beats: new Set(['title', 'objective', 'narrative_function', 'decision_made', 'consequence', 'revelation', 'payoff', 'required_detail']),
+  beats: new Set([
+    'title', 'objective', 'narrative_function', 'decision_made', 'consequence',
+    'revelation', 'payoff', 'required_detail',
+    'characters', 'arcs', 'canon_links',
+    'tension_start', 'tension_end', 'scientific_density', 'emotional_density',
+    'beat_number', 'order_index',
+  ]),
 };
 
 const ALLOWED_ACTIONS_BY_TABLE: Record<TargetTable, Action[]> = {
   canon_objects: ['mark_validated', 'mark_reviewed', 'mark_index_refresh_required', 'apply_note_patch'],
   characters: ['mark_validated', 'mark_reviewed', 'apply_note_patch'],
   chapters: ['mark_validated', 'mark_reviewed', 'mark_locked', 'mark_index_refresh_required', 'apply_note_patch'],
-  beats: ['mark_validated', 'mark_reviewed', 'mark_rejected', 'apply_note_patch'],
+  beats: ['mark_validated', 'mark_reviewed', 'mark_rejected', 'mark_deleted', 'apply_note_patch'],
 };
 
 function sb() {
@@ -90,6 +97,8 @@ Deno.serve(async (req) => {
       else basePatch.validation_status = 'reviewed';
     } else if (action === 'mark_rejected') {
       basePatch = { ...basePatch, validation_status: 'rejected' };
+    } else if (action === 'mark_deleted') {
+      basePatch = { ...basePatch, status: 'deleted', validation_status: 'rejected' };
     } else if (action === 'mark_locked') {
       basePatch = { ...basePatch, locked: true };
     } else if (action === 'mark_index_refresh_required') {
