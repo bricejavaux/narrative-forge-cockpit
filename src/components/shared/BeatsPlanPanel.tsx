@@ -215,6 +215,17 @@ export default function BeatsPlanPanel() {
         </button>
       </div>
 
+      <div className="rounded border border-primary/20 bg-primary/5 p-3 text-[11px] text-foreground/85 leading-snug">
+        <p className="editorial-eyebrow mb-1">Flux beats (ordre obligatoire)</p>
+        <ol className="space-y-0.5 list-decimal list-inside">
+          <li><strong>Prévisualiser</strong> = proposition temporaire OpenAI (non enregistrée).</li>
+          <li><strong>Modifier</strong> les beats proposés directement ci-dessous.</li>
+          <li><strong>Enregistrer en base</strong> = upsert dans Supabase (champ beats).</li>
+          <li><strong>Valider pour génération</strong> = approuver comme entrée de génération future.</li>
+        </ol>
+        <p className="mt-1 text-muted-foreground">La validation n'est possible qu'après enregistrement. La génération de chapitre reste bloquée tant que les beats ne sont pas validés.</p>
+      </div>
+
       {readError && (
         <div className="text-xs p-3 rounded border border-destructive/40 bg-destructive/5 text-destructive inline-flex items-start gap-2">
           <AlertTriangle size={12} className="mt-0.5" /> {readError}
