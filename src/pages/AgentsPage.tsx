@@ -4,7 +4,7 @@ import { isDemoMode } from '@/lib/productionMode';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import PersistedAgentsPanel from '@/components/shared/PersistedAgentsPanel';
-import AgentVersionEditorPanel from '@/components/shared/AgentVersionEditorPanel';
+// AgentVersionEditorPanel removed — contradicted PersistedAgentsPanel.
 import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2, ListChecks, Shield } from 'lucide-react';
 import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID, defaultModelForCategory, defaultProfileForCategory, modelById } from '@/lib/openaiModels';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
