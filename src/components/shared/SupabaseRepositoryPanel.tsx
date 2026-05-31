@@ -87,16 +87,6 @@ export default function SupabaseRepositoryPanel() {
           <p className="editorial-eyebrow">Référentiel Supabase</p>
           <h3 className="text-lg editorial-heading text-foreground flex items-center gap-2">
             <Database className="w-4 h-4" /> Couche narrative active
-            {liveOk && (
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Supabase live
-              </span>
-            )}
-            {sections && !liveOk && coreBlocked.length > 0 && (
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-700">
-                Supabase — lecture core bloquée
-              </span>
-            )}
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
             {liveOk
@@ -104,10 +94,23 @@ export default function SupabaseRepositoryPanel() {
               : 'Diagnostic classé : vide ≠ lecture bloquée ≠ table non créée ≠ phase suivante.'}
           </p>
         </div>
-        <button onClick={triggerRefresh} className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground">
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Rafraîchir
-        </button>
+        <div className="flex items-center gap-2">
+          {liveOk && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-600 bg-emerald-500/5">
+              live
+            </span>
+          )}
+          {sections && !liveOk && coreBlocked.length > 0 && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-rose-500/40 text-rose-600 bg-rose-500/5">
+              core bloqué
+            </span>
+          )}
+          <button onClick={triggerRefresh} className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground">
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Rafraîchir
+          </button>
+        </div>
       </div>
+
 
       {!liveOk && requiredBlocked > 0 && (
         <div className="text-[11px] text-rose-700 border border-rose-500/30 bg-rose-500/5 p-2 rounded">
