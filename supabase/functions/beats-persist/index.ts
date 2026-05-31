@@ -61,7 +61,8 @@ Deno.serve(async (req) => {
 
     for (let i = 0; i < beats.length; i++) {
       const b = beats[i] ?? {};
-      const beat_number = Number(b.beat_number ?? b.order ?? i + 1);
+      const requested_number = Number(b.beat_number ?? b.order ?? i + 1);
+      const beat_number = strategy === 'append' ? numberOffset + i + 1 : requested_number;
       const row: Record<string, any> = {
         chapter_id,
         tome_id: chapter.tome_id ?? null,
@@ -95,18 +96,21 @@ Deno.serve(async (req) => {
       };
 
       try {
-        const { data: existing } = await supabase
-          .from('beats')
-          .select('id')
-          .eq('chapter_id', chapter_id)
-          .eq('beat_number', beat_number)
-          .eq('beat_type', 'planned')
-          .maybeSingle();
+        // For replace + append: always insert (existing planned were soft-deleted or kept under previous numbers)
+        // For merge: upsert by beat_number
+        let existingId: string | null = null;
+        if (strategy === 'merge') {
+          const { data: existing } = await supabase
+            .from('beats').select('id')
+            .eq('chapter_id', chapter_id).eq('beat_number', beat_number)
+            .eq('beat_type', 'planned').neq('status', 'deleted').maybeSingle();
+          existingId = existing?.id ?? null;
+        }
 
-        if (existing?.id) {
-          const { error } = await supabase.from('beats').update(row).eq('id', existing.id);
+        if (existingId) {
+          const { error } = await supabase.from('beats').update(row).eq('id', existingId);
           if (error) errors.push({ beat_number, error: error.message });
-          else { updated++; if (samples.length < 3) samples.push({ id: existing.id, beat_number, title: row.title }); }
+          else { updated++; if (samples.length < 3) samples.push({ id: existingId, beat_number, title: row.title }); }
         } else {
           const { data, error } = await supabase.from('beats').insert(row).select('id').maybeSingle();
           if (error) errors.push({ beat_number, error: error.message });
