@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle } from 'lucide-react';
+import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle, Play, ExternalLink } from 'lucide-react';
 import { agentsService, type AgentRow, type AgentVersionRow, type AgentBindingRow } from '@/services/agentsService';
 import { supabase } from '@/integrations/supabase/client';
-import { classifyAgentTestability, TESTABILITY_LABEL } from '@/lib/agentTestability';
+import { classifyAgentTestability, TESTABILITY_LABEL, type TestabilityCtx } from '@/lib/agentTestability';
+import { Link } from 'react-router-dom';
 
 export default function PersistedAgentsPanel() {
   const [loading, setLoading] = useState(false);
@@ -21,20 +22,29 @@ export default function PersistedAgentsPanel() {
   const [reason, setReason] = useState('');
 
   // env for testability classification
-  const [env, setEnv] = useState<{ hasChapters: boolean; hasCanon: boolean; pgvectorActive: boolean; bindingsByAgent: Record<string, AgentBindingRow[]> }>({
-    hasChapters: false, hasCanon: false, pgvectorActive: false, bindingsByAgent: {},
+  const [env, setEnv] = useState<Omit<TestabilityCtx, 'bindings'> & { bindingsByAgent: Record<string, AgentBindingRow[]> }>({
+    hasChapters: false, hasCanon: false, hasCharacters: false,
+    hasPlannedBeats: false, hasValidatedBeats: false, hasFullText: false,
+    pgvectorActive: false, openaiReady: false, bindingsByAgent: {},
   });
+
+  const [testing, setTesting] = useState(false);
+  const [lastRun, setLastRun] = useState<any>(null);
 
   const load = async () => {
     setLoading(true); setErr(null);
     try {
       const list = await agentsService.list();
       setAgents(list);
-      // load env context
-      const [chCount, caCount, allBindings] = await Promise.all([
+      const [chCount, caCount, chrCount, plannedCount, validatedCount, fullTextCount, allBindings, oaiSetting] = await Promise.all([
         supabase.from('chapters').select('id', { count: 'exact', head: true }),
         supabase.from('canon_objects').select('id', { count: 'exact', head: true }),
+        supabase.from('characters').select('id', { count: 'exact', head: true }),
+        supabase.from('beats').select('id', { count: 'exact', head: true }).eq('beat_type', 'planned').neq('status', 'deleted'),
+        supabase.from('beats').select('id', { count: 'exact', head: true }).eq('beat_type', 'planned').eq('validation_status', 'validated'),
+        supabase.from('chapters').select('id', { count: 'exact', head: true }).not('full_text', 'is', null),
         supabase.from('agent_index_bindings').select('id,agent_id,index_name,corpus_name,required,top_k,similarity_threshold,status'),
+        supabase.from('app_settings').select('value').eq('key', 'openai').maybeSingle(),
       ]);
       const map: Record<string, AgentBindingRow[]> = {};
       ((allBindings.data ?? []) as any[]).forEach((b) => {
@@ -42,7 +52,17 @@ export default function PersistedAgentsPanel() {
         map[b.agent_id].push(b as AgentBindingRow);
       });
       const anyActive = ((allBindings.data ?? []) as any[]).some((b) => b.status === 'active');
-      setEnv({ hasChapters: (chCount.count ?? 0) > 0, hasCanon: (caCount.count ?? 0) > 0, pgvectorActive: anyActive, bindingsByAgent: map });
+      const openaiReady = !!(oaiSetting.data?.value as any)?.api_key_configured;
+      setEnv({
+        hasChapters: (chCount.count ?? 0) > 0,
+        hasCanon: (caCount.count ?? 0) > 0,
+        hasCharacters: (chrCount.count ?? 0) > 0,
+        hasPlannedBeats: (plannedCount.count ?? 0) > 0,
+        hasValidatedBeats: (validatedCount.count ?? 0) > 0,
+        hasFullText: (fullTextCount.count ?? 0) > 0,
+        pgvectorActive: anyActive, openaiReady,
+        bindingsByAgent: map,
+      });
       if (!selected && list.length) await pick(list[0]);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
@@ -201,11 +221,53 @@ export default function PersistedAgentsPanel() {
                 )}
               </div>
 
+              {(() => {
+                const t = classifyAgentTestability(selected, { ...env, bindings: env.bindingsByAgent[selected.id] });
+                const meta = TESTABILITY_LABEL[t.status];
+                const canTest = t.can_run_now;
+                const runTest = async () => {
+                  setTesting(true); setLastRun(null);
+                  try {
+                    const { data, error } = await supabase.functions.invoke('run-execute', {
+                      body: { run_type: 'run_selected_agent', agent_id: selected.id, mode: 'live', instruction: `Test live for ${selected.name}`, payload: { ping: true } },
+                    });
+                    setLastRun(error ? { error: error.message } : data);
+                  } finally { setTesting(false); }
+                };
+                return (
+                  <div className="rounded border border-border p-2 space-y-1.5 bg-secondary/20">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${meta.classes}`}>{meta.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{t.reason}</span>
+                    </div>
+                    {t.blockers.length > 0 && (
+                      <p className="text-[10px] text-amber-700">→ {t.next_action}</p>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button onClick={runTest} disabled={!canTest || testing}
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-emerald-500/40 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-40">
+                        {testing ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />} Test agent (run-execute)
+                      </button>
+                      <Link to="/runs" className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                        <ExternalLink size={10} /> Voir dans Runs
+                      </Link>
+                    </div>
+                    {lastRun && (
+                      <details className="text-[10px]">
+                        <summary className="cursor-pointer text-muted-foreground">Dernier run {lastRun?.run_id ? `· ${String(lastRun.run_id).slice(0, 8)}` : ''}</summary>
+                        <pre className="bg-muted/40 rounded p-1 max-h-32 overflow-auto font-mono">{JSON.stringify(lastRun, null, 2)}</pre>
+                      </details>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="flex items-end gap-2 pt-2 border-t border-border">
-                <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Raison du changement…"
+                <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Raison du changement (obligatoire)…"
                   className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs" />
-                <button onClick={saveVersion} disabled={busy}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 disabled:opacity-40">
+                <button onClick={saveVersion} disabled={busy || !reason.trim()}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 disabled:opacity-40"
+                  title={!reason.trim() ? 'Raison de changement obligatoire' : 'Saver nouvelle version'}>
                   {busy ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Save new version
                 </button>
               </div>

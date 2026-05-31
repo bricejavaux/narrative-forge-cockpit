@@ -4,7 +4,7 @@ import { isDemoMode } from '@/lib/productionMode';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import PersistedAgentsPanel from '@/components/shared/PersistedAgentsPanel';
-import AgentVersionEditorPanel from '@/components/shared/AgentVersionEditorPanel';
+// AgentVersionEditorPanel removed — contradicted PersistedAgentsPanel.
 import { Bot, X, Sliders, Brain, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, DollarSign, Clock, Database, Play, Loader2, ListChecks, Shield } from 'lucide-react';
 import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID, defaultModelForCategory, defaultProfileForCategory, modelById } from '@/lib/openaiModels';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
@@ -150,15 +150,9 @@ export default function AgentsPage() {
 
       <PersistedAgentsPanel />
 
-      <AgentVersionEditorPanel />
-
       {!isDemoMode() && (
-        <div className="cockpit-card p-6 space-y-2">
-          <p className="editorial-eyebrow">Catalogue agents — Phase 2</p>
-          <p className="text-xs text-muted-foreground">
-            Le catalogue dummy (filtres, tuning, presets) reste accessible en Demo Mode. En Production Test,
-            seul le registry persisté ci-dessus est opérationnel. Classification Testable-now / Requires chapter plan / Requires pgvector arrive en Phase 2.
-          </p>
+        <div className="text-[11px] text-muted-foreground italic">
+          Production Test : seuls les agents persistés ci-dessus sont opérationnels. Le catalogue local mock est masqué.
         </div>
       )}
 
