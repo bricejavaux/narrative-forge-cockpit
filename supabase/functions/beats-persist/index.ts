@@ -15,6 +15,8 @@ Deno.serve(async (req) => {
     const beats: any[] = Array.isArray(body?.beats) ? body.beats : [];
     const validation: string = body?.validation ?? 'human_confirmed';
     const model: string | null = body?.model ?? null;
+    const strategy: 'replace' | 'merge' | 'append' =
+      body?.strategy === 'replace' || body?.strategy === 'append' ? body.strategy : 'merge';
 
     if (!chapter_id) return json({ error: 'chapter_id required' }, 400);
     if (beats.length === 0) return json({ error: 'beats required' }, 400);
@@ -31,8 +33,31 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
     let inserted = 0;
     let updated = 0;
+    let soft_deleted = 0;
     const errors: Array<{ beat_number: number; error: string }> = [];
     const samples: any[] = [];
+
+    if (strategy === 'replace') {
+      const { data: existing } = await supabase
+        .from('beats').select('id')
+        .eq('chapter_id', chapter_id).eq('beat_type', 'planned').neq('status', 'deleted');
+      const ids = (existing ?? []).map((r: any) => r.id);
+      if (ids.length > 0) {
+        const { error } = await supabase.from('beats')
+          .update({ status: 'deleted', validation_status: 'rejected', updated_at: now })
+          .in('id', ids);
+        if (!error) soft_deleted = ids.length;
+      }
+    }
+
+    let numberOffset = 0;
+    if (strategy === 'append') {
+      const { data: maxRow } = await supabase
+        .from('beats').select('beat_number')
+        .eq('chapter_id', chapter_id).eq('beat_type', 'planned').neq('status', 'deleted')
+        .order('beat_number', { ascending: false }).limit(1).maybeSingle();
+      numberOffset = Number((maxRow as any)?.beat_number ?? 0);
+    }
 
     for (let i = 0; i < beats.length; i++) {
       const b = beats[i] ?? {};
