@@ -322,23 +322,31 @@ export default function BeatsPlanPanel() {
               <button onClick={runPreview} disabled={loading || persisting || !selected || !mode.canRunNow}
                 className="text-xs px-3 py-1.5 rounded border border-border hover:bg-secondary disabled:opacity-50 inline-flex items-center gap-1.5">
                 {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                Preview beats (chapitre sélectionné)
+                1. Prévisualiser les beats
               </button>
               <button onClick={runPersist} disabled={loading || persisting || !preview?.beats?.length}
                 className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
                 {persisting ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                Persister beats validés
+                2. Enregistrer en base
               </button>
-              <button onClick={validateAll} disabled={validating || persisted.length === 0}
+              <button onClick={validateAll}
+                disabled={validating || persisted.length === 0}
+                title={persisted.length === 0 ? 'Aucun beat en base — enregistrez d\'abord' : 'Approuver ces beats comme entrée de génération'}
                 className="text-xs px-3 py-1.5 rounded border border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/5 disabled:opacity-50 inline-flex items-center gap-1.5">
                 {validating ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
-                Valider tous ({persisted.length})
+                3. Valider pour génération ({persisted.length})
               </button>
               <button onClick={runBatchAll} disabled={batchRunning || !mode.canRunNow}
                 className="text-xs px-3 py-1.5 rounded border border-violet-500/40 text-violet-700 hover:bg-violet-500/5 disabled:opacity-50 inline-flex items-center gap-1.5">
                 {batchRunning ? <Loader2 size={12} className="animate-spin" /> : <Layers size={12} />}
-                Générer pour tous les chapitres ({chapters.length})
+                Prévisualiser pour tous les chapitres ({chapters.length})
               </button>
+              {batch && !batchRunning && (
+                <button onClick={() => { setBatch(null); try { localStorage.removeItem(BATCH_LS_KEY); } catch {} }}
+                  className="text-xs px-3 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+                  <X size={12} /> Effacer batch
+                </button>
+              )}
               {batchRunning && (
                 <button onClick={() => setStopRequested(true)} className="text-xs px-3 py-1.5 rounded border border-rose-500/40 text-rose-700 inline-flex items-center gap-1.5">
                   <StopCircle size={12} /> Stop
