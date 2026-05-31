@@ -198,9 +198,31 @@ export default function ProductionBeatsWorkshop({
     onSelectChapter(c);
   };
 
-  const confirmChapterChange = (action: 'abandon' | 'stay') => {
+  const confirmChapterChange = async (action: 'abandon' | 'stay' | 'save') => {
     if (!chapterChangeModal) return;
     if (action === 'stay') { setChapterChangeModal(null); return; }
+    if (action === 'save') {
+      // Save preview to its original chapter, then switch.
+      if (preview && previewChapterId) {
+        try {
+          setPersisting(true);
+          const payload = preview.map((b) => ({
+            beat_number: b.beat_number, title: b.title, objective: b.objective,
+            narrative_function: b.narrative_function, decision_made: b.decision_made,
+            consequence: b.consequence, revelation: b.revelation, payoff: b.payoff,
+            required_detail: b.required_detail,
+            characters: b.characters ?? [], arcs: b.arcs ?? [], canon_links: b.canon_links ?? [],
+            tension_start: b.tension_start, tension_end: b.tension_end,
+            scientific_density: b.scientific_density, emotional_density: b.emotional_density,
+            risk_flags: b.risk_flags ?? [],
+          }));
+          const { error } = await supabase.functions.invoke('beats-persist', {
+            body: { chapter_id: previewChapterId, beats: payload, validation: 'human_confirmed', model: previewMeta?.model ?? null, strategy: 'replace' },
+          });
+          if (error) { alert(`Enregistrement échoué: ${error.message}. Changement annulé.`); setChapterChangeModal(null); return; }
+        } finally { setPersisting(false); }
+      }
+    }
     setPreview(null); setPreviewChapterId(null); setPreviewMeta(null); setSelectedBeatKey(null);
     onSelectChapter(chapterChangeModal.target);
     setChapterChangeModal(null);
