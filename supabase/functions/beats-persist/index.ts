@@ -140,8 +140,10 @@ Deno.serve(async (req) => {
     return json({
       mode: 'live',
       chapter_id,
+      strategy,
       inserted,
       updated,
+      soft_deleted,
       skipped: 0,
       errors,
       service_role_visible_count: visible ?? null,
