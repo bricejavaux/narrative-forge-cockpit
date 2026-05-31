@@ -873,10 +873,10 @@ function BeatNumField({ label, value, onChange }: { label: string; value: number
   );
 }
 
-function IconBtn({ children, onClick, title, destructive }: { children: React.ReactNode; onClick: () => void; title: string; destructive?: boolean }) {
+function IconBtn({ children, onClick, title, destructive, disabled }: { children: React.ReactNode; onClick: () => void; title: string; destructive?: boolean; disabled?: boolean }) {
   return (
-    <button onClick={onClick} title={title}
-      className={`p-1.5 rounded border ${destructive ? 'border-destructive/40 text-destructive hover:bg-destructive/5' : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary/40'}`}>
+    <button onClick={onClick} title={title} disabled={disabled}
+      className={`p-1.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed ${destructive ? 'border-destructive/40 text-destructive hover:bg-destructive/5' : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary/40'}`}>
       {children}
     </button>
   );
