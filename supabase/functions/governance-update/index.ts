@@ -97,6 +97,8 @@ Deno.serve(async (req) => {
       else basePatch.validation_status = 'reviewed';
     } else if (action === 'mark_rejected') {
       basePatch = { ...basePatch, validation_status: 'rejected' };
+    } else if (action === 'mark_deleted') {
+      basePatch = { ...basePatch, status: 'deleted', validation_status: 'rejected' };
     } else if (action === 'mark_locked') {
       basePatch = { ...basePatch, locked: true };
     } else if (action === 'mark_index_refresh_required') {
