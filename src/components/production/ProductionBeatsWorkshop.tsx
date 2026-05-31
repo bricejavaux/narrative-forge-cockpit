@@ -198,9 +198,31 @@ export default function ProductionBeatsWorkshop({
     onSelectChapter(c);
   };
 
-  const confirmChapterChange = (action: 'abandon' | 'stay') => {
+  const confirmChapterChange = async (action: 'abandon' | 'stay' | 'save') => {
     if (!chapterChangeModal) return;
     if (action === 'stay') { setChapterChangeModal(null); return; }
+    if (action === 'save') {
+      // Save preview to its original chapter, then switch.
+      if (preview && previewChapterId) {
+        try {
+          setPersisting(true);
+          const payload = preview.map((b) => ({
+            beat_number: b.beat_number, title: b.title, objective: b.objective,
+            narrative_function: b.narrative_function, decision_made: b.decision_made,
+            consequence: b.consequence, revelation: b.revelation, payoff: b.payoff,
+            required_detail: b.required_detail,
+            characters: b.characters ?? [], arcs: b.arcs ?? [], canon_links: b.canon_links ?? [],
+            tension_start: b.tension_start, tension_end: b.tension_end,
+            scientific_density: b.scientific_density, emotional_density: b.emotional_density,
+            risk_flags: b.risk_flags ?? [],
+          }));
+          const { error } = await supabase.functions.invoke('beats-persist', {
+            body: { chapter_id: previewChapterId, beats: payload, validation: 'human_confirmed', model: previewMeta?.model ?? null, strategy: 'replace' },
+          });
+          if (error) { alert(`Enregistrement échoué: ${error.message}. Changement annulé.`); setChapterChangeModal(null); return; }
+        } finally { setPersisting(false); }
+      }
+    }
     setPreview(null); setPreviewChapterId(null); setPreviewMeta(null); setSelectedBeatKey(null);
     onSelectChapter(chapterChangeModal.target);
     setChapterChangeModal(null);
@@ -497,7 +519,7 @@ export default function ProductionBeatsWorkshop({
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Le batch ne sauvegarde jamais automatiquement. Ouvrez chaque chapitre dans la zone B pour vérifier, enregistrer puis valider.
+          Batch preview local — durable job Supabase à venir. Le batch ne sauvegarde jamais automatiquement et est stocké dans le navigateur (localStorage). Ouvrez chaque chapitre dans la zone B pour vérifier, enregistrer puis valider.
         </p>
         {batch && (
           <div className="rounded border border-border p-2">
@@ -715,8 +737,8 @@ export default function ProductionBeatsWorkshop({
               <div className="flex flex-wrap gap-1 pt-2 border-t border-border">
                 <IconBtn onClick={() => addBeat(selectedBeat._key)} title="Ajouter après"><Plus size={11} /></IconBtn>
                 <IconBtn onClick={() => duplicateBeat(selectedBeat._key)} title="Dupliquer"><Copy size={11} /></IconBtn>
-                <IconBtn onClick={() => moveBeat(selectedBeat._key, -1)} title="Monter"><ArrowUp size={11} /></IconBtn>
-                <IconBtn onClick={() => moveBeat(selectedBeat._key, 1)} title="Descendre"><ArrowDown size={11} /></IconBtn>
+                <IconBtn onClick={() => moveBeat(selectedBeat._key, -1)} title="Monter" disabled={(preview?.findIndex((b) => b._key === selectedBeat._key) ?? 0) === 0}><ArrowUp size={11} /></IconBtn>
+                <IconBtn onClick={() => moveBeat(selectedBeat._key, 1)} title="Descendre" disabled={(preview?.findIndex((b) => b._key === selectedBeat._key) ?? 0) === (preview?.length ?? 1) - 1}><ArrowDown size={11} /></IconBtn>
                 <IconBtn onClick={() => deletePreviewBeat(selectedBeat._key)} title="Supprimer" destructive><Trash2 size={11} /></IconBtn>
               </div>
 
@@ -744,15 +766,18 @@ export default function ProductionBeatsWorkshop({
           <DialogHeader>
             <DialogTitle>Prévisualisation non enregistrée</DialogTitle>
             <DialogDescription>
-              Une prévisualisation non enregistrée existe pour le chapitre précédent. Que voulez-vous faire ?
+              Une prévisualisation non enregistrée existe pour le chapitre précédent. Action par défaut : rester sur le chapitre.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <button onClick={() => confirmChapterChange('stay')} className="text-xs px-3 py-1.5 rounded border border-border">
-              Rester sur le chapitre
+          <DialogFooter className="flex-wrap">
+            <button onClick={() => confirmChapterChange('stay')} className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground">
+              Rester sur le chapitre (sûr)
             </button>
-            <button onClick={() => confirmChapterChange('abandon')} className="text-xs px-3 py-1.5 rounded bg-destructive text-destructive-foreground">
-              Abandonner la prévisualisation
+            <button onClick={() => confirmChapterChange('save')} disabled={persisting} className="text-xs px-3 py-1.5 rounded border border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/5 disabled:opacity-50">
+              {persisting ? 'Enregistrement…' : 'Enregistrer la prévisualisation puis changer'}
+            </button>
+            <button onClick={() => confirmChapterChange('abandon')} className="text-xs px-3 py-1.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/5">
+              Abandonner la prévisualisation et changer
             </button>
           </DialogFooter>
         </DialogContent>
@@ -848,10 +873,10 @@ function BeatNumField({ label, value, onChange }: { label: string; value: number
   );
 }
 
-function IconBtn({ children, onClick, title, destructive }: { children: React.ReactNode; onClick: () => void; title: string; destructive?: boolean }) {
+function IconBtn({ children, onClick, title, destructive, disabled }: { children: React.ReactNode; onClick: () => void; title: string; destructive?: boolean; disabled?: boolean }) {
   return (
-    <button onClick={onClick} title={title}
-      className={`p-1.5 rounded border ${destructive ? 'border-destructive/40 text-destructive hover:bg-destructive/5' : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary/40'}`}>
+    <button onClick={onClick} title={title} disabled={disabled}
+      className={`p-1.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed ${destructive ? 'border-destructive/40 text-destructive hover:bg-destructive/5' : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary/40'}`}>
       {children}
     </button>
   );
