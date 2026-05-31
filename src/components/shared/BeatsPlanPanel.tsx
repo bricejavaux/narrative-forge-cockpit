@@ -308,12 +308,26 @@ export default function BeatsPlanPanel() {
 
           <div className="col-span-8 space-y-3">
             {selChapter && (
-              <div>
-                <p className="text-xs text-foreground">
-                  <span className="font-mono text-muted-foreground">#{selChapter.number}</span> {selChapter.title}
-                </p>
-                {selChapter.main_arc && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Arc : {selChapter.main_arc}</p>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="text-xs text-foreground">
+                    <span className="font-mono text-muted-foreground">#{selChapter.number}</span> {selChapter.title}
+                    <span className="ml-2 text-[10px] font-mono text-muted-foreground">id: {selChapter.id.slice(0, 8)}…</span>
+                  </p>
+                  {selChapter.main_arc && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Arc : {selChapter.main_arc}</p>
+                  )}
+                </div>
+                {preview?.chapter_id && (
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                    preview.chapter_id === selected
+                      ? 'border-amber-500/40 bg-amber-500/5 text-amber-700'
+                      : 'border-rose-500/40 bg-rose-500/5 text-rose-700'
+                  }`}>
+                    {preview.chapter_id === selected
+                      ? 'preview · non enregistrée'
+                      : '⚠ preview d\'un autre chapitre'}
+                  </span>
                 )}
               </div>
             )}
