@@ -519,7 +519,7 @@ export default function ProductionBeatsWorkshop({
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Le batch ne sauvegarde jamais automatiquement. Ouvrez chaque chapitre dans la zone B pour vérifier, enregistrer puis valider.
+          Batch preview local — durable job Supabase à venir. Le batch ne sauvegarde jamais automatiquement et est stocké dans le navigateur (localStorage). Ouvrez chaque chapitre dans la zone B pour vérifier, enregistrer puis valider.
         </p>
         {batch && (
           <div className="rounded border border-border p-2">
