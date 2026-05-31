@@ -766,15 +766,18 @@ export default function ProductionBeatsWorkshop({
           <DialogHeader>
             <DialogTitle>Prévisualisation non enregistrée</DialogTitle>
             <DialogDescription>
-              Une prévisualisation non enregistrée existe pour le chapitre précédent. Que voulez-vous faire ?
+              Une prévisualisation non enregistrée existe pour le chapitre précédent. Action par défaut : rester sur le chapitre.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <button onClick={() => confirmChapterChange('stay')} className="text-xs px-3 py-1.5 rounded border border-border">
-              Rester sur le chapitre
+          <DialogFooter className="flex-wrap">
+            <button onClick={() => confirmChapterChange('stay')} className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground">
+              Rester sur le chapitre (sûr)
             </button>
-            <button onClick={() => confirmChapterChange('abandon')} className="text-xs px-3 py-1.5 rounded bg-destructive text-destructive-foreground">
-              Abandonner la prévisualisation
+            <button onClick={() => confirmChapterChange('save')} disabled={persisting} className="text-xs px-3 py-1.5 rounded border border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/5 disabled:opacity-50">
+              {persisting ? 'Enregistrement…' : 'Enregistrer la prévisualisation puis changer'}
+            </button>
+            <button onClick={() => confirmChapterChange('abandon')} className="text-xs px-3 py-1.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/5">
+              Abandonner la prévisualisation et changer
             </button>
           </DialogFooter>
         </DialogContent>
