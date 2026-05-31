@@ -1,60 +1,96 @@
 import { useEffect, useState } from 'react';
-import NoteComposer from '@/components/shared/NoteComposer';
-import { Play, Save, Download, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
-import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
+import { supabase } from '@/integrations/supabase/client';
+import { Play, Loader2, AlertTriangle, RefreshCcw, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { agentsService, type AgentRow } from '@/services/agentsService';
 
-type ModeDef = { id: string; label: string; live?: boolean; blockers?: string[] };
+type RunType =
+  | 'openai_connection_test'
+  | 'structure_text_note'
+  | 'run_selected_agent'
+  | 'audit_chapter_plan'
+  | 'audit_planned_beats'
+  | 'diagnostic_tome_live'
+  | 'export_test';
 
-// Runs page is a *technical* page only. Production actions (beats generation,
-// validation, chapter generation, rewrite, lock) belong to /production.
-const ALLOWED_MODES: ModeDef[] = [
-  { id: 'r_audit_plan', label: 'Audit du plan chapitre (live)', blockers: ['plan chapitre requis'] },
-  { id: 'r_audit_beats', label: 'Audit des beats prévus (live)', blockers: ['beats prévus requis'] },
-  { id: 'r_structure_note', label: 'Structurer une note texte (live)' },
-  { id: 'r_export_test', label: 'Test export (live)' },
-  { id: 'r_dry_run', label: 'Dry run (simulation)' },
+const RUN_TYPES: { id: RunType; label: string; needsAgent?: boolean; needsTarget?: boolean }[] = [
+  { id: 'openai_connection_test', label: 'OpenAI connection test' },
+  { id: 'structure_text_note', label: 'Structure text note' },
+  { id: 'run_selected_agent', label: 'Run selected agent', needsAgent: true },
+  { id: 'audit_chapter_plan', label: 'Audit chapter plan (live)' },
+  { id: 'audit_planned_beats', label: 'Audit planned beats (live)', needsTarget: true },
+  { id: 'diagnostic_tome_live', label: 'Diagnostic tome (live)' },
+  { id: 'export_test', label: 'Export test' },
 ];
 
-const FUTURE_MODES: ModeDef[] = [
-  { id: 'f_generate_chapter', label: 'Génération chapitre — futur (beats validés requis)' },
-  { id: 'f_observed_beats', label: 'Extraction beats observés — futur' },
-  { id: 'f_chapter_audit', label: 'Audit chapitre vs beats — futur' },
-  { id: 'f_rewrite', label: 'Réécriture ciblée — futur' },
-  { id: 'f_pgvector', label: 'Retrieval pgvector — futur' },
+const FUTURE_RUN_TYPES = [
+  'generate_chapter_draft',
+  'extract_observed_beats',
+  'audit_chapter_vs_beats',
+  'targeted_rewrite',
+  'pgvector_retrieval',
+  'autonomous_rewrite',
 ];
 
-const ALL_MODES = [...ALLOWED_MODES, ...FUTURE_MODES];
+type RunRow = {
+  id: string; name: string; status: string; mode: string;
+  started_at: string | null; finished_at: string | null;
+  duration: string | null; findings: number; payload: any; result: any;
+};
 
 export default function RunsPage() {
-  const [selectedMode, setSelectedMode] = useState<ModeDef>(ALLOWED_MODES[0]);
+  const [runType, setRunType] = useState<RunType>('openai_connection_test');
+  const [agents, setAgents] = useState<AgentRow[]>([]);
+  const [agentId, setAgentId] = useState<string>('');
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [chapterId, setChapterId] = useState<string>('');
+  const [model, setModel] = useState<string>('');
+  const [instruction, setInstruction] = useState<string>('');
+  const [rawText, setRawText] = useState<string>('');
+  const [running, setRunning] = useState(false);
+  const [runs, setRuns] = useState<RunRow[]>([]);
+  const [selectedRun, setSelectedRun] = useState<RunRow | null>(null);
+  const [outputs, setOutputs] = useState<any[]>([]);
+  const [err, setErr] = useState<string | null>(null);
 
-  
-  const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
-  const [loadingReadiness, setLoadingReadiness] = useState(true);
+  const loadRuns = async () => {
+    const { data } = await supabase.from('runs').select('id,name,status,mode,started_at,finished_at,duration,findings,payload,result').order('created_at', { ascending: false }).limit(40);
+    setRuns((data ?? []) as RunRow[]);
+  };
 
   useEffect(() => {
-    supabaseService.getReadiness()
-      .then(setReadiness)
-      .catch(() => setReadiness(null))
-      .finally(() => setLoadingReadiness(false));
+    loadRuns();
+    agentsService.list().then((l) => { setAgents(l); if (l[0]) setAgentId(l[0].id); });
+    supabase.from('chapters').select('id,number,title').order('number').limit(50).then(({ data }) => {
+      setChapters(data ?? []); if (data?.[0]) setChapterId(data[0].id);
+    });
   }, []);
 
-  const openaiOk = !!readiness?.openai?.api_key_configured;
-  const supabaseOk = !!readiness?.supabase?.project_connected;
-  const onedriveOk = !!readiness?.onedrive?.oauth_configured;
+  const def = RUN_TYPES.find((r) => r.id === runType)!;
 
-  const checklist = [
-    { label: 'OpenAI disponible', ok: openaiOk, note: openaiOk ? readiness?.openai?.model ?? undefined : 'clé absente' },
-    { label: 'Supabase disponible', ok: supabaseOk },
-    { label: 'OneDrive disponible', ok: onedriveOk, note: onedriveOk ? undefined : 'optionnel' },
-    { label: 'Indexes requis disponibles', ok: !!readiness?.indexes?.pgvector_ready, note: readiness?.indexes?.pgvector_ready ? undefined : 'pgvector pending — phase 2' },
-    { label: 'Objets cibles sélectionnés', ok: true },
-    { label: 'Format de sortie sélectionné', ok: true },
-  ];
-  const required = [openaiOk, supabaseOk]; // OneDrive optional
-  const ready = required.every(Boolean);
-  const isDryRun = selectedMode.id === 'r_dry_run';
+  const execute = async () => {
+    setRunning(true); setErr(null);
+    try {
+      const body: any = { run_type: runType, mode: 'live', model: model || null };
+      if (def.needsAgent) body.agent_id = agentId;
+      if (def.needsTarget && chapterId) { body.target_type = 'chapter'; body.target_id = chapterId; }
+      if (runType === 'structure_text_note') body.payload = { raw_text: rawText };
+      if (instruction) body.instruction = instruction;
+      const { data, error } = await supabase.functions.invoke('run-execute', { body });
+      if (error) setErr(error.message);
+      await loadRuns();
+      if (data?.run_id) {
+        const { data: row } = await supabase.from('runs').select('*').eq('id', data.run_id).maybeSingle();
+        if (row) await openRun(row as RunRow);
+      }
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setRunning(false); }
+  };
 
+  const openRun = async (r: RunRow) => {
+    setSelectedRun(r);
+    const { data } = await supabase.from('run_outputs').select('*').eq('run_id', r.id).order('created_at');
+    setOutputs(data ?? []);
+  };
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -62,194 +98,148 @@ export default function RunsPage() {
         <p className="editorial-eyebrow">Intelligence · Page technique</p>
         <h1 className="text-3xl editorial-heading text-foreground mt-1">Runs</h1>
         <p className="text-xs text-muted-foreground mt-1 max-w-3xl">
-          Historique, exécutions techniques avancées et tests dry-run / live. Les actions de production
-          (génération beats, validation, audit, génération chapitre, réécriture, verrouillage) se font dans <strong>Production</strong>.
+          Exécution technique et trace durable des runs. La production éditoriale (beats, chapitre, validation) reste dans <strong>Production</strong>. Les runs lancés ici (ou par Production) persistent dans <code>runs</code> + <code>run_outputs</code> + <code>audit_findings</code> + <code>rewrite_tasks</code>.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Configuration */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="cockpit-card space-y-4">
-            <h2 className="font-display font-semibold text-sm text-foreground">Exécution technique</h2>
+      <div className="grid grid-cols-12 gap-4">
+        {/* Form */}
+        <div className="col-span-12 lg:col-span-5 cockpit-card p-4 space-y-3">
+          <h2 className="font-display text-sm text-foreground">Nouveau run technique</h2>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Type de run</label>
-                <select
-                  value={selectedMode.id}
-                  onChange={e => setSelectedMode(ALL_MODES.find(m => m.id === e.target.value) || ALLOWED_MODES[0])}
-                  className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground"
-                >
-                  <optgroup label="Disponible maintenant">
-                    {ALLOWED_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </optgroup>
-                  <optgroup label="Futur / bloqué">
-                    {FUTURE_MODES.map(m => <option key={m.id} value={m.id} disabled>{m.label}</option>)}
-                  </optgroup>
-                </select>
+          <label className="block text-xs">
+            <span className="editorial-eyebrow block mb-0.5">Type</span>
+            <select value={runType} onChange={(e) => setRunType(e.target.value as RunType)}
+              className="w-full text-xs px-2 py-1.5 rounded border border-border bg-background">
+              <optgroup label="Disponibles">
+                {RUN_TYPES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+              </optgroup>
+              <optgroup label="Futurs (désactivés)">
+                {FUTURE_RUN_TYPES.map((r) => <option key={r} value={r} disabled>{r} — non implémenté</option>)}
+              </optgroup>
+            </select>
+          </label>
 
-                {selectedMode.blockers && selectedMode.blockers.length > 0 && (
-                  <div className="mt-2 rounded border border-amber/30 bg-amber/5 p-2 text-[11px] text-amber-700">
-                    <p className="font-display font-semibold mb-1">Conditions requises :</p>
-                    <ul className="space-y-0.5">
-                      {selectedMode.blockers.map(b => <li key={b}>· {b}</li>)}
-                    </ul>
-                    <p className="mt-1 italic opacity-80">Persistance des runs en cours d'implémentation — résultats actuels non sauvegardés.</p>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Périmètre</label>
-                <select className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground">
-                  <option>Tome entier</option>
-                  <option>Chapitres sélectionnés</option>
-                  <option>Arc spécifique</option>
-                  <option>Personnage spécifique</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Objet cible</label>
-                <p className="mt-1 text-xs text-muted-foreground italic">
-                  Sélection chapitre/arc/personnage à câbler — utiliser <strong>Production</strong> pour cibler un chapitre.
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Politique réécriture</label>
-                <p className="mt-1 text-xs text-muted-foreground italic">
-                  Lecture seule / suggestions uniquement. Réécriture autonome désactivée.
-                </p>
-              </div>
+          {def.needsAgent && (
+            <label className="block text-xs">
+              <span className="editorial-eyebrow block mb-0.5">Agent</span>
+              <select value={agentId} onChange={(e) => setAgentId(e.target.value)}
+                className="w-full text-xs px-2 py-1.5 rounded border border-border bg-background">
+                {agents.length === 0 && <option value="">Aucun agent — initialiser dans Agent Studio</option>}
+                {agents.map((a) => <option key={a.id} value={a.id}>{a.name} {a.is_active ? '' : '· inactif'}</option>)}
+              </select>
+            </label>
+          )}
+
+          {def.needsTarget && (
+            <label className="block text-xs">
+              <span className="editorial-eyebrow block mb-0.5">Chapitre cible</span>
+              <select value={chapterId} onChange={(e) => setChapterId(e.target.value)}
+                className="w-full text-xs px-2 py-1.5 rounded border border-border bg-background">
+                {chapters.length === 0 && <option value="">Aucun chapitre</option>}
+                {chapters.map((c) => <option key={c.id} value={c.id}>#{c.number} {c.title}</option>)}
+              </select>
+            </label>
+          )}
+
+          <label className="block text-xs">
+            <span className="editorial-eyebrow block mb-0.5">Modèle (optionnel)</span>
+            <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="ex: gpt-4.1-mini, gpt-5"
+              className="w-full text-xs px-2 py-1.5 rounded border border-border bg-background" />
+          </label>
+
+          <label className="block text-xs">
+            <span className="editorial-eyebrow block mb-0.5">Instruction (optionnel)</span>
+            <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} rows={2}
+              className="w-full text-xs px-2 py-1.5 rounded border border-border bg-background font-mono" />
+          </label>
+
+          {runType === 'structure_text_note' && (
+            <label className="block text-xs">
+              <span className="editorial-eyebrow block mb-0.5">Texte brut</span>
+              <textarea value={rawText} onChange={(e) => setRawText(e.target.value)} rows={3}
+                className="w-full text-xs px-2 py-1.5 rounded border border-border bg-background" />
+            </label>
+          )}
+
+          <button onClick={execute} disabled={running}
+            className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
+            {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+            Exécuter live (persistance Supabase)
+          </button>
+
+          {err && (
+            <div className="text-[11px] p-2 rounded border border-destructive/40 bg-destructive/5 text-destructive inline-flex items-start gap-1">
+              <AlertTriangle size={11} className="mt-0.5" /> {err}
             </div>
+          )}
+        </div>
 
-            <div className="rounded border border-border bg-secondary/20 p-2 text-[11px] text-muted-foreground">
-              Sélection d'agents ad-hoc non disponible ici — voir <strong>Agent Studio</strong> pour le registre persisté.
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Budget max</label>
-                <input type="text" value="$5.00" readOnly className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground font-mono" />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">Politique persistance</label>
-                <select className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground">
-                  <option>Sauvegarder en DB</option>
-                  <option>Export seulement</option>
-                  <option>Dry run</option>
-                </select>
-              </div>
-            </div>
+        {/* History */}
+        <div className="col-span-12 lg:col-span-7 cockpit-card p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-sm text-foreground">Historique runs ({runs.length})</h2>
+            <button onClick={loadRuns} className="text-[10px] font-mono px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+              <RefreshCcw size={10} /> Rafraîchir
+            </button>
           </div>
-
-          {/* Pre-run checklist */}
-          <div className="cockpit-card space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="editorial-eyebrow">Checklist pré-run {loadingReadiness && <span className="text-[10px] text-muted-foreground">· vérification…</span>}</h3>
-              <span className={`text-[11px] font-mono ${ready ? 'text-emerald-600' : 'text-amber'}`}>
-                {ready ? (isDryRun ? 'prêt (dry run)' : 'prêt (live)') : 'non prêt — Lancer désactivé'}
-              </span>
-            </div>
-            <ul className="text-xs space-y-1">
-              {checklist.map((c) => (
-                <li key={c.label} className="flex items-center gap-2">
-                  {c.ok
-                    ? <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
-                    : <XCircle size={12} className="text-rose shrink-0" />}
-                  <span className={c.ok ? 'text-foreground' : 'text-muted-foreground'}>{c.label}</span>
-                  {c.note && <span className="text-[10px] font-mono text-muted-foreground">· {c.note}</span>}
+          {runs.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Aucun run encore — lancez un run ci-contre.</p>
+          ) : (
+            <ul className="space-y-1 max-h-[300px] overflow-y-auto">
+              {runs.map((r) => (
+                <li key={r.id}>
+                  <button onClick={() => openRun(r)}
+                    className={`w-full text-left text-[11px] px-2 py-1.5 rounded border flex items-center gap-2 ${selectedRun?.id === r.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}>
+                    {r.status === 'completed' ? <CheckCircle2 size={11} className="text-emerald-600" /> :
+                     r.status === 'failed' ? <XCircle size={11} className="text-destructive" /> :
+                     r.status === 'running' ? <Loader2 size={11} className="animate-spin text-sky-500" /> :
+                     <Clock size={11} className="text-muted-foreground" />}
+                    <span className="flex-1 truncate font-mono">{r.name}</span>
+                    <span className="text-[9px] text-muted-foreground">{r.duration ?? '—'}</span>
+                    <span className="text-[9px] text-muted-foreground">{r.findings} finds</span>
+                  </button>
                 </li>
               ))}
             </ul>
-          </div>
+          )}
+        </div>
 
-          {/* Payload preview */}
-          <div className="cockpit-card space-y-3">
-            <h3 className="editorial-eyebrow flex items-center gap-2">
-              <Database size={11} /> Aperçu payload — {isDryRun ? 'dry run' : (ready ? 'live test' : 'pré-vérification')}
-            </h3>
-            <p className="text-[11px] text-muted-foreground">
-              Aperçu indicatif des objets, indexes et tables qui seront mobilisés. Aucune écriture
-              persistée tant que la persistance des runs n'est pas implémentée.
-            </p>
-            <div className="grid grid-cols-2 gap-3 text-xs">
+        {/* Run detail */}
+        {selectedRun && (
+          <div className="col-span-12 cockpit-card p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-sm text-foreground">Détail run · <span className="font-mono">{selectedRun.id.slice(0, 8)}</span></h3>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                selectedRun.status === 'completed' ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30' :
+                selectedRun.status === 'failed' ? 'bg-destructive/10 text-destructive border-destructive/30' :
+                'bg-amber-500/10 text-amber-700 border-amber-500/30'}`}>{selectedRun.status}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div>
-                <p className="text-muted-foreground mb-1">Objets envoyés</p>
-                <p className="font-mono text-foreground/80">selon sélection</p>
+                <p className="editorial-eyebrow mb-1">Payload (input)</p>
+                <pre className="bg-muted/30 p-2 rounded font-mono max-h-48 overflow-auto">{JSON.stringify(selectedRun.payload, null, 2)}</pre>
               </div>
               <div>
-                <p className="text-muted-foreground mb-1">Indexes consultés</p>
-                <p className="font-mono text-primary">selon agents</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">Modèle OpenAI</p>
-                <p className="font-mono text-foreground/80">{readiness?.openai?.model ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">Outputs attendus</p>
-                <p className="font-mono text-foreground/80">findings · scores · rewrite_tasks</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-muted-foreground mb-1">Tables Supabase potentiellement touchées</p>
-                <p className="font-mono text-accent">runs · run_outputs · audit_findings · rewrite_tasks</p>
+                <p className="editorial-eyebrow mb-1">Result (summary)</p>
+                <pre className="bg-muted/30 p-2 rounded font-mono max-h-48 overflow-auto">{JSON.stringify(selectedRun.result, null, 2)}</pre>
               </div>
             </div>
+            <div>
+              <p className="editorial-eyebrow mb-1">Outputs persistés ({outputs.length})</p>
+              {outputs.length === 0 ? <p className="text-[11px] text-muted-foreground">Aucun</p> : (
+                <ul className="space-y-1">
+                  {outputs.map((o) => (
+                    <li key={o.id} className="text-[11px] border border-border rounded p-2">
+                      <span className="font-mono text-[10px] text-muted-foreground">{o.kind}</span>
+                      <pre className="mt-1 bg-muted/20 p-1.5 rounded font-mono max-h-40 overflow-auto">{JSON.stringify(o.payload, null, 2)}</pre>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 flex-wrap">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/30 text-primary text-sm font-display hover:bg-primary/20 transition-colors">
-              <Zap size={14} /> Simuler (dry run)
-            </button>
-            <button
-              disabled={!openaiOk || isDryRun}
-              title={!openaiOk ? 'OpenAI runtime non disponible' : isDryRun ? 'Mode Dry Run sélectionné' : 'Lancer en live (OpenAI)'}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-display ${openaiOk && !isDryRun ? 'bg-primary text-primary-foreground hover:opacity-90' : 'bg-primary text-primary-foreground opacity-50 cursor-not-allowed'}`}
-            >
-              <Play size={14} /> Live test {openaiOk && !isDryRun && '(OpenAI)'}
-            </button>
-            <button
-              disabled
-              title="Persistance des runs non implémentée — capacité « run_persistence » pending"
-              className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm opacity-50 cursor-not-allowed"
-            >
-              <Save size={14} /> Sauver dans la DB
-            </button>
-            <button
-              disabled
-              title="Réécriture autonome désactivée intentionnellement — validation humaine requise"
-              className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm opacity-50 cursor-not-allowed"
-            >
-              <Zap size={14} /> Réécriture autonome (désactivée)
-            </button>
-            <button className="flex items-center gap-2 px-3 py-2 rounded border border-border text-muted-foreground text-sm hover:text-foreground transition-colors">
-              <Download size={14} /> Exporter config
-            </button>
-          </div>
-          <div className={`flex items-center gap-2 text-[11px] ${ready ? 'text-emerald-600' : 'text-amber'}`}>
-            {ready ? <CheckCircle2 size={11} /> : <AlertTriangle size={11} />}
-            {ready
-              ? (isDryRun
-                ? 'Dry Run actif — aucun appel OpenAI ne sera effectué.'
-                : `Live prêt — provider OpenAI (${readiness?.openai?.model ?? 'défaut'}).`)
-              : '« Lancer le Run » désactivé tant que OpenAI et Supabase ne sont pas branchés.'}
-          </div>
-        </div>
-
-        {/* Historique runs */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="editorial-eyebrow">Historique des runs</h2>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">
-              persistance pending
-            </span>
-          </div>
-          <NoteComposer target="run en préparation" compact />
-          <div className="cockpit-card space-y-2 text-xs">
-            <p className="text-foreground">Aucun run réel exécuté.</p>
-            <p className="text-muted-foreground">Persistance des runs non implémentée. Dry-run et test live OpenAI disponibles ci-dessus. Pour produire des beats / chapitres, utiliser <strong>Production</strong>.</p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
