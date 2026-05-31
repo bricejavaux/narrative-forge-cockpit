@@ -22,20 +22,29 @@ export default function PersistedAgentsPanel() {
   const [reason, setReason] = useState('');
 
   // env for testability classification
-  const [env, setEnv] = useState<{ hasChapters: boolean; hasCanon: boolean; pgvectorActive: boolean; bindingsByAgent: Record<string, AgentBindingRow[]> }>({
-    hasChapters: false, hasCanon: false, pgvectorActive: false, bindingsByAgent: {},
+  const [env, setEnv] = useState<Omit<TestabilityCtx, 'bindings'> & { bindingsByAgent: Record<string, AgentBindingRow[]> }>({
+    hasChapters: false, hasCanon: false, hasCharacters: false,
+    hasPlannedBeats: false, hasValidatedBeats: false, hasFullText: false,
+    pgvectorActive: false, openaiReady: false, bindingsByAgent: {},
   });
+
+  const [testing, setTesting] = useState(false);
+  const [lastRun, setLastRun] = useState<any>(null);
 
   const load = async () => {
     setLoading(true); setErr(null);
     try {
       const list = await agentsService.list();
       setAgents(list);
-      // load env context
-      const [chCount, caCount, allBindings] = await Promise.all([
+      const [chCount, caCount, chrCount, plannedCount, validatedCount, fullTextCount, allBindings, oaiSetting] = await Promise.all([
         supabase.from('chapters').select('id', { count: 'exact', head: true }),
         supabase.from('canon_objects').select('id', { count: 'exact', head: true }),
+        supabase.from('characters').select('id', { count: 'exact', head: true }),
+        supabase.from('beats').select('id', { count: 'exact', head: true }).eq('beat_type', 'planned').neq('status', 'deleted'),
+        supabase.from('beats').select('id', { count: 'exact', head: true }).eq('beat_type', 'planned').eq('validation_status', 'validated'),
+        supabase.from('chapters').select('id', { count: 'exact', head: true }).not('full_text', 'is', null),
         supabase.from('agent_index_bindings').select('id,agent_id,index_name,corpus_name,required,top_k,similarity_threshold,status'),
+        supabase.from('app_settings').select('value').eq('key', 'openai').maybeSingle(),
       ]);
       const map: Record<string, AgentBindingRow[]> = {};
       ((allBindings.data ?? []) as any[]).forEach((b) => {
@@ -43,7 +52,17 @@ export default function PersistedAgentsPanel() {
         map[b.agent_id].push(b as AgentBindingRow);
       });
       const anyActive = ((allBindings.data ?? []) as any[]).some((b) => b.status === 'active');
-      setEnv({ hasChapters: (chCount.count ?? 0) > 0, hasCanon: (caCount.count ?? 0) > 0, pgvectorActive: anyActive, bindingsByAgent: map });
+      const openaiReady = !!(oaiSetting.data?.value as any)?.api_key_configured;
+      setEnv({
+        hasChapters: (chCount.count ?? 0) > 0,
+        hasCanon: (caCount.count ?? 0) > 0,
+        hasCharacters: (chrCount.count ?? 0) > 0,
+        hasPlannedBeats: (plannedCount.count ?? 0) > 0,
+        hasValidatedBeats: (validatedCount.count ?? 0) > 0,
+        hasFullText: (fullTextCount.count ?? 0) > 0,
+        pgvectorActive: anyActive, openaiReady,
+        bindingsByAgent: map,
+      });
       if (!selected && list.length) await pick(list[0]);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
