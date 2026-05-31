@@ -17,7 +17,9 @@ type PreviewBeat = {
 
 type PersistedBeat = { id: string; beat_number: number | null; title: string; status: string | null; validation_status: string | null; narrative_function: string | null };
 
-type PreviewResp = { mode?: string; model?: string; chapter_title?: string; count?: number; beats?: PreviewBeat[]; warnings?: string[]; error?: string };
+type PreviewResp = { mode?: string; model?: string; chapter_title?: string; chapter_id?: string; count?: number; beats?: PreviewBeat[]; warnings?: string[]; error?: string };
+
+const BATCH_LS_KEY = 'beats_batch_job_v1';
 
 type BeatMode = {
   id: string;
@@ -89,15 +91,41 @@ export default function BeatsPlanPanel() {
   };
 
   useEffect(() => { loadChapters(); }, []);
-  useEffect(() => { if (selected) loadPersisted(selected); }, [selected]);
+  // On chapter change: clear preview from previous chapter, reload persisted.
+  useEffect(() => {
+    if (!selected) return;
+    if (preview && preview.chapter_id && preview.chapter_id !== selected) {
+      const keep = window.confirm(
+        `Une prévisualisation non enregistrée existe pour le chapitre précédent.\n\nOK = abandonner la prévisualisation et charger le nouveau chapitre.\nAnnuler = garder l'ancienne prévisualisation (mais elle sera affichée comme appartenant à un autre chapitre).`
+      );
+      if (keep) setPreview(null);
+    }
+    loadPersisted(selected);
+  }, [selected]); // eslint-disable-line
   useEffect(() => { setModelId(mode.recommendedModel); }, [modeId]); // eslint-disable-line
+
+  // Hydrate batch state from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BATCH_LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setBatch(parsed);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try {
+      if (batch) localStorage.setItem(BATCH_LS_KEY, JSON.stringify(batch));
+    } catch { /* ignore */ }
+  }, [batch]);
 
   const runPreviewFor = async (chapter_id: string): Promise<PreviewResp> => {
     const { data, error } = await supabase.functions.invoke('beats-preview', {
       body: { chapter_id, model: effectiveModel || undefined, mode: modeId, beat_count_target: 6 },
     });
-    if (error) return { error: error.message };
-    return data as PreviewResp;
+    if (error) return { error: error.message, chapter_id };
+    return { ...(data as PreviewResp), chapter_id };
   };
 
   const runPreview = async () => {
@@ -109,14 +137,18 @@ export default function BeatsPlanPanel() {
 
   const runPersist = async () => {
     if (!selected || !preview?.beats?.length) return;
-    if (!confirm(`Persister ${preview.beats.length} beats validés pour ce chapitre ? (upsert par beat_number)`)) return;
+    if (preview.chapter_id && preview.chapter_id !== selected) {
+      alert('La prévisualisation appartient à un autre chapitre. Sélectionnez le bon chapitre avant d\'enregistrer.');
+      return;
+    }
+    if (!confirm(`Enregistrer ${preview.beats.length} beats en base pour ce chapitre ? (upsert par beat_number)`)) return;
     setPersisting(true);
     try {
       const { data, error } = await supabase.functions.invoke('beats-persist', {
         body: { chapter_id: selected, beats: preview.beats, validation: 'human_confirmed', model: preview.model ?? null },
       });
-      if (error) alert(`Erreur persist: ${error.message}`);
-      else if ((data as any)?.error) alert(`Erreur persist: ${(data as any).error}`);
+      if (error) alert(`Erreur enregistrement: ${error.message}`);
+      else if ((data as any)?.error) alert(`Erreur enregistrement: ${(data as any).error}`);
       await loadPersisted(selected);
     } finally { setPersisting(false); }
   };
