@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
-import { runs, agents, chapters } from '@/data/dummyData';
-import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
-import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
+import { Play, Save, Download, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { isDemoMode } from '@/lib/productionMode';
 
@@ -113,31 +111,20 @@ export default function RunsPage() {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground uppercase tracking-wider">Objet cible</label>
-                <select className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground">
-                  <option>Tous les chapitres</option>
-                  {chapters.slice(0, 5).map(ch => <option key={ch.id}>Ch.{ch.number} — {ch.title}</option>)}
-                </select>
+                <p className="mt-1 text-xs text-muted-foreground italic">
+                  Sélection chapitre/arc/personnage à câbler — utiliser <strong>Production</strong> pour cibler un chapitre.
+                </p>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground uppercase tracking-wider">Politique réécriture</label>
-                <select className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground">
-                  <option>Lecture seule</option>
-                  <option>Suggestions uniquement</option>
-                  <option>Réécriture avec validation</option>
-                  <option>Réécriture automatique</option>
-                </select>
+                <p className="mt-1 text-xs text-muted-foreground italic">
+                  Lecture seule / suggestions uniquement. Réécriture autonome désactivée.
+                </p>
               </div>
             </div>
 
-            <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wider">Agents sélectionnés</label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {agents.slice(0, 8).map(a => (
-                  <button key={a.id} className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors">
-                    {a.name}
-                  </button>
-                ))}
-              </div>
+            <div className="rounded border border-border bg-secondary/20 p-2 text-[11px] text-muted-foreground">
+              Sélection d'agents ad-hoc non disponible ici — voir <strong>Agent Studio</strong> pour le registre persisté.
             </div>
 
             <div className="grid grid-cols-2 gap-4">
