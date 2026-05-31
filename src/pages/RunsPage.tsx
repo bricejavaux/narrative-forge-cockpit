@@ -242,34 +242,14 @@ export default function RunsPage() {
           <div className="flex items-center justify-between">
             <h2 className="editorial-eyebrow">Historique des runs</h2>
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">
-              {demo ? 'Demo fixtures' : 'Phase 2 — persistance pending'}
+              persistance pending
             </span>
           </div>
           <NoteComposer target="run en préparation" compact />
-          {!demo && (
-            <div className="cockpit-card space-y-2 text-xs">
-              <p className="text-foreground">Aucun run réel exécuté.</p>
-              <p className="text-muted-foreground">Run persistence — Phase 2. Dry run disponible. Live OpenAI test disponible pour agents sans écriture.</p>
-            </div>
-          )}
-          {demo && runs.map(run => (
-            <div key={run.id} className="cockpit-card space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display font-semibold text-sm text-foreground">{run.name}</span>
-                <StatusBadge status={run.status} />
-              </div>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>Mode: {run.mode}</p>
-                <p>Agents: {run.agents.join(', ')}</p>
-                <div className="flex gap-3 font-mono">
-                  <span>{run.findings} findings</span>
-                  <span>{run.cost}</span>
-                  <span>{run.duration}</span>
-                </div>
-                <p className="text-[10px]">{run.date}</p>
-              </div>
-            </div>
-          ))}
+          <div className="cockpit-card space-y-2 text-xs">
+            <p className="text-foreground">Aucun run réel exécuté.</p>
+            <p className="text-muted-foreground">Persistance des runs non implémentée. Dry-run et test live OpenAI disponibles ci-dessus. Pour produire des beats / chapitres, utiliser <strong>Production</strong>.</p>
+          </div>
         </div>
       </div>
     </div>
