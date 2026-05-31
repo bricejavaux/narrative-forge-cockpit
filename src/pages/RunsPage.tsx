@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
-import { runs, agents, chapters } from '@/data/dummyData';
-import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
-import { Play, Save, Download, ExternalLink, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
+import { Play, Save, Download, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
-import { isDemoMode } from '@/lib/productionMode';
 
 type ModeDef = { id: string; label: string; live?: boolean; blockers?: string[] };
 
@@ -31,7 +28,7 @@ const ALL_MODES = [...ALLOWED_MODES, ...FUTURE_MODES];
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState<ModeDef>(ALLOWED_MODES[0]);
 
-  const demo = isDemoMode();
+  
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [loadingReadiness, setLoadingReadiness] = useState(true);
 
@@ -113,31 +110,20 @@ export default function RunsPage() {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground uppercase tracking-wider">Objet cible</label>
-                <select className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground">
-                  <option>Tous les chapitres</option>
-                  {chapters.slice(0, 5).map(ch => <option key={ch.id}>Ch.{ch.number} — {ch.title}</option>)}
-                </select>
+                <p className="mt-1 text-xs text-muted-foreground italic">
+                  Sélection chapitre/arc/personnage à câbler — utiliser <strong>Production</strong> pour cibler un chapitre.
+                </p>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground uppercase tracking-wider">Politique réécriture</label>
-                <select className="mt-1 w-full bg-surface-2 border border-border rounded px-3 py-2 text-sm text-foreground">
-                  <option>Lecture seule</option>
-                  <option>Suggestions uniquement</option>
-                  <option>Réécriture avec validation</option>
-                  <option>Réécriture automatique</option>
-                </select>
+                <p className="mt-1 text-xs text-muted-foreground italic">
+                  Lecture seule / suggestions uniquement. Réécriture autonome désactivée.
+                </p>
               </div>
             </div>
 
-            <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wider">Agents sélectionnés</label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {agents.slice(0, 8).map(a => (
-                  <button key={a.id} className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors">
-                    {a.name}
-                  </button>
-                ))}
-              </div>
+            <div className="rounded border border-border bg-secondary/20 p-2 text-[11px] text-muted-foreground">
+              Sélection d'agents ad-hoc non disponible ici — voir <strong>Agent Studio</strong> pour le registre persisté.
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -255,34 +241,14 @@ export default function RunsPage() {
           <div className="flex items-center justify-between">
             <h2 className="editorial-eyebrow">Historique des runs</h2>
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-600 border-slate-500/30">
-              {demo ? 'Demo fixtures' : 'Phase 2 — persistance pending'}
+              persistance pending
             </span>
           </div>
           <NoteComposer target="run en préparation" compact />
-          {!demo && (
-            <div className="cockpit-card space-y-2 text-xs">
-              <p className="text-foreground">Aucun run réel exécuté.</p>
-              <p className="text-muted-foreground">Run persistence — Phase 2. Dry run disponible. Live OpenAI test disponible pour agents sans écriture.</p>
-            </div>
-          )}
-          {demo && runs.map(run => (
-            <div key={run.id} className="cockpit-card space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display font-semibold text-sm text-foreground">{run.name}</span>
-                <StatusBadge status={run.status} />
-              </div>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>Mode: {run.mode}</p>
-                <p>Agents: {run.agents.join(', ')}</p>
-                <div className="flex gap-3 font-mono">
-                  <span>{run.findings} findings</span>
-                  <span>{run.cost}</span>
-                  <span>{run.duration}</span>
-                </div>
-                <p className="text-[10px]">{run.date}</p>
-              </div>
-            </div>
-          ))}
+          <div className="cockpit-card space-y-2 text-xs">
+            <p className="text-foreground">Aucun run réel exécuté.</p>
+            <p className="text-muted-foreground">Persistance des runs non implémentée. Dry-run et test live OpenAI disponibles ci-dessus. Pour produire des beats / chapitres, utiliser <strong>Production</strong>.</p>
+          </div>
         </div>
       </div>
     </div>

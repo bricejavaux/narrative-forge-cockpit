@@ -17,7 +17,9 @@ type PreviewBeat = {
 
 type PersistedBeat = { id: string; beat_number: number | null; title: string; status: string | null; validation_status: string | null; narrative_function: string | null };
 
-type PreviewResp = { mode?: string; model?: string; chapter_title?: string; count?: number; beats?: PreviewBeat[]; warnings?: string[]; error?: string };
+type PreviewResp = { mode?: string; model?: string; chapter_title?: string; chapter_id?: string; count?: number; beats?: PreviewBeat[]; warnings?: string[]; error?: string };
+
+const BATCH_LS_KEY = 'beats_batch_job_v1';
 
 type BeatMode = {
   id: string;
@@ -89,15 +91,41 @@ export default function BeatsPlanPanel() {
   };
 
   useEffect(() => { loadChapters(); }, []);
-  useEffect(() => { if (selected) loadPersisted(selected); }, [selected]);
+  // On chapter change: clear preview from previous chapter, reload persisted.
+  useEffect(() => {
+    if (!selected) return;
+    if (preview && preview.chapter_id && preview.chapter_id !== selected) {
+      const keep = window.confirm(
+        `Une prévisualisation non enregistrée existe pour le chapitre précédent.\n\nOK = abandonner la prévisualisation et charger le nouveau chapitre.\nAnnuler = garder l'ancienne prévisualisation (mais elle sera affichée comme appartenant à un autre chapitre).`
+      );
+      if (keep) setPreview(null);
+    }
+    loadPersisted(selected);
+  }, [selected]); // eslint-disable-line
   useEffect(() => { setModelId(mode.recommendedModel); }, [modeId]); // eslint-disable-line
+
+  // Hydrate batch state from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BATCH_LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setBatch(parsed);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try {
+      if (batch) localStorage.setItem(BATCH_LS_KEY, JSON.stringify(batch));
+    } catch { /* ignore */ }
+  }, [batch]);
 
   const runPreviewFor = async (chapter_id: string): Promise<PreviewResp> => {
     const { data, error } = await supabase.functions.invoke('beats-preview', {
       body: { chapter_id, model: effectiveModel || undefined, mode: modeId, beat_count_target: 6 },
     });
-    if (error) return { error: error.message };
-    return data as PreviewResp;
+    if (error) return { error: error.message, chapter_id };
+    return { ...(data as PreviewResp), chapter_id };
   };
 
   const runPreview = async () => {
@@ -109,14 +137,18 @@ export default function BeatsPlanPanel() {
 
   const runPersist = async () => {
     if (!selected || !preview?.beats?.length) return;
-    if (!confirm(`Persister ${preview.beats.length} beats validés pour ce chapitre ? (upsert par beat_number)`)) return;
+    if (preview.chapter_id && preview.chapter_id !== selected) {
+      alert('La prévisualisation appartient à un autre chapitre. Sélectionnez le bon chapitre avant d\'enregistrer.');
+      return;
+    }
+    if (!confirm(`Enregistrer ${preview.beats.length} beats en base pour ce chapitre ? (upsert par beat_number)`)) return;
     setPersisting(true);
     try {
       const { data, error } = await supabase.functions.invoke('beats-persist', {
         body: { chapter_id: selected, beats: preview.beats, validation: 'human_confirmed', model: preview.model ?? null },
       });
-      if (error) alert(`Erreur persist: ${error.message}`);
-      else if ((data as any)?.error) alert(`Erreur persist: ${(data as any).error}`);
+      if (error) alert(`Erreur enregistrement: ${error.message}`);
+      else if ((data as any)?.error) alert(`Erreur enregistrement: ${(data as any).error}`);
       await loadPersisted(selected);
     } finally { setPersisting(false); }
   };
@@ -181,6 +213,17 @@ export default function BeatsPlanPanel() {
           className="text-xs px-3 py-1.5 rounded border border-border hover:bg-secondary inline-flex items-center gap-1.5">
           <RefreshCw size={12} /> Rafraîchir chapitres + beats
         </button>
+      </div>
+
+      <div className="rounded border border-primary/20 bg-primary/5 p-3 text-[11px] text-foreground/85 leading-snug">
+        <p className="editorial-eyebrow mb-1">Flux beats (ordre obligatoire)</p>
+        <ol className="space-y-0.5 list-decimal list-inside">
+          <li><strong>Prévisualiser</strong> = proposition temporaire OpenAI (non enregistrée).</li>
+          <li><strong>Modifier</strong> les beats proposés directement ci-dessous.</li>
+          <li><strong>Enregistrer en base</strong> = upsert dans Supabase (champ beats).</li>
+          <li><strong>Valider pour génération</strong> = approuver comme entrée de génération future.</li>
+        </ol>
+        <p className="mt-1 text-muted-foreground">La validation n'est possible qu'après enregistrement. La génération de chapitre reste bloquée tant que les beats ne sont pas validés.</p>
       </div>
 
       {readError && (
@@ -265,12 +308,26 @@ export default function BeatsPlanPanel() {
 
           <div className="col-span-8 space-y-3">
             {selChapter && (
-              <div>
-                <p className="text-xs text-foreground">
-                  <span className="font-mono text-muted-foreground">#{selChapter.number}</span> {selChapter.title}
-                </p>
-                {selChapter.main_arc && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Arc : {selChapter.main_arc}</p>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="text-xs text-foreground">
+                    <span className="font-mono text-muted-foreground">#{selChapter.number}</span> {selChapter.title}
+                    <span className="ml-2 text-[10px] font-mono text-muted-foreground">id: {selChapter.id.slice(0, 8)}…</span>
+                  </p>
+                  {selChapter.main_arc && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Arc : {selChapter.main_arc}</p>
+                  )}
+                </div>
+                {preview?.chapter_id && (
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                    preview.chapter_id === selected
+                      ? 'border-amber-500/40 bg-amber-500/5 text-amber-700'
+                      : 'border-rose-500/40 bg-rose-500/5 text-rose-700'
+                  }`}>
+                    {preview.chapter_id === selected
+                      ? 'preview · non enregistrée'
+                      : '⚠ preview d\'un autre chapitre'}
+                  </span>
                 )}
               </div>
             )}
@@ -279,23 +336,31 @@ export default function BeatsPlanPanel() {
               <button onClick={runPreview} disabled={loading || persisting || !selected || !mode.canRunNow}
                 className="text-xs px-3 py-1.5 rounded border border-border hover:bg-secondary disabled:opacity-50 inline-flex items-center gap-1.5">
                 {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                Preview beats (chapitre sélectionné)
+                1. Prévisualiser les beats
               </button>
               <button onClick={runPersist} disabled={loading || persisting || !preview?.beats?.length}
                 className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
                 {persisting ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                Persister beats validés
+                2. Enregistrer en base
               </button>
-              <button onClick={validateAll} disabled={validating || persisted.length === 0}
+              <button onClick={validateAll}
+                disabled={validating || persisted.length === 0}
+                title={persisted.length === 0 ? 'Aucun beat en base — enregistrez d\'abord' : 'Approuver ces beats comme entrée de génération'}
                 className="text-xs px-3 py-1.5 rounded border border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/5 disabled:opacity-50 inline-flex items-center gap-1.5">
                 {validating ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
-                Valider tous ({persisted.length})
+                3. Valider pour génération ({persisted.length})
               </button>
               <button onClick={runBatchAll} disabled={batchRunning || !mode.canRunNow}
                 className="text-xs px-3 py-1.5 rounded border border-violet-500/40 text-violet-700 hover:bg-violet-500/5 disabled:opacity-50 inline-flex items-center gap-1.5">
                 {batchRunning ? <Loader2 size={12} className="animate-spin" /> : <Layers size={12} />}
-                Générer pour tous les chapitres ({chapters.length})
+                Prévisualiser pour tous les chapitres ({chapters.length})
               </button>
+              {batch && !batchRunning && (
+                <button onClick={() => { setBatch(null); try { localStorage.removeItem(BATCH_LS_KEY); } catch {} }}
+                  className="text-xs px-3 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+                  <X size={12} /> Effacer batch
+                </button>
+              )}
               {batchRunning && (
                 <button onClick={() => setStopRequested(true)} className="text-xs px-3 py-1.5 rounded border border-rose-500/40 text-rose-700 inline-flex items-center gap-1.5">
                   <StopCircle size={12} /> Stop
