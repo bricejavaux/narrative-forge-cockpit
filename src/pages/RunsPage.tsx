@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { Play, Save, Download, AlertTriangle, Zap, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
-import { isDemoMode } from '@/lib/productionMode';
 
 type ModeDef = { id: string; label: string; live?: boolean; blockers?: string[] };
 
@@ -29,7 +28,7 @@ const ALL_MODES = [...ALLOWED_MODES, ...FUTURE_MODES];
 export default function RunsPage() {
   const [selectedMode, setSelectedMode] = useState<ModeDef>(ALLOWED_MODES[0]);
 
-  const demo = isDemoMode();
+  
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [loadingReadiness, setLoadingReadiness] = useState(true);
 
