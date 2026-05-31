@@ -5,9 +5,10 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
-import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap, Mic } from 'lucide-react';
+import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap, Mic, Info } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { openaiService } from '@/services/openaiService';
+import { isDemoMode } from '@/lib/productionMode';
 
 const subViews = ['Score global', 'Par chapitre', 'Par arc', 'Par personnage', 'Hiérarchie L4 / Walvis Bay', 'Alternance macro/micro', 'Détail par scène', 'Coût par activation', 'Phrase-couteau', 'Trace non-humanisée', 'Brice — ingénieur → gardien', 'Audio review coverage'];
 
@@ -69,7 +70,43 @@ export default function DiagnosticsPage() {
         ))}
       </div>
 
-      {activeView === 'Score global' && (
+      {activeView === 'Score global' && !isDemoMode() && (
+        <div className="cockpit-card p-6 space-y-2">
+          <div className="inline-flex items-center gap-2 text-amber-700">
+            <Info size={14} />
+            <p className="text-sm font-display font-medium">Diagnostic indisponible — données réelles insuffisantes.</p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Aucun score Tome n'est calculé tant que beats validés et chapitres générés ne sont pas disponibles en base.
+            Lancez « Générer un diagnostic live » ci-dessous pour une analyse OpenAI fondée sur les données Supabase actuelles
+            (canon, personnages, beats, chapitres).
+          </p>
+          <div className="pt-2">
+            <button
+              onClick={runLiveDiagnostic}
+              disabled={diagLoading || !openaiReady}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg ${openaiReady ? 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20' : 'border border-border text-muted-foreground opacity-60 cursor-not-allowed'}`}>
+              {diagLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+              {openaiReady ? 'Générer un diagnostic live' : 'OpenAI absent — bouton désactivé'}
+            </button>
+          </div>
+          {liveDiag && (
+            <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2.5">
+              <div className="flex items-center gap-2 mb-1 text-[11px] font-mono">
+                <span className={`px-1.5 py-0.5 rounded border ${liveDiag.mode === 'live' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+                  {liveDiag.mode ?? 'error'}
+                </span>
+                {liveDiag.model && <span className="text-muted-foreground">{liveDiag.model}</span>}
+                {liveDiag.error && <span className="text-rose-600">{liveDiag.error}</span>}
+              </div>
+              <pre className="text-[10px] font-mono whitespace-pre-wrap max-h-64 overflow-auto">{JSON.stringify(liveDiag.diagnostic ?? liveDiag, null, 2)}</pre>
+            </div>
+          )}
+          <NoteComposer target="diagnostic global du tome" compact />
+        </div>
+      )}
+
+      {activeView === 'Score global' && isDemoMode() && (
         <div className="space-y-4">
           {/* Summary card */}
           <div className="grid grid-cols-12 gap-4">
