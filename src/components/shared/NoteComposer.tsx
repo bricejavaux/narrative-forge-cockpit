@@ -77,7 +77,7 @@ export default function NoteComposer({ target, compact = false, targetType, targ
     setTranscribing(true); setErr(null); setTranscript('');
     try {
       const file = new File([blob], `note-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
-      const up = await audioTranscriptionService.uploadAudio(file, targetType || 'generic', targetId);
+      const up = await audioTranscriptionService.uploadAudio(file, targetType || 'generic', targetId, durationMs);
       if (!up.ok) throw new Error('Upload audio échoué: ' + up.error);
       const tr: any = await audioTranscriptionService.transcribe(up.audio_path, up.audio_note_id);
       if (tr?.mode === 'live' && typeof tr.transcript === 'string') {
