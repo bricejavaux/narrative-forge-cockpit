@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle } from 'lucide-react';
+import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle, Play, ExternalLink } from 'lucide-react';
 import { agentsService, type AgentRow, type AgentVersionRow, type AgentBindingRow } from '@/services/agentsService';
 import { supabase } from '@/integrations/supabase/client';
-import { classifyAgentTestability, TESTABILITY_LABEL } from '@/lib/agentTestability';
+import { classifyAgentTestability, TESTABILITY_LABEL, type TestabilityCtx } from '@/lib/agentTestability';
+import { Link } from 'react-router-dom';
 
 export default function PersistedAgentsPanel() {
   const [loading, setLoading] = useState(false);
