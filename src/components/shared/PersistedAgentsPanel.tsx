@@ -221,11 +221,53 @@ export default function PersistedAgentsPanel() {
                 )}
               </div>
 
+              {(() => {
+                const t = classifyAgentTestability(selected, { ...env, bindings: env.bindingsByAgent[selected.id] });
+                const meta = TESTABILITY_LABEL[t.status];
+                const canTest = t.can_run_now;
+                const runTest = async () => {
+                  setTesting(true); setLastRun(null);
+                  try {
+                    const { data, error } = await supabase.functions.invoke('run-execute', {
+                      body: { run_type: 'run_selected_agent', agent_id: selected.id, mode: 'live', instruction: `Test live for ${selected.name}`, payload: { ping: true } },
+                    });
+                    setLastRun(error ? { error: error.message } : data);
+                  } finally { setTesting(false); }
+                };
+                return (
+                  <div className="rounded border border-border p-2 space-y-1.5 bg-secondary/20">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${meta.classes}`}>{meta.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{t.reason}</span>
+                    </div>
+                    {t.blockers.length > 0 && (
+                      <p className="text-[10px] text-amber-700">→ {t.next_action}</p>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button onClick={runTest} disabled={!canTest || testing}
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-emerald-500/40 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-40">
+                        {testing ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />} Test agent (run-execute)
+                      </button>
+                      <Link to="/runs" className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                        <ExternalLink size={10} /> Voir dans Runs
+                      </Link>
+                    </div>
+                    {lastRun && (
+                      <details className="text-[10px]">
+                        <summary className="cursor-pointer text-muted-foreground">Dernier run {lastRun?.run_id ? `· ${String(lastRun.run_id).slice(0, 8)}` : ''}</summary>
+                        <pre className="bg-muted/40 rounded p-1 max-h-32 overflow-auto font-mono">{JSON.stringify(lastRun, null, 2)}</pre>
+                      </details>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="flex items-end gap-2 pt-2 border-t border-border">
-                <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Raison du changement…"
+                <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Raison du changement (obligatoire)…"
                   className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs" />
-                <button onClick={saveVersion} disabled={busy}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 disabled:opacity-40">
+                <button onClick={saveVersion} disabled={busy || !reason.trim()}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 disabled:opacity-40"
+                  title={!reason.trim() ? 'Raison de changement obligatoire' : 'Saver nouvelle version'}>
                   {busy ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Save new version
                 </button>
               </div>
