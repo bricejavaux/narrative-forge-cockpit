@@ -83,6 +83,30 @@ export default function PersistedAgentsPanel() {
     setEditSystem(v?.system_prompt ?? '');
     setEditScript(JSON.stringify(v?.operating_script ?? [], null, 2));
     setReason('');
+    const curModel = a.selected_model ?? a.default_model ?? '';
+    const isKnown = OPENAI_MODELS.some((m) => m.id === curModel);
+    setEditModelId(isKnown ? curModel : (curModel ? CUSTOM_MODEL_OPTION_ID : ''));
+    setEditModelCustom(isKnown ? '' : curModel);
+    setModelReason('');
+  };
+
+  const saveSelectedModel = async () => {
+    if (!selected) return;
+    const newModel = editModelId === CUSTOM_MODEL_OPTION_ID ? editModelCustom.trim() : editModelId;
+    if (!newModel) { setErr('Modèle requis'); return; }
+    setSavingModel(true); setErr(null);
+    try {
+      const previous_model = selected.selected_model ?? selected.default_model ?? null;
+      const prevMeta = (selected as any).metadata ?? {};
+      await agentsService.updateAgent(selected.id, {
+        selected_model: newModel,
+        metadata: { ...prevMeta, last_model_change: { previous_model, new_model: newModel, changed_at: new Date().toISOString(), reason: modelReason || null } },
+      } as any);
+      await load();
+      const refreshed = (await agentsService.list()).find((x) => x.id === selected.id);
+      if (refreshed) await pick(refreshed);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setSavingModel(false); }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
