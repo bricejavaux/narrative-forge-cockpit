@@ -58,7 +58,7 @@ export default function ProductionPage() {
         const tAll = (taskRows.data ?? []).filter((r: any) => r.target_id === c.id);
         const tDone = tAll.filter((r: any) => ['done', 'accepted', 'applied'].includes(r.status)).length;
         const tOpen = tAll.filter((r: any) => ['pending', 'open', 'in_progress'].includes(r.status)).length;
-        byCh[c.id] = computeChapterStageStatuses(c, {
+        byCh[c.id] = getChapterProductionStatus(c, {
           planned: { total: pl.length, complete, validated },
           observed: obs,
           findings: { total: fAll.length, closed: fClosed },
