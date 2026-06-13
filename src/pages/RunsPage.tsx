@@ -300,6 +300,53 @@ export default function RunsPage() {
               )}
             </div>
 
+            {/* Vector retrieval trace — visible whenever the agent run carried retrieval metadata */}
+            {(() => {
+              const res: any = selectedRun.result ?? {};
+              const chunks = Array.isArray(res?.retrieved_chunks) ? res.retrieved_chunks : [];
+              const used = !!res?.vector_context_used;
+              const reqIdx: string[] = Array.isArray(res?.indexes_requested) ? res.indexes_requested : [];
+              const activeIdx: string[] = Array.isArray(res?.indexes_active) ? res.indexes_active : [];
+              const pendingIdx: string[] = Array.isArray(res?.indexes_pending) ? res.indexes_pending : [];
+              if (!reqIdx.length && !chunks.length && !used) return null;
+              const sims = chunks.map((c: any) => Number(c.similarity)).filter((n: number) => !Number.isNaN(n));
+              const simMin = sims.length ? Math.min(...sims) : null;
+              const simMax = sims.length ? Math.max(...sims) : null;
+              const sources = Array.from(new Set(chunks.map((c: any) => c.source_file ?? c.chunk_id).filter(Boolean)));
+              return (
+                <div className="rounded border border-border p-2 bg-secondary/20 text-[11px] space-y-1">
+                  <p className="editorial-eyebrow flex items-center gap-1">Vector retrieval</p>
+                  <p className="font-mono text-[10px]">
+                    used: {used ? 'yes' : 'no'} · top_k cible: {chunks.length} · corpus actifs: {activeIdx.join(', ') || '—'}
+                    {pendingIdx.length > 0 && <> · pending: <span className="text-amber-700">{pendingIdx.join(', ')}</span></>}
+                  </p>
+                  {sims.length > 0 && (
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      similarity range: {simMin?.toFixed(3)} → {simMax?.toFixed(3)}
+                    </p>
+                  )}
+                  {sources.length > 0 && (
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      source files: {sources.slice(0, 8).join(' · ')}{sources.length > 8 ? ` (+${sources.length - 8})` : ''}
+                    </p>
+                  )}
+                  {chunks.length > 0 && (
+                    <details className="text-[10px]">
+                      <summary className="cursor-pointer text-muted-foreground">{chunks.length} chunk(s)</summary>
+                      <ul className="mt-1 space-y-1">
+                        {chunks.map((c: any, i: number) => (
+                          <li key={i} className="border border-border rounded p-1">
+                            <p className="font-mono text-[9px] text-muted-foreground">[{i + 1}] {c.source_file ?? c.chunk_id} · sim={typeof c.similarity === 'number' ? c.similarity.toFixed(3) : '—'}</p>
+                            <p className="text-[10px] text-foreground line-clamp-3">{c.text_excerpt ?? c.text ?? ''}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div>
                 <p className="editorial-eyebrow mb-1">Payload</p>

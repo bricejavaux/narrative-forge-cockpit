@@ -1,93 +1,229 @@
-# Agents + Runs — strict implementation iteration
+# Iteration plan — Audio + pgvector (science_portals) + scientific agent retrieval
 
-Goal: Agents = configure, Runs = execute/trace, Production = produce. No dummy data in Production Test. Every live agent execution goes through `run-execute`.
+Three independent workstreams, shipped in order. Each one is gated by its own
+acceptance tests. Nothing in the "Do not" list is touched: no Follett / SF
+ingestion, no chapter generation, no autonomous rewrite, no silent canon/beat
+mutation, no Chroma migration, no new mock data.
 
-## 1. Inventory & checks (read-only first)
+---
 
-Before writing, verify the actual shapes of the persistence layer to avoid pretending things work:
+## Phase 1 — Audio RLS / Whisper / microphone
 
-- `supabase--read_query` on `information_schema.columns` for: `runs`, `run_outputs`, `audit_findings`, `rewrite_tasks`, `agents`, `agent_versions`, `agent_index_bindings`. Compare to section 13 of the brief; any missing column → migration in step 7.
-- `supabase--read_query` on `pg_policies` for those same tables, confirm `authenticated` can `SELECT` (RunsPage reads them directly).
-- Read `supabase/functions/agents-bootstrap/index.ts` to see what registry it currently seeds. Extend (idempotent upsert on `external_id`) to the 22 agents in section 3.
-- Read `src/components/shared/PersistedAgentsPanel.tsx`, `src/pages/RunsPage.tsx`, `src/lib/openaiModels.ts` to align selectors and model lists.
+### 1.1 Storage + RLS fix (root cause of "row-level security policy" error)
 
-## 2. AgentsPage — drop dummy operational path
+- Confirm `audio` bucket exists (it already does per project state) and keep it private.
+- Migration: add `storage.objects` policies for the `audio` bucket only.
+  Authenticated role: insert/select/update/delete restricted to
+  `bucket_id = 'audio'`. No anon write.
+- Migration: add an INSERT policy on `public.audio_notes` for the
+  `service_role` path used by the upload Edge Function; reads stay as today.
+  (audio_notes already has SELECT for anon — unchanged.)
+- Path convention enforced server-side:
+  `audio/{target_type}/{target_id}/{yyyyMMdd-HHmmss}-{uuid}.webm`.
 
-- Remove `import { agents } from '@/data/dummyData'` and the entire local cards/detail block that consumes it.
-- In Production Test, render only `<PersistedAgentsPanel />` as the operational catalogue.
-- In Demo Mode (explicit), keep the legacy block but wrap it with a clear "Demo only — not used in Production Test" banner. Implementation: extract that JSX to `AgentsDemoCatalogue.tsx` and render it only when `isDemoMode()` is true.
-- Empty state inside `PersistedAgentsPanel`: "Agent registry empty" + button "Initialiser les agents par défaut" → calls `agentsService.bootstrap()` then refetches.
+### 1.2 Edge Function `audio-upload` (preferred option A in the spec)
 
-## 3. agents-bootstrap — full 22-agent registry
+- Accepts: `{ target_type, target_id, target_label, mime_type, duration_seconds, file_size, audio_base64 }`.
+- Validates with Zod, decodes base64, writes to Storage with
+  `SUPABASE_SERVICE_ROLE_KEY`, inserts `public.audio_notes` row with
+  `status = 'uploaded'`, returns `{ audio_note_id, storage_path }`.
+- CORS headers on every response, including errors.
 
-Idempotent upsert by `external_id` for the 22 agents listed in section 3 of the brief, grouped by category (`extraction | generation | audit | diagnostic | rewrite | style | export`), with normalized `status` (`active | future`) and `criticality`. For each agent, upsert one current `agent_versions` row (`is_current = true`, `change_reason = 'initial bootstrap'`) and the relevant `agent_index_bindings` rows (e.g. world/character/arc/science/style/draft).
+### 1.3 Edge Function `openai-transcribe-audio` (fix/replace)
 
-Future agents (chapter_draft, observed_beats, chapter_vs_beats, targeted_rewrite, style_polish, meta_tome_audit, export_preparation) are inserted with `status = 'future'` and `is_active = false` so `classifyAgentTestability` returns `future_disabled`.
+- Input: `{ audio_note_id, storage_path, language? }`.
+- Downloads from Storage (service role) → POSTs to OpenAI `audio/transcriptions`
+  (model `whisper-1` from `app_settings.openai`).
+- Persists transcript in `public.audio_transcripts`, updates `audio_notes.status`
+  to `transcript_ready` (or `transcription_failed` on error, file preserved).
+- Returns the exact envelope from your spec (`mode`, `transcript`, `model`,
+  `provider: 'openai'`, `status`, `warnings`, `errors`).
 
-## 4. Agent Studio cockpit upgrades (inside `PersistedAgentsPanel`)
+### 1.4 Component `AudioOrTextNoteComposer`
 
-- Header summary: total / active / testable_now / blocked / future_disabled / source=Supabase / OpenAI readiness.
-- Filters: category, status, testability, requires_pgvector, can_run_now.
-- Card: name, category, status, testability badge (from `classifyAgentTestability`), selected_model, recommended_model, permission_level, persistence_status, vector_context_status, last_run status.
-- Detail panel sections: Identity / Purpose / Runtime (selected_model dropdown + temperature/max_tokens/reasoning_effort) / Script (system_prompt, operating_script, inputs_schema, outputs_schema — change_reason mandatory) / Dependencies / Governance / Version history (list, compare via side-by-side JSON, restore) / Test–Run (Test agent, Run on target, Open last run).
-- Saving a script change calls `agentsService.saveVersion(agent_id, patch, change_reason)` — already exists.
-- Test/Run buttons call `supabase.functions.invoke('run-execute', { run_type: 'run_selected_agent', agent_id, target_type, target_id, model })`. Never call `openai-agent-run` from this UI.
+- New shared component in `src/components/shared/AudioOrTextNoteComposer.tsx`.
+- Props: `target_type`, `target_id`, `target_label`, `context?`,
+  `default_mode: 'text' | 'microphone' | 'upload'`.
+- State machine matches your status list exactly (`idle`…`failed`).
+- Microphone: real `MediaRecorder` (no fake waveform), webm preferred, timer,
+  in-browser playback before submit, explicit error if `MediaRecorder`
+  unavailable or permission denied.
+- Text path is fully independent: stays "live" even if mic/Whisper are blocked.
+- Calls `audio-upload` → `openai-transcribe-audio` → existing
+  `openai-structure-note`. Structured proposal renders inline with **explicit
+  human validation** (Apply patch / Comment / Rewrite task / Useful no-change
+  / Reject / Edit). No auto-apply.
+- Wired into Production, Architecture, Canon, Characters, Diagnostics, and
+  Audio & Reviews pages — replacing the legacy `NoteComposer` call sites.
+  Runs page stays text-only unless you want it added.
 
-## 5. agentTestability — extend context
+### 1.5 Truthful status badges
 
-Wire real Supabase counts inside `PersistedAgentsPanel` once: chapters / canon_objects / characters / planned-beats / validated-beats / chapters with full_text. Pass to `classifyAgentTestability` along with `openaiReady` and `pgvectorActive`. Add `ready_for_production_workflow` status and `warnings[]` (e.g. science_index recommended). Return value already drives label + blockers.
+- New `src/lib/audioCapabilities.ts` resolves five flags independently:
+  text-structure, mic-capture, audio-upload, whisper, patch-apply.
+- Badge surface in the composer + Audio page shows each one as
+  `live / blocked / unsupported` with the actual reason — never aggregates.
 
-## 6. RunsPage — technical trace layer
+---
 
-Already calls `run-execute`. Tighten:
+## Phase 2 — Minimal pgvector for `science_portals` only
 
-- Top: tabs running / completed / failed / cancelled with counts.
-- New-run form: run_type selector grouped (Available now / Future disabled) — disabled rows show reason from `FUTURE_RUN_TYPES`.
-- Execution console for the active run: status, started_at, finished_at, duration, provider, model, error_message.
-- Outputs panel: summary, findings list (severity badge, recommendation), rewrite_tasks list (pending), raw JSON in collapsible.
-- Governance actions on findings: Accept / Create rewrite task / Mark acceptable / Ignore with reason → updates `audit_findings.status` and optionally inserts a `rewrite_tasks` row (status `pending`, `requires_validation = true`). On rewrite tasks: Edit / Reject / Mark resolved.
+`vector` extension is already installed (operators in db functions list confirm
+it). Existing tables `vector_documents`, `vector_indexes`,
+`vector_source_packages`, `vector_chunks`, `vector_source_chunks` are present
+but don't match the minimal shape your spec asks for; rather than reshape them
+(risk of breaking existing UI), I will:
 
-## 7. Schema/RLS migration (only if section 1 finds gaps)
+- **Reuse** `vector_documents` (already has `embedding vector`, `corpus_name`,
+  `content`, `metadata`).
+- **Add** the missing `public.vector_embeddings` table exactly per spec
+  (id, document_id FK cascade, corpus_name, embedding_model, embedding
+  vector(1536), metadata, created_at) — chosen 1536 to match
+  `text-embedding-3-small`.
+- Indexes: `ivfflat (embedding vector_cosine_ops)`, btree on `corpus_name`,
+  btree on `document_id`.
+- GRANT: SELECT to anon (read-only retrieval visibility), full to
+  authenticated + service_role. RLS enabled, SELECT policy `using (true)`,
+  write policies restricted to authenticated + service_role.
+- A no-op migration `create extension if not exists vector` for idempotency
+  + audit trail.
 
-If `runs` lacks `run_type | agent_version_id | provider | error_message`, or `audit_findings` lacks proper status enum, add a migration adding the missing columns with safe defaults. Keep existing permissive `authenticated USING(true)` policies (per security memory). If any SELECT policy is missing for `audit_findings` / `rewrite_tasks` / `run_outputs`, add it.
+### 2.1 Edge Function `vector-ingest-science-portals`
 
-## 8. run-execute hardening
+- Service-role only. Locates the `science_portals` package row in
+  `vector_source_packages`.
+- Reads `chunks.jsonl` from the OneDrive mirror via the existing connector
+  (gateway path), or from a Supabase `source-files` mirror if already
+  ingested as a source — chosen at runtime by checking what's available;
+  warnings returned if neither is reachable.
+- Generates embeddings via OpenAI `text-embedding-3-small`, batched (e.g.,
+  64 chunks per request).
+- Upserts `vector_documents` (by `(corpus_name, chunk_id)`), upserts
+  `vector_embeddings`, marks package `ingestion_status = 'ingested'` with
+  `embedding_model` + `ingested_at`.
+- Hard refusal for `follett` / `sf_portals_fiction` (returns 400 with reason).
 
-- Accept `agent_version_id` and persist it on the `runs` row.
-- On failure, write `error_message` and a `run_outputs` row of `kind = 'error'` with `{ where, hint }` so the UI can show the exact failing function/table.
-- Reject unknown `run_type` with explicit message (already done).
+### 2.2 Edge Function `vector-search`
 
-## 9. Production ↔ Runs link
+- Input/output exactly per spec.
+- Embeds the query with the **same** model used for the documents
+  (read from `vector_source_packages` row, fallback `text-embedding-3-small`).
+- Pure SQL via RPC or PostgREST: `1 - (embedding <=> query)` as similarity,
+  filtered to requested `corpus_names`, top_k.
+- Explicit error envelope if extension missing or no embeddings present.
 
-`ProductionBeatsWorkshop` "Auditer les beats prévus du chapitre" already calls an agent path; switch it to `supabase.functions.invoke('run-execute', { run_type: 'audit_planned_beats', agent_id: <resolved external_id 'agent_audit_planned_beats'>, target_type: 'chapter', target_id })`. Show resulting findings inline + link "Voir dans Runs → /runs?run_id=…".
+### 2.3 UI surfaces
 
-## 10. Cleanup pass
+- New `PgvectorReadinessPanel` (used in Indexes + Dashboard) — reports the
+  exact six readiness flags from your spec, plus first-corpus selection
+  (`science_portals`) and Chroma marked archive-only.
+- Indexes page rows updated:
+  - `science_portals`: live row with synced/ingested/embeddings count/last
+    ingested + "Tester la recherche" button calling `vector-search`.
+  - `follett`, `sf_portals_fiction`: visible but disabled with the exact
+    rights/policy text from the spec.
+  - Chroma: "archive only / not queried" label.
 
-- `rg openaiService.runAgent` and `rg openai-agent-run` across `src/` — replace any operational UI call by `run-execute`. Keep `openaiService.runAgent` exported for an explicit "Low-level debug" toggle inside Runs only, labelled "Low-level debug only — not persisted."
-- Remove "stubbed orchestration", "vector context pending" pseudo-status pills from operational panels (they remain only inside the Demo catalogue).
+---
 
-## 11. Acceptance verification
+## Phase 3 — Bind scientific agents to `science_portals`
 
-After implementation, run section 20's tests by checking:
-- `PersistedAgentsPanel` empty-state → bootstrap → 22 rows visible.
-- Save new version + restore: read `agent_versions` ordering.
-- `Test agent` creates a `runs` row visible in `RunsPage`.
-- Production audit creates a `runs` row visible in `RunsPage`.
-- `rg` shows no operational UI path importing `openaiService.runAgent` outside the labelled debug component.
+### 3.1 Bindings
 
-## Technical notes
+- Migration: upsert `agent_index_bindings` rows for the six agents you listed
+  (`agent_audit_scientific_density`, `agent_audit_canon_consistency`,
+  `agent_audit_planned_beats`, `agent_validate_beat_quality`,
+  `agent_diagnostic_chapter`, `agent_diagnostic_beats`). The last two do not
+  exist yet under those names — I'll bind by name match if present and report
+  "Not implemented yet — agent slug missing" for any that don't resolve,
+  rather than inventing new agents.
+- `index_name = 'science_portals'`, `corpus_name = 'science_portals'`,
+  `required = false` (degraded mode allowed), `top_k = 5`,
+  `similarity_threshold = 0.2`, `status` driven by readiness.
 
-- Model dropdown list lives in `src/lib/openaiModels.ts`. Add any missing IDs from section 7 (`gpt-5`, `gpt-5.4`, `gpt-5.5`, `o4-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`) with `availability: 'configurable'` for unverified ones so the "Disponibilité non garantie" hint shows automatically.
-- `classifyAgentTestability` already returns blockers + next_action. Just thread real counts.
-- Version compare can be a minimal two-column JSON diff (stringified) — no third-party diff lib.
+### 3.2 `run-execute` retrieval enrichment
 
-## What is explicitly NOT in scope
+- Before calling `openai-agent-run`, if the resolved agent has an active
+  `science_portals` binding and pgvector is live, build a retrieval query
+  from the available target context (chapter title, beat objectives, canon
+  links, scientific_density flags, user instruction), call `vector-search`
+  (top_k=5, capped content size), and inject `retrieved_context` into the
+  agent payload + persist it on `run_steps.metadata` so the Runs page can
+  surface it.
+- If retrieval fails or pgvector isn't ready: continue in degraded mode and
+  surface a `warning` on the run.
+- Agent output prompt is extended (in `openai-agent-run`) to require citation
+  of `source_file` + `chunk_id` for any science claim drawn from retrieved
+  context.
 
-- pgvector wiring
-- chapter full-text generation
-- autonomous rewrite
-- any new top-level page
-- moving Production actions to Runs
-- new mock/demo data
+### 3.3 Agent Studio retrieval section
 
-Output of each phase is verified against acceptance tests before moving on.
+- In `PersistedAgentsPanel`, for each agent with a `science_portals` binding,
+  show: uses pgvector, required, active corpus, last retrieval count (from
+  most recent run step), retrieval status (active / degraded / unavailable),
+  and a "Tester retrieval science_portals" button (query + top_k inputs,
+  shows chunks/similarity/source files).
+
+### 3.4 Production audit badge
+
+- `ProductionBeatsWorkshop` "Audit planned beats" button: before invoking
+  `run-execute`, look up the resolved agent's bindings; render
+  `Contexte scientifique : science_portals actif` or
+  `Contexte scientifique non utilisé` based on actual state, and pass a
+  hint into the run payload. Audit prompt updated to discuss density,
+  unsupported claims, missing detail, and overloading risk.
+
+### 3.5 Runs trace
+
+- `RunsPage` detail view: read `run_steps.metadata.retrieved_context`
+  (corpus_names, top_k, results[]); render a "Vector retrieval" section
+  with chunk count, source files, similarity range, and full raw payload
+  in the collapsible JSON.
+
+### 3.6 Dashboard readiness
+
+- `pgvector` flag becomes `live` only when extension + tables + search
+  function + `science_portals` embeddings_count > 0 all hold.
+- Remove `pgvector pending` from "Chapter Production blockers" once the
+  above is true. Follett/SF stay archive/disabled, never blockers.
+
+---
+
+## What stays "Not implemented yet" by design
+
+- Follett and `sf_portals_fiction` ingestion (rights/policy pending).
+- Chroma migration (archive-only).
+- Chapter draft generation, autonomous rewrite, silent canon/beat edits.
+- `agent_diagnostic_chapter` / `agent_diagnostic_beats` if they don't exist
+  in the registry — surfaced as missing-slug warning rather than fabricated.
+
+## Technical details (review section)
+
+- **Audio MIME**: webm in Chrome/Firefox, mp4/m4a on Safari — both accepted
+  by Whisper; component picks the supported `MediaRecorder` mimeType at
+  runtime.
+- **Edge functions need CORS + Zod validation + service-role downloads**
+  per the cloud-edge-config guidance already in scope.
+- **Embedding dimension**: 1536 chosen to match `text-embedding-3-small`,
+  documented in Settings panel and in the `vector_embeddings.embedding`
+  column type. Switching to a different model later requires a migration.
+- **Existing tables not deleted**: `vector_chunks`,
+  `vector_source_packages`, `vector_indexes`, `vector_source_chunks` stay
+  untouched; only `vector_embeddings` is added.
+- **Bindings table writes** go through the migration tool (schema-safe
+  upsert by `(agent_id, index_name)`).
+- **Run payload size cap**: total retrieved content trimmed to ~6k chars
+  (≈1.5k tokens) before injection, token estimate surfaced on the run.
+
+---
+
+## Order of execution
+
+1. Phase 1.1–1.5 (audio RLS + edge functions + composer + status badges).
+2. Phase 2.1–2.3 (migration, ingest fn, search fn, readiness/indexes UI).
+3. Phase 3.1–3.6 (bindings, run-execute enrichment, Studio/Production/Runs UI,
+   dashboard readiness).
+
+After each phase I'll run the acceptance tests from your spec for that phase
+before moving on, and report any "Not implemented yet" surfaces with the
+exact technical reason.
