@@ -18,6 +18,19 @@ export const vectorIngestionService = {
     return (data ?? []) as VectorIndexRow[];
   },
 
+  /**
+   * Restricted ingestion: only science_portals is allowed in the current
+   * iteration. follett and sf_portals_fiction are explicitly blocked by the
+   * vector-ingest-science-portals wrapper. Callers MUST use this method,
+   * not vector-ingest-package directly.
+   */
+  async ingestSciencePortals(opts: { dry_run?: boolean; limit?: number; embedding_model?: string } = {}) {
+    const { data, error } = await supabase.functions.invoke('vector-ingest-science-portals', { body: opts });
+    if (error) throw error;
+    return data;
+  },
+
+  /** @deprecated use ingestSciencePortals — direct vector-ingest-package usage is no longer permitted from the UI. */
   async ingestPackage(opts: {
     corpus_name: string;
     target_index: string;
@@ -26,9 +39,10 @@ export const vectorIngestionService = {
     embedding_model?: string;
     dry_run?: boolean;
   }) {
-    const { data, error } = await supabase.functions.invoke('vector-ingest-package', { body: opts });
-    if (error) throw error;
-    return data;
+    if (opts.corpus_name !== 'science_portals') {
+      throw new Error(`Corpus "${opts.corpus_name}" désactivé dans cette itération (politique droits/style). Seul science_portals est autorisé.`);
+    }
+    return this.ingestSciencePortals({ dry_run: opts.dry_run, limit: opts.limit, embedding_model: opts.embedding_model });
   },
 
   async search(opts: {
