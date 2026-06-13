@@ -38,10 +38,47 @@ Deno.serve(async (req) => {
     const { data: beats } = await supabase.from('beats').select('*').eq('chapter_id', chapter_id).eq('beat_type', 'planned').order('beat_number');
     const { data: canon } = await supabase.from('canon_objects').select('title,summary,description').limit(15);
 
+    // === Vector context injection (best-effort) ===
+    // Build a compact query from chapter + top beat objectives, search active indexes via vector-search.
+    let vectorContextUsed = false;
+    let vectorChunks: any[] = [];
+    let vectorIndexesActive: string[] = [];
+    let vectorIndexesPending: string[] = [];
+    try {
+      const query = [
+        (chapter as any).title ?? '',
+        ...(beats ?? []).slice(0, 6).map((b: any) => `${b.title ?? ''}: ${b.objective ?? ''}`),
+      ].filter(Boolean).join('\n').slice(0, 2000);
+
+      const { data: indexes } = await supabase.from('vector_indexes').select('name,status').limit(20);
+      const candidateIndexes = (indexes ?? []).map((i: any) => i.name).filter(Boolean);
+
+      for (const indexName of candidateIndexes) {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/vector-search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({ query, index_name: indexName, top_k: 5, min_similarity: 0.25, run_id: caller_run_id }),
+        });
+        if (!res.ok) continue;
+        const j = await res.json();
+        if (j?.mode === 'live' && Array.isArray(j.retrieved_chunks) && j.retrieved_chunks.length > 0) {
+          vectorContextUsed = true;
+          vectorIndexesActive.push(indexName);
+          for (const c of j.retrieved_chunks) vectorChunks.push({ index: indexName, source: c.source_title, text: String(c.chunk_text ?? '').slice(0, 600) });
+        } else if (j?.mode === 'pending_pgvector') {
+          vectorIndexesPending.push(indexName);
+        }
+      }
+    } catch (_) { /* non-fatal */ }
+
+    const contextBlock = vectorContextUsed
+      ? `\n\nContexte vectoriel (extraits validés):\n${vectorChunks.map((c, i) => `[${i + 1}] (${c.index} · ${c.source ?? '?'}) ${c.text}`).join('\n')}`
+      : '';
+
     const prompt = `Génère le texte du chapitre à partir des beats prévus validés et du canon.
 Respecte l'ordre des beats. Style: roman.
 Beats: ${JSON.stringify(beats ?? [])}
-Canon: ${JSON.stringify(canon ?? [])}`;
+Canon: ${JSON.stringify(canon ?? [])}${contextBlock}`;
 
     const ai = await callOpenAI({ user: prompt, model, temperature: 0.7, maxOutputTokens: 4000 });
     if (!ai.ok) return json({ error: ai.error, degraded: true }, 200);
