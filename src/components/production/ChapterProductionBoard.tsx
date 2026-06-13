@@ -1,4 +1,5 @@
 import { STAGE_ORDER, statusColor, type ProductionStatus } from '@/lib/productionDoctrine';
+import { defaultStageMap } from '@/lib/chapterProductionStatus';
 import { Lock } from 'lucide-react';
 
 const STAGES: { id: string; label: string }[] = [
