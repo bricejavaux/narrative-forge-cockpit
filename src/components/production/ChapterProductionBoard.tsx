@@ -33,6 +33,9 @@ export default function ChapterProductionBoard({
   stageStatuses?: Partial<Record<string, ProductionStatus>>;
   selected?: boolean;
 }) {
+  // Defensive: if upstream hasn't computed real stage statuses yet, fall back to a map derived
+  // from the chapter row itself so the card is never fully grey when a chapter exists.
+  const effectiveStatuses = stageStatuses ?? defaultStageMap(chapter);
   return (
     <div className={`cockpit-card space-y-2 ${selected ? 'ring-2 ring-primary/40' : ''}`}>
       <div className="flex items-center justify-between">
