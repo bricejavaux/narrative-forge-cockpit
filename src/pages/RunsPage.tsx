@@ -53,7 +53,7 @@ export default function RunsPage() {
   const [selectedRun, setSelectedRun] = useState<RunRow | null>(null);
   const [outputs, setOutputs] = useState<any[]>([]);
   const [findings, setFindings] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [, setTasks] = useState<any[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   const loadRuns = async () => {
