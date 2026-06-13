@@ -34,13 +34,18 @@ const STATUS_STYLE: Record<CapabilityStatus, string> = {
 };
 
 export function buildCapabilities(r: ConnectionReadiness | null, counts?: { canon: number; characters: number } | null): Capability[] {
-  const pgvOk = !!r?.indexes?.pgvector_ready;
+  const idx = (r as any)?.indexes ?? {};
+  const runs = (r as any)?.runs ?? {};
+  const pgvOk = !!idx.pgvector_ready;
+  const scienceActive = !!idx.science_index_active;
+  const embeddings = Number(idx.science_portals_embeddings_count ?? 0);
   const audioPipelineOk = r?.openai?.transcription_pipeline_status === 'transcription_live';
   const exportsPersist = !!r?.exports?.supabase_export_persistence_available;
   const pdfFuture = r?.exports?.pdf_epub_future ?? true;
   const canonCount = counts?.canon ?? 0;
   const charCount = counts?.characters ?? 0;
   const openaiOk = !!r?.openai?.api_key_configured;
+  const runsLive = !!runs.pipeline_live;
 
   return [
     // -- Production Test blockers (only) --
@@ -90,9 +95,9 @@ export function buildCapabilities(r: ConnectionReadiness | null, counts?: { cano
     {
       key: 'run_persistence',
       name: 'Persistance des runs',
-      status: 'pending',
+      status: runsLive ? 'live' : 'pending',
       phase: 'chapter_production',
-      blocker: 'Orchestrateur runs/run_outputs non implémenté.',
+      blocker: runsLive ? undefined : 'runs/run_outputs non lisibles ou run-execute injoignable.',
       relatedRoute: '/runs',
     },
     {
@@ -105,17 +110,10 @@ export function buildCapabilities(r: ConnectionReadiness | null, counts?: { cano
     },
     {
       key: 'pgvector',
-      name: 'pgvector ingestion',
-      status: pgvOk ? 'live' : 'pending',
+      name: 'pgvector ingestion (science_portals)',
+      status: scienceActive && embeddings > 0 ? 'live' : pgvOk ? 'degraded' : 'pending',
       phase: 'chapter_production',
-      blocker: pgvOk ? undefined : 'pgvector non activé.',
-      relatedRoute: '/indexes',
-    },
-    {
-      key: 'embeddings',
-      name: 'Embeddings vectoriels',
-      status: pgvOk ? 'live' : 'pending',
-      phase: 'chapter_production',
+      blocker: scienceActive && embeddings > 0 ? undefined : `science_index ${scienceActive ? 'actif' : 'inactif'} · embeddings=${embeddings}`,
       relatedRoute: '/indexes',
     },
     // -- Future / intentional --
@@ -123,7 +121,7 @@ export function buildCapabilities(r: ConnectionReadiness | null, counts?: { cano
       key: 'audio_pipeline',
       name: 'Pipeline audio (Whisper)',
       status: audioPipelineOk ? 'live' : 'future',
-      phase: 'future',
+      phase: audioPipelineOk ? 'production_test' : 'future',
       relatedRoute: '/audio',
     },
     {

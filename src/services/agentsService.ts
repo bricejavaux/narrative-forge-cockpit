@@ -19,6 +19,7 @@ export type AgentRow = {
   simulated_cost: string | null;
   is_active: boolean;
   updated_at: string;
+  metadata?: any;
 };
 
 export type AgentVersionRow = {

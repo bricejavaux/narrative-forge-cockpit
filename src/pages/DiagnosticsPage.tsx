@@ -5,10 +5,11 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
-import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap, Mic, Info } from 'lucide-react';
+import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap, Mic, Info, FileEdit, ExternalLink } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
-import { openaiService } from '@/services/openaiService';
+import { supabase } from '@/integrations/supabase/client';
 import { isDemoMode } from '@/lib/productionMode';
+import { Link } from 'react-router-dom';
 
 const subViews = ['Score global', 'Par chapitre', 'Par arc', 'Par personnage', 'Hiérarchie L4 / Walvis Bay', 'Alternance macro/micro', 'Détail par scène', 'Coût par activation', 'Phrase-couteau', 'Trace non-humanisée', 'Brice — ingénieur → gardien', 'Audio review coverage'];
 
@@ -25,25 +26,62 @@ export default function DiagnosticsPage() {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [diagLoading, setDiagLoading] = useState(false);
   const [liveDiag, setLiveDiag] = useState<any>(null);
+  const [liveFindings, setLiveFindings] = useState<any[]>([]);
   useEffect(() => { supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
   const openaiReady = !!readiness?.openai?.api_key_configured;
+  const demo = isDemoMode();
 
   const runLiveDiagnostic = async () => {
-    setDiagLoading(true); setLiveDiag(null);
+    setDiagLoading(true); setLiveDiag(null); setLiveFindings([]);
     try {
-      const res = await openaiService.generateDiagnostic('global');
-      setLiveDiag(res);
+      const { data, error } = await supabase.functions.invoke('run-execute', {
+        body: { run_type: 'diagnostic_tome_live', scope: 'global', mode: 'live' },
+      });
+      if (error) { setLiveDiag({ error: error.message }); return; }
+      setLiveDiag(data);
+      // Pull persisted findings for this run
+      if ((data as any)?.run_id) {
+        const { data: finds } = await supabase.from('audit_findings').select('*').eq('run_id', (data as any).run_id).order('created_at');
+        setLiveFindings(finds ?? []);
+      }
     } catch (e) {
       setLiveDiag({ error: e instanceof Error ? e.message : 'unknown' });
     } finally { setDiagLoading(false); }
   };
 
-  const chapterData = chapters.map((ch) => ({
+  const promoteFinding = async (f: any) => {
+    const instr = window.prompt('Instruction de réécriture (status=pending, jamais auto-appliquée) :', f?.recommendation ?? f?.title ?? '');
+    if (!instr) return;
+    const { error } = await supabase.from('rewrite_tasks').insert({
+      target_type: f?.target_type ?? 'tome', target_id: f?.target_id ?? null,
+      title: String(f?.title ?? 'Rewrite').slice(0, 200),
+      proposal: instr, status: 'pending', requires_validation: true,
+      created_by_agent: 'diagnostic_tome_live',
+      metadata: { source_finding_id: f?.id, run_id: liveDiag?.run_id },
+    });
+    if (error) { window.alert(error.message); return; }
+    await supabase.from('audit_findings').update({ status: 'task_created' }).eq('id', f.id);
+    if (liveDiag?.run_id) {
+      const { data: finds } = await supabase.from('audit_findings').select('*').eq('run_id', liveDiag.run_id).order('created_at');
+      setLiveFindings(finds ?? []);
+    }
+  };
+
+  const updateFindingStatus = async (id: string, status: string) => {
+    await supabase.from('audit_findings').update({ status }).eq('id', id);
+    if (liveDiag?.run_id) {
+      const { data: finds } = await supabase.from('audit_findings').select('*').eq('run_id', liveDiag.run_id).order('created_at');
+      setLiveFindings(finds ?? []);
+    }
+  };
+
+  // Demo-only data — only computed when demo mode is on.
+  const chapterData = demo ? chapters.map((ch) => ({
     name: `Ch.${ch.number}`,
     score: ch.score, tension: ch.tension, sciDensity: ch.sciDensity, emotion: ch.emotion,
-  }));
+  })) : [];
 
-  const openAudioCount = audioNotes.filter((a) => a.treatmentStatus === 'open').length;
+  const openAudioCount = demo ? audioNotes.filter((a) => a.treatmentStatus === 'open').length : 0;
 
   return (
     <div className="space-y-6 animate-slide-in">
