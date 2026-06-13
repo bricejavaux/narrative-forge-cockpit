@@ -245,15 +245,45 @@ export default function PersistedAgentsPanel() {
               </div>
 
               <div className="space-y-1">
-                <p className="editorial-eyebrow flex items-center gap-1"><Database size={9} /> Index bindings</p>
+                <p className="editorial-eyebrow flex items-center gap-1"><Database size={9} /> Index bindings · pgvector</p>
                 {bindings.length === 0 ? <p className="text-[11px] text-muted-foreground">Aucun</p> : (
-                  <div className="flex flex-wrap gap-1">
-                    {bindings.map((b) => (
-                      <span key={b.id} className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border bg-secondary/50">
-                        {b.index_name} · top_k={b.top_k} · sim≥{b.similarity_threshold} · {b.status}
-                      </span>
-                    ))}
+                  <div className="space-y-1">
+                    {bindings.map((b) => {
+                      const isActive = b.status === 'active';
+                      const isPending = b.status === 'pending_pgvector';
+                      const label = isActive ? 'active' : isPending ? 'pending_pgvector' : b.status;
+                      const classes = isActive
+                        ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
+                        : isPending
+                          ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+                          : 'bg-slate-500/10 text-slate-600 border-slate-500/30';
+                      return (
+                        <div key={b.id} className="flex items-center justify-between gap-2 text-[10px] font-mono border border-border rounded px-1.5 py-1 bg-secondary/40">
+                          <span>
+                            {b.index_name} · corpus={b.corpus_name ?? '—'} · top_k={b.top_k} · sim≥{b.similarity_threshold} · required={String(b.required)}
+                          </span>
+                          <span className={`px-1 py-0.5 rounded border ${classes}`}>{label}</span>
+                        </div>
+                      );
+                    })}
                   </div>
+                )}
+                {bindings.some((b) => b.index_name === 'science_index') && (
+                  <button
+                    onClick={async () => {
+                      const q = window.prompt('Query test retrieval science_portals :', 'trou de ver stabilité énergie');
+                      if (!q) return;
+                      const { data, error } = await supabase.functions.invoke('vector-search', {
+                        body: { query: q, index_names: ['science_index'], top_k: 5, similarity_threshold: 0.2 },
+                      });
+                      const payload = error ? { error: error.message } : data;
+                      window.alert(`Résultat retrieval (mode=${(payload as any)?.mode ?? '?'}) — ${(payload as any)?.retrieved_chunks?.length ?? 0} chunk(s)\n\n` +
+                        JSON.stringify(payload, null, 2).slice(0, 2000));
+                    }}
+                    className="text-[10px] font-mono px-2 py-0.5 mt-1 rounded border border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+                  >
+                    Tester retrieval science_portals
+                  </button>
                 )}
               </div>
 
