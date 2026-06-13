@@ -1,4 +1,5 @@
 import { STAGE_ORDER, statusColor, type ProductionStatus } from '@/lib/productionDoctrine';
+import { defaultStageMap } from '@/lib/chapterProductionStatus';
 import { Lock } from 'lucide-react';
 
 const STAGES: { id: string; label: string }[] = [
@@ -32,6 +33,9 @@ export default function ChapterProductionBoard({
   stageStatuses?: Partial<Record<string, ProductionStatus>>;
   selected?: boolean;
 }) {
+  // Defensive: if upstream hasn't computed real stage statuses yet, fall back to a map derived
+  // from the chapter row itself so the card is never fully grey when a chapter exists.
+  const effectiveStatuses = stageStatuses ?? defaultStageMap(chapter);
   return (
     <div className={`cockpit-card space-y-2 ${selected ? 'ring-2 ring-primary/40' : ''}`}>
       <div className="flex items-center justify-between">
@@ -51,7 +55,7 @@ export default function ChapterProductionBoard({
       </div>
       <div className="flex items-center gap-1">
         {STAGES.map((s) => {
-          const status = stageStatuses?.[s.id] ?? 'not_started';
+          const status = effectiveStatuses?.[s.id] ?? 'not_started';
           const c = COLOR[statusColor(status as any)];
           return (
             <div key={s.id} className="flex-1 flex flex-col items-center gap-1" title={`${s.label}: ${status}`}>

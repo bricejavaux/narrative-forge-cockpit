@@ -1,81 +1,149 @@
-# Patch fonctionnel majeur — plan d'exécution
+# Patch de consolidation — Narrative Forge Cockpit
 
-Patch volumineux mais cadré. Aucune refonte UI, aucun dummy réintroduit, validation humaine conservée. Je propose ce découpage en 6 batches livrables séparément, dans cet ordre. Dis-moi simplement "go batch 1" (ou tous) et j'exécute.
+Portée : stabilisation pour passage en test réel. **Pas** de refonte UI, **pas** de dummy data réintroduite, **pas** de bouton sans handler.
 
-## Batch 1 — Socle pgvector (Parties 1 + 2)
-
-Migration Supabase idempotente :
-- `create extension if not exists vector`
-- Compléter `vector_chunks` avec colonnes manquantes (`corpus`, `chunk_ordinal`, `chunk_hash`, `embedding_model`, `updated_at`) + contrainte unique `(corpus, source_path, chunk_hash)` + CHECK non-vide.
-- Index btree (corpus, index_name, source_package_id) + index vectoriel `vector_chunks_embedding_idx` (hnsw si dispo, sinon ivfflat).
-- RPC `match_vector_chunks(query_embedding, match_index_name, match_corpus, match_count, min_similarity)` retournant le schéma demandé (remplace la version actuelle qui n'a pas la signature corpus/min_similarity).
-- RLS : lecture authenticated/anon contrôlée, écriture service_role only.
-
-Edge functions :
-- `vector-ingest-package` : enrichir l'existant avec hashing stable, dry_run réel, blocage explicite `follett` et `sf_portals_fiction` (erreur 403 doctrine), log dans `import_jobs`.
-- `vector-search` : aligner sur nouvelle signature RPC (corpus + min_similarity), forcer `text-embedding-3-small`.
-- `connection-status` : retourner le bloc `pgvector` complet (extension_ready, table_ready, rpc_ready, embedding_count_total, embedding_count_by_index, default_embedding_model, status).
-
-## Batch 2 — UI Indexes (Partie 3)
-
-Refondre `IndexesPage.tsx` (composant existant uniquement) :
-- Header readiness pgvector (4 badges + compteurs).
-- Bloc `science_portals` : statut + Ingest + Dry run + zone test recherche sémantique (input query, top_k, résultats lisibles).
-- Bloc `follett` et `sf_portals_fiction` : carte "ingestion désactivée — droits/usage non validés", pas de bouton actif.
-- Nettoyage du wording obsolète.
-
-## Batch 3 — Agents spécialisés (Parties 4 + 5)
-
-Migration : ajout colonnes manquantes sur `agents` si besoin (`slug`, `category`, `objective`, `recommended_models`, `operating_script`, `index_bindings`, `output_schema`, `requires_openai`, `requires_pgvector`, `version`).
-
-Edge function `agents-bootstrap` étendue : upsert idempotent des 11 agents spécialisés (beat_planner, chapter_writer, audit_planned_beats, audit_chapter_vs_beats, extract_observed_beats, canon_consistency, character_consistency, style_pass, science_density, rewrite_planner, meta_tome_audit). **Champs personnalisés (selected_model, system_prompt édité) préservés** — merge sur champs manquants uniquement, confirmation requise pour overwrite.
-
-`PersistedAgentsPanel.tsx` : afficher catégorie, objectif, modèles recommandés, index bindings + statut pgvector par index, bouton "Tester agent" qui appelle `run-execute` et renvoie run_id/modèle/vector_context_used + lien Runs. Désactivation si requires_pgvector et pgvector non live.
-
-## Batch 4 — Run engine + Runs page (Parties 6 + 7)
-
-`run-execute` consolidé :
-- Charge agent par slug, calcule `effective_model` selon la cascade demandée.
-- Charge contexte Supabase selon `target_type` (chapter/beat/character/canon_object).
-- Si `use_vector_context` : itère `agent.index_bindings`, appelle `vector-search` par binding, agrège `retrieved_chunks_count`.
-- Appel OpenAI, validation JSON best-effort vs `output_schema`.
-- Persiste `runs` (avec `effective_model`, `vector_context_used`, `retrieved_chunks_count`), `run_outputs`, `audit_findings` si présents, `rewrite_tasks` en `pending_review` si présents — jamais d'application auto.
-- Erreur → status failed + stage explicite, pas de fail silencieux.
-
-`RunsPage.tsx` : colonnes manquantes (modèle, vector_context_used, chunks count, duration). Détail run : contexte cible, chunks retrieved, JSON output repliable, findings + boutons "Créer commande corrective" / "Accepter" / "Marquer traité". Deep-link `?run_id=` déjà présent — vérifier qu'il ouvre le détail.
-
-## Batch 5 — Génération de chapitre (Parties 8 + 9 + 10)
-
-Edge function `chapter-generate` réécrite :
-- Préconditions : chapter existe, beats prévus tous `validation_status=validated`, canon/characters accessibles, OpenAI live, pgvector OK si bindings required.
-- Charge contexte vectoriel via bindings de `agent_chapter_writer`.
-- Prompt strict (pas de méta, pas de plan apparent).
-- Sauvegarde : crée `chapter_versions` avant overwrite de `chapters.full_text`, met `production_status=draft_generated`.
-- Crée run + run_output liés.
-
-`ProductionPage.tsx` / `ProductionBeatsWorkshop` :
-- Bouton "Générer chapitre" après beats validés (désactivé sinon, prérequis affichés).
-- Barre d'avancement (étapes contexte → vector → OpenAI → save → run).
-- Après génération : extrait + boutons "Ouvrir chapitre", "Voir run", "Extraire beats observés", "Auditer chapitre vs beats" — aucun déclenchement automatique.
-- Zone "Chapitre généré" : full_text editable, word count, dernier modèle, dernier run_id, statut étendu, lock/unlock conditionnel (full_text + observed extracted OU audit ignoré explicite + 0 finding critique + validation humaine).
-
-Architecture Tome : confirmer read-only (pas de bouton génération/persistance beats), ajouter "Ouvrir dans Production".
-
-## Batch 6 — Diagnostics governance (Partie 11)
-
-`DiagnosticsPage.tsx` : déjà partiellement en place. Compléter pour que chaque recommandation live produise une carte avec 3 actions (Créer commande corrective → `rewrite_tasks` pending_review + source=diagnostic + source_run_id ; Accepter sans action ; Ignorer). Aucune application directe au canon/personnages/chapitre.
-
-## Contraintes appliquées partout
-
-- Aucun "live" sans capacité réellement opérationnelle (status calculé depuis `connection-status`).
-- Pas de masquage d'erreur, pas de pending vague à la place d'un blocked.
-- Aucune écriture sensible côté frontend, tout via Edge Functions.
-- `follett` et `sf_portals_fiction` bloqués au niveau ingest function + UI.
-
-## Acceptance tests (Partie 12)
-
-Tests A-E joués manuellement après chaque batch concerné. Je documente les résultats attendus dans `.lovable/plan.md` au fil de l'eau.
+Le patch est livré en 7 lots cohérents. Chaque lot est atomique : si un lot casse quelque chose, on peut le rollback sans toucher les autres.
 
 ---
 
-**Validation demandée** : confirme "go all" pour exécution séquentielle des 6 batches, ou "go batch N" pour livraison incrémentale. Je recommande l'incrémental : batch 1 d'abord (socle pgvector) pour valider que la couche basse fonctionne avant d'enchaîner.
+## Lot A — Source unique de vérité : statut chapitre + capacités
+
+**Problème** : le Chapter Production Board reste gris parce que chaque composant recalcule son propre statut, et les compteurs « capacités à finaliser » divergent entre Header / Dashboard / Modal.
+
+**Action** :
+- Créer `src/lib/chapterProductionStatus.ts` exportant `getChapterProductionStatus(chapter, beats, auditFindings, rewriteTasks, exports)` retournant `Record<StageId, ProductionStatus>` avec les règles exactes de la spec §2.
+- Créer `src/lib/capabilitiesReadiness.ts` exportant `getCapabilitiesReadiness(readiness)` retournant `{ blocking_production_test, blocking_chapter_production, future_intentional, live, disabled_intentional }`.
+- Brancher `ChapterProductionBoard`, `ProductionFlowPanel`, `Dashboard` et `Header` sur ces deux fonctions. Supprimer les calculs locaux divergents.
+- `CapabilitiesModal` et le badge Header lisent le même objet.
+
+**Acceptation** : board passe au vert dès qu'il y a des beats persistés ; compteur Header = compteur Modal = compteur Dashboard.
+
+---
+
+## Lot B — Dashboard et Architecture : retirer la fabrication
+
+**Dashboard** :
+- Retirer profil utilisateur, cloche, « prochaines actions » non actionnables, doublons production flow, tout bouton de fabrication directe.
+- Garder : connexions, OneDrive repo, Supabase repo (badge live), production flow (même calcul que Production), capacités à finaliser, derniers événements.
+- Cartes = navigation simple vers la page concernée.
+
+**Architecture Tome** :
+- Bannière en haut : « Aucune génération ni persistance ici. Production = atelier de fabrication. »
+- Retirer / désactiver les boutons « Preview OpenAI », « Persister », « Refresh » qui déclenchent du backend.
+- Garder « Rafraîchir les données » (relecture Supabase pure) et ajouter un CTA principal « Ouvrir dans Production ».
+
+---
+
+## Lot C — Production : workflow beats sans bug
+
+**Atelier beats** ordonné : Prévisualiser → Éditer → Persister → Valider → Auditer.
+
+Corrections dans `ProductionBeatsWorkshop` :
+- Preview n'écrit jamais en base ; un nouveau preview **remplace** le preview précédent du chapitre (clear state avant push).
+- Le batch « Prévisualiser tous les chapitres » est déplacé en zone globale (haut de page), retiré de la zone détail.
+- Au changement de chapitre : `useEffect([chapterId])` qui reset `previewBeats` et refetch `persistedBeats` pour le chapitre courant uniquement.
+- Édition manuelle d'un beat : champs `title, objective, narrative_function, tension, consequence, canon_links, status` éditables.
+- Suppression : si beat non persisté → retire du preview ; si persisté → DELETE en base + run.
+- Supprimer la 2e liste de beats redondante en bas.
+- Retirer les flèches haut/bas (faux affordance) sauf si on les branche réellement à un reorder persisté — décision : on les retire.
+
+---
+
+## Lot D — Runs traçables partout
+
+**Backend** : standardiser `runs` + `run_outputs` pour toutes les actions listées §4. Migration : aucune (schéma déjà OK), uniquement enrichir `run-execute` et `beats-persist`/`beats-plan`/`audit-plan`/`chapter-generate` pour qu'ils écrivent un `run_output` systématique.
+
+**Frontend** :
+- Créer helper `src/services/runLinkService.ts` : `withRunLink(action)` retourne `{ runId, outputs[] }` et déclenche un toast avec lien « Voir le run » qui route vers `/runs?run=<id>`.
+- `RunsPage` : ouvrir le détail à partir du query param. Afficher inputs / agent / modèle / contexte / output / erreur.
+- Retirer le label « résultats non sauvegardés » dès lors que la fonction écrit dans runs/run_outputs.
+- Boutons sans backend réel = `disabled` avec tooltip explicite, jamais cachés trompeusement.
+
+---
+
+## Lot E — Agents : modèle persisté + cockpit complet
+
+**Bug central** : changer le modèle ne persiste pas, on retombe sur `gpt-4.1-mini`.
+
+- Vérifier `agentsService.updateAgent` : doit faire un `UPDATE agents SET model = ...` ; à défaut, le créer (edge function `agents-update` si nécessaire pour passer par service role).
+- `run-execute` : résolution modèle = `payload.model ?? agent.model ?? default` (déjà fait au Batch 4, vérifier que `agent.model` est bien lu depuis la table à chaque run).
+- Liste de modèles : `gpt-4.1-mini`, `gpt-4.1`, `gpt-4.1-nano` (centralisée dans `src/lib/openaiModels.ts`).
+- Agent Studio (panneau dans `AgentsPage`) : nom, statut, objectif, modèle (select persisté), prompt système (textarea), script JSON, index bindings, bouton « Tester » (crée run), bouton « Voir dans Runs ».
+- Section « Futurs / désactivés » séparée.
+
+---
+
+## Lot F — pgvector : bindings live + génération avec contexte
+
+- `connection-status` (déjà fait au Batch 1) expose `pgvector.status`. Vérifier que `agent_index_bindings` est lu et que le statut binding = `live` si l'index a des embeddings > 0, sinon `pending_pgvector`.
+- `IndexesPage` : pour chaque index, afficher corpus, chunks, embeddings, dernière ingestion, statut, bouton test recherche. `follett` et `sf_portals_fiction` restent bloqués (déjà OK).
+- `chapter-generate` : appeler `vector-search` pour récupérer le contexte des bindings de `agent_chapter_writer` ; si pgvector indispo, continuer la génération avec un flag `vector_context_used: false` dans le run_output.
+
+---
+
+## Lot G — Génération chapitre : garde-fous + version
+
+`chapter-generate` :
+- Refuse si aucun beat `status=validated` pour le chapitre → 409 avec message.
+- Refuse si `chapter.locked = true` → 409.
+- Crée une ligne `chapter_versions` avec le texte généré.
+- Met à jour `chapters.full_text` uniquement après succès.
+- Écrit un `run` + `run_output` avec `word_count`, `version_id`, `vector_context_used`, `beats_total`, `beats_validated`.
+- Réponse renvoie `run_id` et `version_id` ; l'UI affiche « Voir run » + « Voir chapitre généré ».
+
+Garde-fous équivalents côté UI (bouton désactivé + raison).
+
+---
+
+## Sections couvertes en passant (pas de lot dédié)
+
+- **§8 Diagnostics** : ajouter bouton « Créer commande corrective » sur chaque finding → crée `rewrite_task` (déjà partiellement fait, à compléter sur Diagnostics).
+- **§9 Audio** : rendre les cartes de notes persistées cliquables → ouvre un panneau détail avec transcription, structuration, actions. Pas de changement du pipeline.
+- **§11 Nettoyage** : retirer mentions « dummy », anciens mocks, badges « requires OpenAI » quand la clé est présente.
+
+---
+
+## Hors scope explicite
+
+- Pas de refonte design / palette.
+- Pas de re-ingestion de `follett` ou `sf_portals_fiction`.
+- Pas d'auto-rewrite : la validation humaine reste obligatoire partout.
+- Pas de nouvelle table ; uniquement `chapter_versions` (existe déjà).
+
+---
+
+## Détails techniques
+
+**Fichiers principalement touchés** :
+- `src/lib/chapterProductionStatus.ts` (nouveau)
+- `src/lib/capabilitiesReadiness.ts` (nouveau)
+- `src/components/production/ChapterProductionBoard.tsx`
+- `src/components/production/ProductionBeatsWorkshop.tsx`
+- `src/components/shared/ProductionFlowPanel.tsx`
+- `src/components/shared/CapabilitiesModal.tsx`
+- `src/components/layout/Header.tsx`
+- `src/pages/DashboardPage.tsx`
+- `src/pages/ArchitecturePage.tsx`
+- `src/pages/ProductionPage.tsx`
+- `src/pages/AgentsPage.tsx`
+- `src/pages/RunsPage.tsx`
+- `src/pages/IndexesPage.tsx`
+- `src/pages/DiagnosticsPage.tsx`
+- `src/pages/AudioPage.tsx`
+- `src/services/agentsService.ts`
+- `src/services/runLinkService.ts` (nouveau)
+- `supabase/functions/run-execute/index.ts`
+- `supabase/functions/chapter-generate/index.ts`
+- `supabase/functions/beats-persist/index.ts`, `beats-plan/index.ts`, `audit-plan/index.ts` (ajout run_output systématique)
+
+**Migrations** : aucune.
+
+---
+
+## Plan de livraison
+
+Je propose de livrer en 2 vagues :
+- **Vague 1** : Lots A + B + C (UX stabilisée, board correct, plus de boutons fantômes).
+- **Vague 2** : Lots D + E + F + G (runs partout, modèle persisté, génération chapitre complète).
+
+Confirme **« go vague 1 »**, **« go vague 2 »** ou **« go all »**.

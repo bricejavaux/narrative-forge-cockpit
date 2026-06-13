@@ -10,46 +10,7 @@ import { toast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
 import { Play, Loader2, ExternalLink } from 'lucide-react';
 import type { ProductionStatus } from '@/lib/productionDoctrine';
-
-type StageMap = Partial<Record<string, ProductionStatus>>;
-
-function computeChapterStageStatuses(chapter: any, ctx: {
-  planned: { total: number; complete: number; validated: number };
-  observed: number;
-  findings: { total: number; closed: number };
-  rewriteTasks: { total: number; done: number; open: number };
-}): StageMap {
-  const m: StageMap = {};
-  m.architecture = chapter ? 'validated' : 'not_started';
-  if (ctx.planned.total === 0) m.planned_beats = 'not_started';
-  else if (ctx.planned.complete === ctx.planned.total) m.planned_beats = 'validated';
-  else m.planned_beats = 'draft';
-
-  if (ctx.planned.total === 0) m.beat_validation = 'not_started';
-  else if (ctx.planned.validated === ctx.planned.total) m.beat_validation = 'validated';
-  else m.beat_validation = 'ready_for_review';
-
-  if (chapter?.full_text) m.chapter_generation = 'validated';
-  else if (ctx.planned.total > 0 && ctx.planned.validated === ctx.planned.total) m.chapter_generation = 'ready_for_review';
-  else m.chapter_generation = 'not_started';
-
-  m.observed_beats = ctx.observed > 0 ? 'draft' : 'not_started';
-
-  if (ctx.findings.total === 0) m.chapter_audit = 'not_started';
-  else if (ctx.findings.closed === ctx.findings.total) m.chapter_audit = 'validated';
-  else m.chapter_audit = 'draft';
-
-  if (ctx.rewriteTasks.total === 0) m.targeted_rewrite = 'not_started';
-  else if (ctx.rewriteTasks.done === ctx.rewriteTasks.total) m.targeted_rewrite = 'validated';
-  else m.targeted_rewrite = 'draft';
-
-  if (chapter?.locked) m.chapter_lock = 'locked';
-  else if (chapter?.full_text) m.chapter_lock = 'ready_for_review';
-  else m.chapter_lock = 'not_started';
-
-  m.export = chapter?.locked ? 'export_ready' : 'not_started';
-  return m;
-}
+import { getChapterProductionStatus, type StageMap } from '@/lib/chapterProductionStatus';
 
 export default function ProductionPage() {
   const [stages, setStages] = useState<StageState[]>([]);
@@ -97,7 +58,7 @@ export default function ProductionPage() {
         const tAll = (taskRows.data ?? []).filter((r: any) => r.target_id === c.id);
         const tDone = tAll.filter((r: any) => ['done', 'accepted', 'applied'].includes(r.status)).length;
         const tOpen = tAll.filter((r: any) => ['pending', 'open', 'in_progress'].includes(r.status)).length;
-        byCh[c.id] = computeChapterStageStatuses(c, {
+        byCh[c.id] = getChapterProductionStatus(c, {
           planned: { total: pl.length, complete, validated },
           observed: obs,
           findings: { total: fAll.length, closed: fClosed },
