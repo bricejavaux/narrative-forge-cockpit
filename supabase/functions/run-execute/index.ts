@@ -196,8 +196,25 @@ Deno.serve(async (req) => {
         }
 
         const failed = !!data?.error || data?.mode === 'mock';
-        await finalize(failed ? 'failed' : 'completed', { ...data, stage: failed ? 'openai_agent_failed' : 'completed', agent_name: agentRow?.name ?? null, resolved_model: resolvedModel }, findings.length);
-        return json({ run_id, stage: failed ? 'openai_agent_failed' : 'completed', ...data });
+        const findings_count = findings.length;
+        const rewrite_tasks_count = tasks.length;
+        const vector_context_used = !!data?.vector_context_used;
+        const indexes_active = Array.isArray(data?.indexes_active) ? data.indexes_active : [];
+        const indexes_pending = Array.isArray(data?.indexes_pending) ? data.indexes_pending : [];
+        await finalize(failed ? 'failed' : 'completed', {
+          ...data, stage: failed ? 'openai_agent_failed' : 'completed',
+          agent_name: agentRow?.name ?? null, resolved_model: resolvedModel,
+          effective_model: resolvedModel, agent_id, target_type, target_id,
+          findings_count, rewrite_tasks_count, vector_context_used, indexes_active, indexes_pending,
+        }, findings_count);
+        return json({
+          run_id, run_type, stage: failed ? 'openai_agent_failed' : 'completed',
+          effective_model: resolvedModel, resolved_model: resolvedModel,
+          agent_id, agent_name: agentRow?.name ?? null, target_type, target_id,
+          output_count: 1, findings_count, rewrite_tasks_count,
+          vector_context_used, indexes_active, indexes_pending,
+          ...data,
+        });
       }
 
       if (run_type === 'export_test') {

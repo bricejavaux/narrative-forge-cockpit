@@ -57,7 +57,13 @@ export default function PersistedAgentsPanel() {
         map[b.agent_id].push(b as AgentBindingRow);
       });
       const anyActive = ((allBindings.data ?? []) as any[]).some((b) => b.status === 'active');
-      const openaiReady = !!(oaiSetting.data?.value as any)?.api_key_configured;
+      // Authoritative runtime source = connection-status. Fallback = app_settings.
+      let openaiReady = false;
+      try {
+        const { data: rd } = await supabase.functions.invoke('connection-status', { body: {} });
+        openaiReady = !!(rd as any)?.openai?.api_key_configured && !!(rd as any)?.openai?.agent_runs_available;
+      } catch { /* fall through */ }
+      if (!openaiReady) openaiReady = !!(oaiSetting.data?.value as any)?.api_key_configured;
       setEnv({
         hasChapters: (chCount.count ?? 0) > 0,
         hasCanon: (caCount.count ?? 0) > 0,
@@ -384,11 +390,35 @@ export default function PersistedAgentsPanel() {
                       </Link>
                     </div>
                     {lastRun && (
-                      <details className="text-[10px]">
-                        <summary className="cursor-pointer text-muted-foreground">Dernier run {lastRun?.run_id ? `· ${String(lastRun.run_id).slice(0, 8)}` : ''}</summary>
-                        <pre className="bg-muted/40 rounded p-1 max-h-32 overflow-auto font-mono">{JSON.stringify(lastRun, null, 2)}</pre>
-                      </details>
+                      <div className="text-[10px] space-y-1 border-t border-border pt-1">
+                        {lastRun.error ? (
+                          <p className="text-destructive font-mono">erreur · stage={lastRun.stage ?? '—'} · {lastRun.error}</p>
+                        ) : (
+                          <>
+                            <p className="font-mono">
+                              run_id: <span className="text-foreground">{String(lastRun.run_id ?? '—').slice(0, 8)}</span> ·
+                              stage: <span className="text-foreground">{lastRun.stage ?? '—'}</span> ·
+                              model: <span className="text-foreground">{lastRun.resolved_model ?? lastRun.model ?? '—'}</span>
+                            </p>
+                            <p className="font-mono">
+                              findings: {Array.isArray(lastRun.findings) ? lastRun.findings.length : (lastRun.findings_normalized ?? 0)} ·
+                              vector_context_used: {String(!!lastRun.vector_context_used)}
+                            </p>
+                            {lastRun.summary && <p className="text-foreground/80 italic">{String(lastRun.summary).slice(0, 240)}</p>}
+                            {lastRun.run_id && (
+                              <Link to={`/runs?run_id=${lastRun.run_id}`} className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
+                                <ExternalLink size={10} /> Voir résultat dans Runs
+                              </Link>
+                            )}
+                          </>
+                        )}
+                        <details>
+                          <summary className="cursor-pointer text-muted-foreground">raw</summary>
+                          <pre className="bg-muted/40 rounded p-1 max-h-32 overflow-auto font-mono">{JSON.stringify(lastRun, null, 2)}</pre>
+                        </details>
+                      </div>
                     )}
+
                   </div>
                 );
               })()}

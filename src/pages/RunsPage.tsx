@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Play, Loader2, AlertTriangle, RefreshCcw, CheckCircle2, XCircle, Clock, ListChecks, FileEdit } from 'lucide-react';
 import { agentsService, type AgentRow } from '@/services/agentsService';
@@ -53,8 +54,9 @@ export default function RunsPage() {
   const [selectedRun, setSelectedRun] = useState<RunRow | null>(null);
   const [outputs, setOutputs] = useState<any[]>([]);
   const [findings, setFindings] = useState<any[]>([]);
-  const [, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const loadRuns = async () => {
     const { data } = await supabase.from('runs')
@@ -70,6 +72,19 @@ export default function RunsPage() {
       setChapters(data ?? []); if (data?.[0]) setChapterId(data[0].id);
     });
   }, []);
+
+  // Auto-open run from ?run_id=
+  useEffect(() => {
+    const rid = searchParams.get('run_id');
+    if (!rid) return;
+    if (selectedRun?.id === rid) return;
+    (async () => {
+      const { data } = await supabase.from('runs').select('*').eq('id', rid).maybeSingle();
+      if (data) await openRun(data as RunRow);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
 
   const def = RUN_TYPES.find((r) => r.id === runType)!;
 
@@ -94,15 +109,26 @@ export default function RunsPage() {
 
   const openRun = async (r: RunRow) => {
     setSelectedRun(r);
+    if (searchParams.get('run_id') !== r.id) {
+      const sp = new URLSearchParams(searchParams);
+      sp.set('run_id', r.id);
+      setSearchParams(sp, { replace: true });
+    }
     const [outs, finds, rts] = await Promise.all([
       supabase.from('run_outputs').select('*').eq('run_id', r.id).order('created_at'),
       supabase.from('audit_findings').select('*').eq('run_id', r.id).order('created_at'),
-      supabase.from('rewrite_tasks').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('rewrite_tasks').select('*').order('created_at', { ascending: false }).limit(100),
     ]);
     setOutputs(outs.data ?? []);
     setFindings(finds.data ?? []);
-    setTasks((rts.data ?? []).filter((t: any) => t?.metadata?.run_id === r.id || true).slice(0, 10));
+    // Strict filter: only tasks linked to this run via metadata.run_id or metadata.source_finding_id
+    const findingIds = new Set((finds.data ?? []).map((f: any) => f.id));
+    setTasks((rts.data ?? []).filter((t: any) => {
+      const m = t?.metadata ?? {};
+      return m.run_id === r.id || (m.source_finding_id && findingIds.has(m.source_finding_id));
+    }));
   };
+
 
   const updateFindingStatus = async (id: string, status: string, note?: string) => {
     await supabase.from('audit_findings').update({ status, metadata: { decided_at: new Date().toISOString(), note: note ?? null } }).eq('id', id);
@@ -269,6 +295,42 @@ export default function RunsPage() {
                 selectedRun.status === 'failed' ? 'bg-destructive/10 text-destructive border-destructive/30' :
                 'bg-amber-500/10 text-amber-700 border-amber-500/30'}`}>{selectedRun.status}</span>
             </div>
+
+            {/* Run summary header */}
+            {(() => {
+              const p: any = selectedRun.payload ?? {};
+              const r: any = selectedRun.result ?? {};
+              const model = r.resolved_model ?? p.model ?? r.model ?? '—';
+              const agentName = r.agent_name ?? (p.agent_id ? `agent:${String(p.agent_id).slice(0, 8)}` : '—');
+              const target = p.target_id ? `${p.target_type ?? 'target'}:${String(p.target_id).slice(0, 8)}` : '—';
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] font-mono">
+                  <div className="border border-border rounded p-1.5"><span className="text-muted-foreground">type</span><br/>{p.run_type ?? '—'}</div>
+                  <div className="border border-border rounded p-1.5"><span className="text-muted-foreground">model</span><br/>{model}</div>
+                  <div className="border border-border rounded p-1.5"><span className="text-muted-foreground">agent</span><br/>{agentName}</div>
+                  <div className="border border-border rounded p-1.5"><span className="text-muted-foreground">target</span><br/>{target}</div>
+                </div>
+              );
+            })()}
+
+            {/* Rewrite tasks linked to this run */}
+            <div>
+              <p className="editorial-eyebrow mb-1 flex items-center gap-1"><FileEdit size={10} /> Rewrite tasks liés ({tasks.length})</p>
+              {tasks.length === 0 ? <p className="text-[11px] text-muted-foreground italic">Aucune commande corrective créée depuis ce run.</p> : (
+                <ul className="space-y-1">
+                  {tasks.map((t) => (
+                    <li key={t.id} className="text-[11px] border border-border rounded p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium truncate">{t.title}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground">{t.status} {t.requires_validation ? '· requires_validation' : ''}</span>
+                      </div>
+                      {t.proposal && <p className="text-muted-foreground mt-0.5">{String(t.proposal).slice(0, 240)}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
 
             {/* Findings + governance */}
             <div>
