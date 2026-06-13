@@ -2,31 +2,29 @@ import { useEffect, useState } from 'react';
 import { ChevronDown, Plug, Sparkles, FlaskConical } from 'lucide-react';
 import { project } from '@/data/dummyData';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
-import CapabilitiesModal from '@/components/shared/CapabilitiesModal';
+import CapabilitiesModal, { buildCapabilities } from '@/components/shared/CapabilitiesModal';
 import { getProductionMode, PRODUCTION_MODE_LABEL, PRODUCTION_MODE_TOOLTIP } from '@/lib/productionMode';
 
 export default function Header() {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
+  const [counts, setCounts] = useState<{ canon: number; characters: number } | null>(null);
   const [capsOpen, setCapsOpen] = useState(false);
   useEffect(() => {
     supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null));
+    supabaseService.getProductionCounts()
+      .then(c => setCounts({ canon: c.canon_count, characters: c.characters_count }))
+      .catch(() => setCounts(null));
   }, []);
 
   const openaiOk = !!readiness?.openai?.api_key_configured;
   const onedriveOk = !!readiness?.onedrive?.oauth_configured;
   const supabaseOk = !!readiness?.supabase?.project_connected && !!readiness?.supabase?.tables_created;
-  const pgvectorPending = !readiness?.indexes?.pgvector_ready;
-  const audioPipelinePending = readiness?.openai?.transcription_pipeline_status !== 'transcription_live';
 
-  // Critical capabilities still to finalize (per spec)
-  const gaps = [
-    pgvectorPending && 'pgvector',
-    audioPipelinePending && 'audio_transcription_pipeline',
-    'run_persistence',
-    'chapter_full_text',
-    'autonomous_rewrite',
-    'pdf_docx_epub',
-  ].filter(Boolean) as string[];
+  // Single source of truth — same helper as Dashboard/Modal.
+  // Count only real blockers (production_test + chapter_production), exclude `future` intentionals.
+  const caps = buildCapabilities(readiness, counts);
+  const gaps = caps.filter(c => c.phase !== 'future' && c.status !== 'live').map(c => c.key);
+
 
   const liveCount = (openaiOk ? 1 : 0) + (onedriveOk ? 1 : 0) + (supabaseOk ? 1 : 0);
   const modeLabel = !readiness
