@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle, Play, ExternalLink } from 'lucide-react';
+import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle, Play, ExternalLink, Cpu } from 'lucide-react';
 import { agentsService, type AgentRow, type AgentVersionRow, type AgentBindingRow } from '@/services/agentsService';
 import { supabase } from '@/integrations/supabase/client';
 import { classifyAgentTestability, TESTABILITY_LABEL, type TestabilityCtx } from '@/lib/agentTestability';
+import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID } from '@/lib/openaiModels';
 import { Link } from 'react-router-dom';
 
 export default function PersistedAgentsPanel() {
+  const [editModelId, setEditModelId] = useState<string>('');
+  const [editModelCustom, setEditModelCustom] = useState<string>('');
+  const [modelReason, setModelReason] = useState<string>('');
+  const [savingModel, setSavingModel] = useState(false);
   const [loading, setLoading] = useState(false);
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [selected, setSelected] = useState<AgentRow | null>(null);
@@ -78,6 +83,30 @@ export default function PersistedAgentsPanel() {
     setEditSystem(v?.system_prompt ?? '');
     setEditScript(JSON.stringify(v?.operating_script ?? [], null, 2));
     setReason('');
+    const curModel = a.selected_model ?? a.default_model ?? '';
+    const isKnown = OPENAI_MODELS.some((m) => m.id === curModel);
+    setEditModelId(isKnown ? curModel : (curModel ? CUSTOM_MODEL_OPTION_ID : ''));
+    setEditModelCustom(isKnown ? '' : curModel);
+    setModelReason('');
+  };
+
+  const saveSelectedModel = async () => {
+    if (!selected) return;
+    const newModel = editModelId === CUSTOM_MODEL_OPTION_ID ? editModelCustom.trim() : editModelId;
+    if (!newModel) { setErr('Modèle requis'); return; }
+    setSavingModel(true); setErr(null);
+    try {
+      const previous_model = selected.selected_model ?? selected.default_model ?? null;
+      const prevMeta = (selected as any).metadata ?? {};
+      await agentsService.updateAgent(selected.id, {
+        selected_model: newModel,
+        metadata: { ...prevMeta, last_model_change: { previous_model, new_model: newModel, changed_at: new Date().toISOString(), reason: modelReason || null } },
+      } as any);
+      await load();
+      const refreshed = (await agentsService.list()).find((x) => x.id === selected.id);
+      if (refreshed) await pick(refreshed);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setSavingModel(false); }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
@@ -224,6 +253,42 @@ export default function PersistedAgentsPanel() {
                     })()}
                   </p>
                 </div>
+              </div>
+
+              <div className="rounded border border-primary/30 bg-primary/5 p-2 space-y-1.5">
+                <p className="editorial-eyebrow flex items-center gap-1"><Cpu size={10} /> Éditer le modèle sélectionné</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-1.5">
+                  <select value={editModelId} onChange={(e) => setEditModelId(e.target.value)}
+                    className="text-[11px] px-2 py-1 rounded border border-border bg-background font-mono col-span-1">
+                    <option value="">— choisir —</option>
+                    {OPENAI_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>{m.label} · {m.tier}</option>
+                    ))}
+                    <option value={CUSTOM_MODEL_OPTION_ID}>custom · ID manuel</option>
+                  </select>
+                  {editModelId === CUSTOM_MODEL_OPTION_ID && (
+                    <input value={editModelCustom} onChange={(e) => setEditModelCustom(e.target.value)}
+                      placeholder="ex: gpt-5.5-preview"
+                      className="text-[11px] px-2 py-1 rounded border border-border bg-background font-mono" />
+                  )}
+                  <input value={modelReason} onChange={(e) => setModelReason(e.target.value)}
+                    placeholder="Raison (optionnel)"
+                    className="text-[11px] px-2 py-1 rounded border border-border bg-background" />
+                </div>
+                {editModelId && editModelId !== CUSTOM_MODEL_OPTION_ID && (
+                  <p className="text-[10px] text-muted-foreground italic">
+                    {OPENAI_MODELS.find((m) => m.id === editModelId)?.note ?? ''}
+                  </p>
+                )}
+                <button onClick={saveSelectedModel} disabled={savingModel || !editModelId}
+                  className="text-[11px] px-2 py-1 rounded border border-primary/40 bg-primary/10 text-primary inline-flex items-center gap-1 disabled:opacity-40">
+                  {savingModel ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Enregistrer modèle agent
+                </button>
+                {(selected as any)?.metadata?.last_model_change && (
+                  <p className="text-[10px] font-mono text-muted-foreground">
+                    Dernier changement : {(selected as any).metadata.last_model_change.previous_model ?? '—'} → {(selected as any).metadata.last_model_change.new_model} · {new Date((selected as any).metadata.last_model_change.changed_at).toLocaleString()}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">

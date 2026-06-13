@@ -5,10 +5,11 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import MicButton from '@/components/shared/MicButton';
 import NoteComposer from '@/components/shared/NoteComposer';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
-import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap, Mic, Info } from 'lucide-react';
+import { Sparkles, Wand2, ArrowRight, ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Loader2, Zap, Mic, Info, FileEdit, ExternalLink } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
-import { openaiService } from '@/services/openaiService';
+import { supabase } from '@/integrations/supabase/client';
 import { isDemoMode } from '@/lib/productionMode';
+import { Link } from 'react-router-dom';
 
 const subViews = ['Score global', 'Par chapitre', 'Par arc', 'Par personnage', 'Hiérarchie L4 / Walvis Bay', 'Alternance macro/micro', 'Détail par scène', 'Coût par activation', 'Phrase-couteau', 'Trace non-humanisée', 'Brice — ingénieur → gardien', 'Audio review coverage'];
 
@@ -25,25 +26,62 @@ export default function DiagnosticsPage() {
   const [readiness, setReadiness] = useState<ConnectionReadiness | null>(null);
   const [diagLoading, setDiagLoading] = useState(false);
   const [liveDiag, setLiveDiag] = useState<any>(null);
+  const [liveFindings, setLiveFindings] = useState<any[]>([]);
   useEffect(() => { supabaseService.getReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
   const openaiReady = !!readiness?.openai?.api_key_configured;
+  const demo = isDemoMode();
 
   const runLiveDiagnostic = async () => {
-    setDiagLoading(true); setLiveDiag(null);
+    setDiagLoading(true); setLiveDiag(null); setLiveFindings([]);
     try {
-      const res = await openaiService.generateDiagnostic('global');
-      setLiveDiag(res);
+      const { data, error } = await supabase.functions.invoke('run-execute', {
+        body: { run_type: 'diagnostic_tome_live', scope: 'global', mode: 'live' },
+      });
+      if (error) { setLiveDiag({ error: error.message }); return; }
+      setLiveDiag(data);
+      // Pull persisted findings for this run
+      if ((data as any)?.run_id) {
+        const { data: finds } = await supabase.from('audit_findings').select('*').eq('run_id', (data as any).run_id).order('created_at');
+        setLiveFindings(finds ?? []);
+      }
     } catch (e) {
       setLiveDiag({ error: e instanceof Error ? e.message : 'unknown' });
     } finally { setDiagLoading(false); }
   };
 
-  const chapterData = chapters.map((ch) => ({
+  const promoteFinding = async (f: any) => {
+    const instr = window.prompt('Instruction de réécriture (status=pending, jamais auto-appliquée) :', f?.recommendation ?? f?.title ?? '');
+    if (!instr) return;
+    const { error } = await supabase.from('rewrite_tasks').insert({
+      target_type: f?.target_type ?? 'tome', target_id: f?.target_id ?? null,
+      title: String(f?.title ?? 'Rewrite').slice(0, 200),
+      proposal: instr, status: 'pending', requires_validation: true,
+      created_by_agent: 'diagnostic_tome_live',
+      metadata: { source_finding_id: f?.id, run_id: liveDiag?.run_id },
+    });
+    if (error) { window.alert(error.message); return; }
+    await supabase.from('audit_findings').update({ status: 'task_created' }).eq('id', f.id);
+    if (liveDiag?.run_id) {
+      const { data: finds } = await supabase.from('audit_findings').select('*').eq('run_id', liveDiag.run_id).order('created_at');
+      setLiveFindings(finds ?? []);
+    }
+  };
+
+  const updateFindingStatus = async (id: string, status: string) => {
+    await supabase.from('audit_findings').update({ status }).eq('id', id);
+    if (liveDiag?.run_id) {
+      const { data: finds } = await supabase.from('audit_findings').select('*').eq('run_id', liveDiag.run_id).order('created_at');
+      setLiveFindings(finds ?? []);
+    }
+  };
+
+  // Demo-only data — only computed when demo mode is on.
+  const chapterData = demo ? chapters.map((ch) => ({
     name: `Ch.${ch.number}`,
     score: ch.score, tension: ch.tension, sciDensity: ch.sciDensity, emotion: ch.emotion,
-  }));
+  })) : [];
 
-  const openAudioCount = audioNotes.filter((a) => a.treatmentStatus === 'open').length;
+  const openAudioCount = demo ? audioNotes.filter((a) => a.treatmentStatus === 'open').length : 0;
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -91,15 +129,52 @@ export default function DiagnosticsPage() {
             </button>
           </div>
           {liveDiag && (
-            <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2.5">
-              <div className="flex items-center gap-2 mb-1 text-[11px] font-mono">
-                <span className={`px-1.5 py-0.5 rounded border ${liveDiag.mode === 'live' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
-                  {liveDiag.mode ?? 'error'}
+            <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2.5 space-y-2">
+              <div className="flex items-center gap-2 mb-1 text-[11px] font-mono flex-wrap">
+                <span className={`px-1.5 py-0.5 rounded border ${liveDiag.stage === 'completed' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+                  {liveDiag.stage ?? liveDiag.mode ?? 'error'}
                 </span>
+                {liveDiag.run_id && (
+                  <Link to="/runs" className="text-primary hover:underline inline-flex items-center gap-1">
+                    <ExternalLink size={10} /> run {String(liveDiag.run_id).slice(0, 8)}
+                  </Link>
+                )}
                 {liveDiag.model && <span className="text-muted-foreground">{liveDiag.model}</span>}
+                {liveDiag.findings_normalized != null && <span className="text-muted-foreground">{liveDiag.findings_normalized} finding(s) normalisé(s)</span>}
                 {liveDiag.error && <span className="text-rose-600">{liveDiag.error}</span>}
               </div>
-              <pre className="text-[10px] font-mono whitespace-pre-wrap max-h-64 overflow-auto">{JSON.stringify(liveDiag.diagnostic ?? liveDiag, null, 2)}</pre>
+
+              {liveFindings.length > 0 && (
+                <div className="space-y-1">
+                  <p className="editorial-eyebrow">Findings persistés (audit_findings)</p>
+                  {liveFindings.map((f) => (
+                    <div key={f.id} className="text-[11px] border border-border rounded p-2 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                          f.severity === 'error' ? 'bg-destructive/10 text-destructive border-destructive/30' :
+                          f.severity === 'warn' ? 'bg-amber-500/10 text-amber-700 border-amber-500/30' :
+                          'bg-slate-500/10 text-slate-600 border-slate-500/30'
+                        }`}>{f.severity}</span>
+                        <span className="flex-1 font-medium">{f.title}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground">{f.status}</span>
+                      </div>
+                      {f.detail && <p className="text-muted-foreground">{f.detail}</p>}
+                      {f.recommendation && <p className="text-muted-foreground italic">→ {f.recommendation}</p>}
+                      <div className="flex gap-1 flex-wrap">
+                        <button onClick={() => promoteFinding(f)} className="text-[10px] px-1.5 py-0.5 rounded border border-primary/40 text-primary inline-flex items-center gap-1"><FileEdit size={10} /> Créer commande corrective</button>
+                        <button onClick={() => updateFindingStatus(f.id, 'accepted')} className="text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/40 text-emerald-700">Accepter</button>
+                        <button onClick={() => updateFindingStatus(f.id, 'acceptable_as_is')} className="text-[10px] px-1.5 py-0.5 rounded border border-border">Acceptable</button>
+                        <button onClick={() => updateFindingStatus(f.id, 'ignored')} className="text-[10px] px-1.5 py-0.5 rounded border border-border">Ignorer</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <details className="text-[10px]">
+                <summary className="cursor-pointer text-muted-foreground">Payload brut</summary>
+                <pre className="text-[10px] font-mono whitespace-pre-wrap max-h-64 overflow-auto">{JSON.stringify(liveDiag.diagnostic ?? liveDiag, null, 2)}</pre>
+              </details>
             </div>
           )}
           <NoteComposer target="diagnostic global du tome" compact />
