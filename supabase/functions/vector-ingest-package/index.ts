@@ -23,6 +23,17 @@ async function embedBatch(texts: string[], model: string): Promise<number[][]> {
   return data.data.map((d: any) => d.embedding);
 }
 
+const BLOCKED_CORPUS: Record<string, string> = {
+  follett: 'Corpus privé de style — ingestion désactivée tant que droits/usage ne sont pas validés.',
+  sf_portals_fiction: 'Corpus privé / fiction de référence — ingestion désactivée tant que droits/usage ne sont pas validés.',
+};
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
@@ -36,6 +47,15 @@ Deno.serve(async (req) => {
 
     if (!corpus_name || !target_index) {
       return json({ ok: false, error: 'corpus_name and target_index are required' }, 400);
+    }
+
+    if (BLOCKED_CORPUS[corpus_name]) {
+      return json({
+        ok: false,
+        error: 'corpus_blocked_by_doctrine',
+        corpus_name,
+        reason: BLOCKED_CORPUS[corpus_name],
+      }, 403);
     }
 
     const supa = createClient(
