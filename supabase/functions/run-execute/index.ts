@@ -35,9 +35,6 @@ Deno.serve(async (req) => {
       return json({ error: 'run_type_not_available_yet', stage: 'validation', run_type, reason: 'Future run type — disabled in this iteration.' }, 400);
     }
 
-    const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    const started = new Date().toISOString();
-
     const { agent_id: rawAgentId = null, agent_slug = null, target_type = null, target_id = null, scope = null, mode = 'live', model: bodyModel = null, payload = {}, instruction = null } = body ?? {};
 
     const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
