@@ -1,62 +1,93 @@
-# Phase 2D — UX role clarification & workflow correction
+# Agents + Runs — strict implementation iteration
 
-Scope: enforce page-role doctrine, kill duplicate UI, make Production the single workshop, fix audio truthfulness, seed the agent registry, improve planned-beats UX. **No pgvector, no chapter text generation, no autonomous rewrite, no Chroma migration.**
+Goal: Agents = configure, Runs = execute/trace, Production = produce. No dummy data in Production Test. Every live agent execution goes through `run-execute`.
 
-Work is split into 5 waves so each can be reviewed independently. I will execute them sequentially, posting a short progress note between waves.
+## 1. Inventory & checks (read-only first)
 
----
+Before writing, verify the actual shapes of the persistence layer to avoid pretending things work:
 
-## Wave A — Dashboard + Supabase Repository + Capabilities consistency
+- `supabase--read_query` on `information_schema.columns` for: `runs`, `run_outputs`, `audit_findings`, `rewrite_tasks`, `agents`, `agent_versions`, `agent_index_bindings`. Compare to section 13 of the brief; any missing column → migration in step 7.
+- `supabase--read_query` on `pg_policies` for those same tables, confirm `authenticated` can `SELECT` (RunsPage reads them directly).
+- Read `supabase/functions/agents-bootstrap/index.ts` to see what registry it currently seeds. Extend (idempotent upsert on `external_id`) to the 22 agents in section 3.
+- Read `src/components/shared/PersistedAgentsPanel.tsx`, `src/pages/RunsPage.tsx`, `src/lib/openaiModels.ts` to align selectors and model lists.
 
-Targets: `DashboardPage.tsx`, `SupabaseRepositoryPanel.tsx`, `CapabilitiesModal.tsx`, `Header.tsx`.
+## 2. AgentsPage — drop dummy operational path
 
-- Dashboard: remove any remaining profile icon / "next best action" / fake activity / fake health / fake recent runs / weak chapters / cost-latency mocks. Keep readiness, OneDrive panel, Supabase panel, compact `ProductionFlowPanel`, `ImportReconcilePanel`, capabilities/blockers.
-- Merge "Sources" + "État des connexions" if duplicated.
-- `SupabaseRepositoryPanel`: add a prominent green **"Supabase live"** badge when core tables (`canon_objects`, `characters`, `import_jobs`, `chapters` if started) are readable, regardless of optional/phase-2 table state. Move raw JSON diagnostic into a collapsed "Diagnostic technique avancé" block (hidden by default when core OK).
-- Capabilities: ensure compact card and modal share one source of truth (single helper computing the 3 groups) so counts always match.
+- Remove `import { agents } from '@/data/dummyData'` and the entire local cards/detail block that consumes it.
+- In Production Test, render only `<PersistedAgentsPanel />` as the operational catalogue.
+- In Demo Mode (explicit), keep the legacy block but wrap it with a clear "Demo only — not used in Production Test" banner. Implementation: extract that JSX to `AgentsDemoCatalogue.tsx` and render it only when `isDemoMode()` is true.
+- Empty state inside `PersistedAgentsPanel`: "Agent registry empty" + button "Initialiser les agents par défaut" → calls `agentsService.bootstrap()` then refetches.
 
-## Wave B — Production page: single chain, board legend, lock tooltip
+## 3. agents-bootstrap — full 22-agent registry
 
-Targets: `ProductionPage.tsx`, `ProductionFlowDiagram.tsx`, `ChapterProductionBoard.tsx`, `LockReopenButton.tsx`, `StageCard.tsx`.
+Idempotent upsert by `external_id` for the 22 agents listed in section 3 of the brief, grouped by category (`extraction | generation | audit | diagnostic | rewrite | style | export`), with normalized `status` (`active | future`) and `criticality`. For each agent, upsert one current `agent_versions` row (`is_current = true`, `change_reason = 'initial bootstrap'`) and the relevant `agent_index_bindings` rows (e.g. world/character/arc/science/style/draft).
 
-- Remove the duplicated 12-stage grid (`stages.map(StageCard)`). Keep only `ProductionFlowDiagram` as the single clickable chain. Clicking a stage scrolls to + highlights the corresponding section below (chapter board / beats workshop / validation panels).
-- `ChapterProductionBoard`: add color legend (green validated, amber pending, red blocked, blue active, grey future). Each card shows: number, title, plan/beats/validation/audit/lock status, next allowed action. Card click selects chapter (already wired) — confirm visual feedback.
-- Add tooltip on every "verrouillé" badge with the doctrine wording about lock semantics + reopen consequence.
+Future agents (chapter_draft, observed_beats, chapter_vs_beats, targeted_rewrite, style_polish, meta_tome_audit, export_preparation) are inserted with `status = 'future'` and `is_active = false` so `classifyAgentTestability` returns `future_disabled`.
 
-## Wave C — Planned beats workshop: guided modes + model dropdown + batch
+## 4. Agent Studio cockpit upgrades (inside `PersistedAgentsPanel`)
 
-Targets: `BeatsPlanPanel.tsx`, `beatsService.ts`, `supabase/functions/beats-plan/index.ts` (light, only to accept mode key if needed).
+- Header summary: total / active / testable_now / blocked / future_disabled / source=Supabase / OpenAI readiness.
+- Filters: category, status, testability, requires_pgvector, can_run_now.
+- Card: name, category, status, testability badge (from `classifyAgentTestability`), selected_model, recommended_model, permission_level, persistence_status, vector_context_status, last_run status.
+- Detail panel sections: Identity / Purpose / Runtime (selected_model dropdown + temperature/max_tokens/reasoning_effort) / Script (system_prompt, operating_script, inputs_schema, outputs_schema — change_reason mandatory) / Dependencies / Governance / Version history (list, compare via side-by-side JSON, restore) / Test–Run (Test agent, Run on target, Open last run).
+- Saving a script change calls `agentsService.saveVersion(agent_id, patch, change_reason)` — already exists.
+- Test/Run buttons call `supabase.functions.invoke('run-execute', { run_type: 'run_selected_agent', agent_id, target_type, target_id, model })`. Never call `openai-agent-run` from this UI.
 
-- Replace free-text mode input with a card grid of 8 recommended modes (default: **Balanced narrative beats**). Each card shows description, when to use, detail level, recommended model, cost/latency hint, requires-pgvector flag, can-run-now flag.
-- Replace free-text model input with a `Select` dropdown (gpt-4.1-nano / mini / 4.1, o4-mini, gpt-5 configurable, gpt-5.4, gpt-5.5, custom). Show warning for "configurable" models.
-- Add batch actions: "Generate beats for all chapters" (sequential with progress `Chapter i/N`, stop button, per-chapter success/fail), "Persist all reviewed", "Validate all" (always behind confirm dialog).
-- Never auto-validate.
+## 5. agentTestability — extend context
 
-## Wave D — Audio truthfulness + shared composer + Architecture role
+Wire real Supabase counts inside `PersistedAgentsPanel` once: chapters / canon_objects / characters / planned-beats / validated-beats / chapters with full_text. Pass to `classifyAgentTestability` along with `openaiReady` and `pgvectorActive`. Add `ready_for_production_workflow` status and `warnings[]` (e.g. science_index recommended). Return value already drives label + blockers.
 
-Targets: `AudioPage.tsx`, `MicButton.tsx`, new `AudioOrTextNoteComposer.tsx`, `ArchitecturePage.tsx`.
+## 6. RunsPage — technical trace layer
 
-- `AudioOrTextNoteComposer` shared component exposing 4 capability rows (text / upload / mic / transcription) each with live|pending badge. Mic button disabled with explicit reason until MediaRecorder is implemented.
-- Replace ad-hoc audio entry points in Canon / Characters / Architecture / Production / Audio with this composer.
-- `ArchitecturePage`: any button that performs production work becomes "Open in Production" (route to /production with chapter id).
+Already calls `run-execute`. Tighten:
 
-## Wave E — Agent registry seed + Runs simplification + Exports auto + Settings
+- Top: tabs running / completed / failed / cancelled with counts.
+- New-run form: run_type selector grouped (Available now / Future disabled) — disabled rows show reason from `FUTURE_RUN_TYPES`.
+- Execution console for the active run: status, started_at, finished_at, duration, provider, model, error_message.
+- Outputs panel: summary, findings list (severity badge, recommendation), rewrite_tasks list (pending), raw JSON in collapsible.
+- Governance actions on findings: Accept / Create rewrite task / Mark acceptable / Ignore with reason → updates `audit_findings.status` and optionally inserts a `rewrite_tasks` row (status `pending`, `requires_validation = true`). On rewrite tasks: Edit / Reject / Mark resolved.
 
-Targets: `AgentsPage.tsx`, `PersistedAgentsPanel.tsx`, `agentsService.ts`, `supabase/functions/agents-bootstrap/index.ts`, `RunsPage.tsx`, `ExportsPage.tsx`, `SettingsPage.tsx`, `DiagnosticsPage.tsx`.
+## 7. Schema/RLS migration (only if section 1 finds gaps)
 
-- Agents: when list is empty show empty state + **"Initialiser les agents par défaut"** button calling `agents-bootstrap`. Bootstrap function seeds the 20 default agents with `is_active`, description, operating script stub, selected/recommended models, IO schemas, required-data flags, testable-now flag, persistence policy, human-validation rule. Current 6 marked active; future 7 marked inactive.
-- Runs: reorganize into 4 sections — Real run history / Available advanced runs / Blocked-or-future runs / Technical payload preview. Each run click shows progress, model, started_at, status, logs, result. Remove the second "production cockpit" framing.
-- Diagnostics: each recommendation gets actions (accept / reject / mark acceptable / create rewrite task / create beat adjustment / create canon impact / ignore-with-reason). No auto-apply.
-- Exports: standard export tiles (Canon / Characters / Chapter plan / Beats / Production state / Full JSON) load from Supabase and produce txt/md/json preview + download + optional OneDrive push. Keep manual paste only under "Custom manual export". Chroma stays archive-only.
-- Settings: remove obsolete `.env` warning, keep one-line note about runtime secrets. Make narrative sliders persistent (Supabase `project_settings` row or localStorage fallback) and reused later by beats generation.
+If `runs` lacks `run_type | agent_version_id | provider | error_message`, or `audit_findings` lacks proper status enum, add a migration adding the missing columns with safe defaults. Keep existing permissive `authenticated USING(true)` policies (per security memory). If any SELECT policy is missing for `audit_findings` / `rewrite_tasks` / `run_outputs`, add it.
 
----
+## 8. run-execute hardening
+
+- Accept `agent_version_id` and persist it on the `runs` row.
+- On failure, write `error_message` and a `run_outputs` row of `kind = 'error'` with `{ where, hint }` so the UI can show the exact failing function/table.
+- Reject unknown `run_type` with explicit message (already done).
+
+## 9. Production ↔ Runs link
+
+`ProductionBeatsWorkshop` "Auditer les beats prévus du chapitre" already calls an agent path; switch it to `supabase.functions.invoke('run-execute', { run_type: 'audit_planned_beats', agent_id: <resolved external_id 'agent_audit_planned_beats'>, target_type: 'chapter', target_id })`. Show resulting findings inline + link "Voir dans Runs → /runs?run_id=…".
+
+## 10. Cleanup pass
+
+- `rg openaiService.runAgent` and `rg openai-agent-run` across `src/` — replace any operational UI call by `run-execute`. Keep `openaiService.runAgent` exported for an explicit "Low-level debug" toggle inside Runs only, labelled "Low-level debug only — not persisted."
+- Remove "stubbed orchestration", "vector context pending" pseudo-status pills from operational panels (they remain only inside the Demo catalogue).
+
+## 11. Acceptance verification
+
+After implementation, run section 20's tests by checking:
+- `PersistedAgentsPanel` empty-state → bootstrap → 22 rows visible.
+- Save new version + restore: read `agent_versions` ordering.
+- `Test agent` creates a `runs` row visible in `RunsPage`.
+- Production audit creates a `runs` row visible in `RunsPage`.
+- `rg` shows no operational UI path importing `openaiService.runAgent` outside the labelled debug component.
 
 ## Technical notes
 
-- No DB migration required for waves A–D. Wave E may add a tiny `project_settings` table (single-row, no auth) for the narrative sliders — I will request approval via the migration tool when we reach it.
-- `agents-bootstrap` already exists; I will extend its seed list rather than rewriting it.
-- Sequential batch beat generation uses existing `beats-plan` edge function in a JS loop; no edge changes needed.
-- All color tokens via existing semantic Tailwind tokens.
+- Model dropdown list lives in `src/lib/openaiModels.ts`. Add any missing IDs from section 7 (`gpt-5`, `gpt-5.4`, `gpt-5.5`, `o4-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`) with `availability: 'configurable'` for unverified ones so the "Disponibilité non garantie" hint shows automatically.
+- `classifyAgentTestability` already returns blockers + next_action. Just thread real counts.
+- Version compare can be a minimal two-column JSON diff (stringified) — no third-party diff lib.
 
-I'll start with **Wave A** as soon as you approve.
+## What is explicitly NOT in scope
+
+- pgvector wiring
+- chapter full-text generation
+- autonomous rewrite
+- any new top-level page
+- moving Production actions to Runs
+- new mock/demo data
+
+Output of each phase is verified against acceptance tests before moving on.
