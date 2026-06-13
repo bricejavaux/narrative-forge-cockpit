@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Loader2, RefreshCw, Sparkles, AlertTriangle, X, Save, ShieldCheck, Layers,
-  StopCircle, Plus, Copy, Trash2, ArrowUp, ArrowDown, ClipboardCheck,
+  StopCircle, Plus, Copy, Trash2, ClipboardCheck,
 } from 'lucide-react';
 import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID } from '@/lib/openaiModels';
 import {
