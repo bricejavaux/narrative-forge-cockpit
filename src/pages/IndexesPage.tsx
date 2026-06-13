@@ -61,6 +61,7 @@ export default function IndexesPage() {
 
       <PgvectorReadinessPanel />
       <SciencePortalsIngestionPanel />
+      <BlockedCorpusCards />
 
       <div className="space-y-3">
         <div>
