@@ -34,9 +34,7 @@ export const openaiService = {
     current_text?: string,
     opts?: RunOptions,
   ) => invoke('openai-suggest-rewrite', { target_type, target_id, instruction, current_text, ...opts }),
-  runAgent: (
-    agent_id: string,
-    payload: Record<string, unknown>,
-    opts?: RunOptions & { instruction?: string; system?: string; qualityProfile?: string; parameters?: Record<string, unknown> },
-  ) => invoke('openai-agent-run', { agent_id, payload, ...opts }),
+  // runAgent removed: all persisted agent executions must go through the
+  // run-execute edge function (which writes a `runs` row visible in Runs).
+  // Direct openai-agent-run invocations from the client are forbidden.
 };
