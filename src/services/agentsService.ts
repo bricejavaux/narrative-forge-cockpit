@@ -132,8 +132,8 @@ export const agentsService = {
   },
 
   async updateAgent(id: string, patch: Partial<AgentRow>) {
-    const { error } = await supabase.from('agents').update(patch).eq('id', id);
+    const { data, error } = await supabase.from('agents').update(patch).eq('id', id).select().maybeSingle();
     if (error) throw error;
-    return { ok: true };
+    return { ok: true, row: (data ?? null) as AgentRow | null };
   },
 };

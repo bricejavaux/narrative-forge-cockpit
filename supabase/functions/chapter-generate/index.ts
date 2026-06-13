@@ -8,12 +8,18 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const { chapter_id, model } = await req.json();
+    const body = await req.json();
+    const { chapter_id, model, run_id } = body ?? {};
+    const caller_run_id: string | null = run_id ?? null;
     if (!chapter_id) return json({ error: 'chapter_id required' }, 400);
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: chapter } = await supabase.from('chapters').select('id,number,title').eq('id', chapter_id).maybeSingle();
+    const { data: chapter } = await supabase.from('chapters').select('id,number,title,locked,full_text').eq('id', chapter_id).maybeSingle();
     if (!chapter) return json({ error: 'chapter not found' }, 404);
+    if ((chapter as any).locked) {
+      return json({ error: 'Chapitre verrouillé : déverrouiller avant régénération.', blocked: true, locked: true }, 409);
+    }
+
 
     // GATE: validated planned beats required
     const { data: planned } = await supabase.from('beats').select('id,validation_status').eq('chapter_id', chapter_id).eq('beat_type', 'planned');
@@ -67,10 +73,24 @@ Canon: ${JSON.stringify(canon ?? [])}`;
       metadata: { model: ai.model, version: nextVersion },
     });
 
-    // Best-effort: link to caller run (when invoked from run-execute)
-    const caller_run_id = (await req.clone().json().catch(() => ({})))?.run_id ?? null;
     const word_count = (ai.text ?? '').split(/\s+/).filter(Boolean).length;
     const preview = (ai.text ?? '').slice(0, 600);
+
+    // Best-effort: write a run_output entry if invoked from a tracked run.
+    if (caller_run_id) {
+      await supabase.from('run_outputs').insert({
+        run_id: caller_run_id,
+        output_type: 'chapter_generation',
+        payload: {
+          chapter_id, version: nextVersion, version_id: ver.id,
+          model: ai.model, word_count,
+          beats_total: total, beats_validated: validated,
+          vector_context_used: false,
+          full_text_preview: preview,
+        },
+      }).then(() => {}, () => {});
+      await supabase.from('runs').update({ status: 'success', completed_at: new Date().toISOString() } as any).eq('id', caller_run_id).then(() => {}, () => {});
+    }
 
     return json({
       ok: true,
@@ -83,6 +103,7 @@ Canon: ${JSON.stringify(canon ?? [])}`;
       run_id: caller_run_id,
       beats_total: total,
       beats_validated: validated,
+      vector_context_used: false,
     });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'unknown' }, 500);
