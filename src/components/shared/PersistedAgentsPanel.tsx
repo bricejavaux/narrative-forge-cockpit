@@ -57,7 +57,13 @@ export default function PersistedAgentsPanel() {
         map[b.agent_id].push(b as AgentBindingRow);
       });
       const anyActive = ((allBindings.data ?? []) as any[]).some((b) => b.status === 'active');
-      const openaiReady = !!(oaiSetting.data?.value as any)?.api_key_configured;
+      // Authoritative runtime source = connection-status. Fallback = app_settings.
+      let openaiReady = false;
+      try {
+        const { data: rd } = await supabase.functions.invoke('connection-status', { body: {} });
+        openaiReady = !!(rd as any)?.openai?.api_key_configured && !!(rd as any)?.openai?.agent_runs_available;
+      } catch { /* fall through */ }
+      if (!openaiReady) openaiReady = !!(oaiSetting.data?.value as any)?.api_key_configured;
       setEnv({
         hasChapters: (chCount.count ?? 0) > 0,
         hasCanon: (caCount.count ?? 0) > 0,
