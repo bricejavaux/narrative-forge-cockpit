@@ -173,15 +173,19 @@ export default function PersistedAgentsPanel() {
               >
                 <div className="flex items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <Bot size={10} className="text-primary shrink-0" />
+                    <Bot size={10} className={a.is_active ? 'text-primary shrink-0' : 'text-muted-foreground shrink-0 opacity-50'} />
                     <span className="text-foreground truncate">{a.name}</span>
                   </div>
                   <span className={`text-[9px] font-mono px-1 py-0.5 rounded border shrink-0 ${meta.classes}`} title={t.reason}>
                     {meta.label}
                   </span>
                 </div>
-                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
-                  {a.selected_model ?? a.default_model ?? '—'} · {a.persistence_status ?? 'suggestions_only'}
+                <p className="text-[10px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1 flex-wrap">
+                  <span className={`px-1 py-0 rounded ${a.is_active ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-500/10 text-slate-500'}`}>
+                    {a.is_active ? 'active' : 'inactive'}
+                  </span>
+                  <span className="truncate">{a.selected_model ?? a.default_model ?? '—'}</span>
+                  <span className="text-muted-foreground/70">· {a.external_id ?? '—'}</span>
                 </p>
               </button>
               );
@@ -193,12 +197,32 @@ export default function PersistedAgentsPanel() {
               <div className="flex items-center justify-between">
                 <p className="font-display text-sm text-foreground">{selected.name}</p>
                 <div className="flex gap-1">
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${selected.is_active ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-slate-500/10 text-slate-500 border-slate-500/30'}`}>
+                    {selected.is_active ? 'active' : 'inactive'}
+                  </span>
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-secondary text-muted-foreground border-border">
                     v{version?.version_number ?? '—'} {version?.is_current ? '(current)' : ''}
                   </span>
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-amber/10 text-amber border-amber/30">
                     {selected.vector_context_status}
                   </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="rounded border border-border p-1.5 bg-secondary/20">
+                  <p className="editorial-eyebrow text-[9px]">Modèle sélectionné</p>
+                  <p className="font-mono text-foreground">{selected.selected_model ?? selected.default_model ?? '—'}</p>
+                </div>
+                <div className="rounded border border-border p-1.5 bg-secondary/20">
+                  <p className="editorial-eyebrow text-[9px]">Modèles recommandés</p>
+                  <p className="font-mono text-foreground truncate" title={JSON.stringify(version?.model_recommendations ?? {})}>
+                    {(() => {
+                      const m = (version?.model_recommendations ?? {}) as Record<string, unknown>;
+                      const vals = Object.values(m).filter(Boolean) as string[];
+                      return vals.length ? vals.join(' · ') : '—';
+                    })()}
+                  </p>
                 </div>
               </div>
 
