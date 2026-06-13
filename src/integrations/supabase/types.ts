@@ -2602,6 +2602,7 @@ export type Database = {
       }
       vector_chunks: {
         Row: {
+          chunk_hash: string | null
           chunk_id: string | null
           chunk_number: number | null
           corpus_name: string | null
@@ -2616,6 +2617,8 @@ export type Database = {
           rights: string | null
           source_file: string | null
           source_id: string | null
+          source_package_id: string | null
+          source_title: string | null
           target_index: string | null
           text: string | null
           text_excerpt: string | null
@@ -2623,6 +2626,7 @@ export type Database = {
           usage: string | null
         }
         Insert: {
+          chunk_hash?: string | null
           chunk_id?: string | null
           chunk_number?: number | null
           corpus_name?: string | null
@@ -2637,6 +2641,8 @@ export type Database = {
           rights?: string | null
           source_file?: string | null
           source_id?: string | null
+          source_package_id?: string | null
+          source_title?: string | null
           target_index?: string | null
           text?: string | null
           text_excerpt?: string | null
@@ -2644,6 +2650,7 @@ export type Database = {
           usage?: string | null
         }
         Update: {
+          chunk_hash?: string | null
           chunk_id?: string | null
           chunk_number?: number | null
           corpus_name?: string | null
@@ -2658,6 +2665,8 @@ export type Database = {
           rights?: string | null
           source_file?: string | null
           source_id?: string | null
+          source_package_id?: string | null
+          source_title?: string | null
           target_index?: string | null
           text?: string | null
           text_excerpt?: string | null
@@ -2670,6 +2679,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "vector_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vector_chunks_source_package_id_fkey"
+            columns: ["source_package_id"]
+            isOneToOne: false
+            referencedRelation: "vector_source_packages"
             referencedColumns: ["id"]
           },
         ]
@@ -2926,22 +2942,22 @@ export type Database = {
     Functions: {
       match_vector_chunks: {
         Args: {
-          index_names?: string[]
+          match_corpus?: string
           match_count?: number
+          match_index_name?: string
+          min_similarity?: number
           query_embedding: string
-          similarity_threshold?: number
         }
         Returns: {
-          chunk_id: string
-          chunk_number: number
-          corpus_name: string
+          chunk_ordinal: number
+          chunk_text: string
+          corpus: string
           id: string
           index_name: string
           metadata: Json
           similarity: number
-          source_file: string
-          text: string
-          text_excerpt: string
+          source_path: string
+          source_title: string
         }[]
       }
     }

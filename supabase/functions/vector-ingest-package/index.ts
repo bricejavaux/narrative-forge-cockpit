@@ -23,6 +23,17 @@ async function embedBatch(texts: string[], model: string): Promise<number[][]> {
   return data.data.map((d: any) => d.embedding);
 }
 
+const BLOCKED_CORPUS: Record<string, string> = {
+  follett: 'Corpus privé de style — ingestion désactivée tant que droits/usage ne sont pas validés.',
+  sf_portals_fiction: 'Corpus privé / fiction de référence — ingestion désactivée tant que droits/usage ne sont pas validés.',
+};
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
@@ -36,6 +47,15 @@ Deno.serve(async (req) => {
 
     if (!corpus_name || !target_index) {
       return json({ ok: false, error: 'corpus_name and target_index are required' }, 400);
+    }
+
+    if (BLOCKED_CORPUS[corpus_name]) {
+      return json({
+        ok: false,
+        error: 'corpus_blocked_by_doctrine',
+        corpus_name,
+        reason: BLOCKED_CORPUS[corpus_name],
+      }, 403);
     }
 
     const supa = createClient(
@@ -107,17 +127,22 @@ Deno.serve(async (req) => {
 
     const docId = doc?.id ?? null;
 
-    // Prepare chunk rows
-    const rows = sampleChunks.map((c: any, i: number) => {
+    // Prepare chunk rows (with stable chunk_hash)
+    const rows = await Promise.all(sampleChunks.map(async (c: any, i: number) => {
       const text = c.text ?? c.content ?? c.text_excerpt ?? '';
+      const source_file = c.source_file ?? pkg.onedrive_path;
+      const chunk_hash = await sha256Hex(`${corpus_name}|${source_file}|${i}|${(text || '').slice(0, 8000)}`);
       return {
         index_name: target_index,
         corpus_name,
         chunk_id: c.chunk_id ?? `${corpus_name}-${docId}-${i}`,
         document_id: docId,
-        source_file: c.source_file ?? pkg.onedrive_path,
+        source_package_id: pkg.id,
+        source_file,
+        source_title: c.source_title ?? pkg.title ?? null,
         source_id: c.source_id ?? null,
         chunk_number: c.chunk_number ?? i,
+        chunk_hash,
         target_index,
         usage: c.usage ?? pkg.usage,
         rights: c.rights ?? pkg.rights,
@@ -127,7 +152,8 @@ Deno.serve(async (req) => {
         embedding_model: mode === 'embed_and_store' ? embedding_model : null,
         embedding_status: mode === 'embed_and_store' ? 'pending' : 'metadata_only',
       } as any;
-    });
+    }));
+
 
     let embeddingsWritten = 0;
 

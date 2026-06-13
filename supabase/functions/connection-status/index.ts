@@ -46,6 +46,45 @@ async function restRow<T = any>(table: string, where: string): Promise<T | null>
   } catch { return null; }
 }
 
+async function rpcReady(): Promise<boolean> {
+  if (!SUPABASE_URL || !SERVICE_ROLE) return false;
+  try {
+    // Probe RPC existence cheaply: call with a zero vector and limit 1
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/match_vector_chunks`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE}`,
+        apikey: SERVICE_ROLE,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query_embedding: new Array(1536).fill(0),
+        match_count: 1,
+        min_similarity: 2.0, // impossible threshold -> 0 rows but proves callable
+      }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function embeddingsByIndex(): Promise<Record<string, number>> {
+  if (!SUPABASE_URL || !SERVICE_ROLE) return {};
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/vector_chunks?select=index_name&embedding_status=eq.done`,
+      { headers: { Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE } },
+    );
+    if (!r.ok) return {};
+    const rows = await r.json() as Array<{ index_name: string }>;
+    const out: Record<string, number> = {};
+    for (const row of rows) {
+      const k = row.index_name || '__null__';
+      out[k] = (out[k] ?? 0) + 1;
+    }
+    return out;
+  } catch { return {}; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -59,6 +98,7 @@ Deno.serve(async (req) => {
     audioBucket, sourceFilesBucket, coversBucket, exportsBucket,
     sciencePkg, scienceIndex, scienceChunksTotal, scienceChunksDone,
     vectorIndexesCount, runsCount, runOutputsCount,
+    pgvectorRpcReady, embByIndex, totalEmbeddingsDone, vectorChunksTableCount,
   ] = await Promise.all([
     bucketExists('audio'),
     bucketExists('source-files'),
@@ -71,14 +111,33 @@ Deno.serve(async (req) => {
     restCount('vector_indexes'),
     restCount('runs'),
     restCount('run_outputs'),
+    rpcReady(),
+    embeddingsByIndex(),
+    restCount('vector_chunks', 'embedding_status=eq.done'),
+    restCount('vector_chunks'),
   ]);
 
   const science_index_active = scienceIndex?.status === 'active';
   const science_chunks_total = scienceChunksTotal ?? 0;
   const science_embeddings_done = scienceChunksDone ?? 0;
   const indexes_created = (vectorIndexesCount ?? 0) > 0;
-  // Truthful pgvector readiness: vector tables readable AND at least one science embedding done.
-  const pgvector_ready = indexes_created && science_embeddings_done > 0;
+
+  // pgvector readiness block per spec
+  const pgvector_table_ready = vectorChunksTableCount !== null;
+  const pgvector_extension_ready = pgvector_table_ready; // table exists ⇒ extension installed
+  const pgvector_rpc_ready = pgvectorRpcReady;
+  const embedding_count_total = totalEmbeddingsDone ?? 0;
+  const default_embedding_model = 'text-embedding-3-small';
+  let pgvector_status: 'live' | 'ready_no_embeddings' | 'blocked';
+  if (!pgvector_extension_ready || !pgvector_table_ready || !pgvector_rpc_ready) {
+    pgvector_status = 'blocked';
+  } else if (embedding_count_total > 0) {
+    pgvector_status = 'live';
+  } else {
+    pgvector_status = 'ready_no_embeddings';
+  }
+
+  const pgvector_ready = pgvector_status === 'live';
   const migration_pending = !indexes_created;
   const runs_pipeline_live = runsCount !== null && runOutputsCount !== null;
 
@@ -149,7 +208,7 @@ Deno.serve(async (req) => {
     },
     indexes: {
       pgvector_ready,
-      pgvector_rpc_available: true,
+      pgvector_rpc_available: pgvector_rpc_ready,
       indexes_created,
       science_index_active,
       science_index_status: scienceIndex?.status ?? null,
@@ -159,6 +218,15 @@ Deno.serve(async (req) => {
       chroma_archive_inspected: false,
       migration_pending,
       refresh_queue_ready: true,
+    },
+    pgvector: {
+      extension_ready: pgvector_extension_ready,
+      table_ready: pgvector_table_ready,
+      rpc_ready: pgvector_rpc_ready,
+      embedding_count_total,
+      embedding_count_by_index: embByIndex,
+      default_embedding_model,
+      status: pgvector_status,
     },
     runs: {
       pipeline_live: runs_pipeline_live,
