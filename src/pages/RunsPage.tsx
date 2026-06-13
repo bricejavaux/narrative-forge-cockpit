@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Play, Loader2, AlertTriangle, RefreshCcw, CheckCircle2, XCircle, Clock, ListChecks, FileEdit } from 'lucide-react';
 import { agentsService, type AgentRow } from '@/services/agentsService';
