@@ -255,6 +255,42 @@ export default function PersistedAgentsPanel() {
                 </div>
               </div>
 
+              <div className="rounded border border-primary/30 bg-primary/5 p-2 space-y-1.5">
+                <p className="editorial-eyebrow flex items-center gap-1"><Cpu size={10} /> Éditer le modèle sélectionné</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-1.5">
+                  <select value={editModelId} onChange={(e) => setEditModelId(e.target.value)}
+                    className="text-[11px] px-2 py-1 rounded border border-border bg-background font-mono col-span-1">
+                    <option value="">— choisir —</option>
+                    {OPENAI_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>{m.label} · {m.tier}</option>
+                    ))}
+                    <option value={CUSTOM_MODEL_OPTION_ID}>custom · ID manuel</option>
+                  </select>
+                  {editModelId === CUSTOM_MODEL_OPTION_ID && (
+                    <input value={editModelCustom} onChange={(e) => setEditModelCustom(e.target.value)}
+                      placeholder="ex: gpt-5.5-preview"
+                      className="text-[11px] px-2 py-1 rounded border border-border bg-background font-mono" />
+                  )}
+                  <input value={modelReason} onChange={(e) => setModelReason(e.target.value)}
+                    placeholder="Raison (optionnel)"
+                    className="text-[11px] px-2 py-1 rounded border border-border bg-background" />
+                </div>
+                {editModelId && editModelId !== CUSTOM_MODEL_OPTION_ID && (
+                  <p className="text-[10px] text-muted-foreground italic">
+                    {OPENAI_MODELS.find((m) => m.id === editModelId)?.note ?? ''}
+                  </p>
+                )}
+                <button onClick={saveSelectedModel} disabled={savingModel || !editModelId}
+                  className="text-[11px] px-2 py-1 rounded border border-primary/40 bg-primary/10 text-primary inline-flex items-center gap-1 disabled:opacity-40">
+                  {savingModel ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Enregistrer modèle agent
+                </button>
+                {(selected as any)?.metadata?.last_model_change && (
+                  <p className="text-[10px] font-mono text-muted-foreground">
+                    Dernier changement : {(selected as any).metadata.last_model_change.previous_model ?? '—'} → {(selected as any).metadata.last_model_change.new_model} · {new Date((selected as any).metadata.last_model_change.changed_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-1">
                 <p className="editorial-eyebrow">Objectif</p>
                 <textarea value={editObjective} onChange={(e) => setEditObjective(e.target.value)}
