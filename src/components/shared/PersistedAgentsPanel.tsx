@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle, Play, ExternalLink } from 'lucide-react';
+import { Loader2, RefreshCcw, Save, History, Bot, Database, AlertTriangle, Play, ExternalLink, Cpu } from 'lucide-react';
 import { agentsService, type AgentRow, type AgentVersionRow, type AgentBindingRow } from '@/services/agentsService';
 import { supabase } from '@/integrations/supabase/client';
 import { classifyAgentTestability, TESTABILITY_LABEL, type TestabilityCtx } from '@/lib/agentTestability';
+import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID } from '@/lib/openaiModels';
 import { Link } from 'react-router-dom';
 
 export default function PersistedAgentsPanel() {
+  const [editModelId, setEditModelId] = useState<string>('');
+  const [editModelCustom, setEditModelCustom] = useState<string>('');
+  const [modelReason, setModelReason] = useState<string>('');
+  const [savingModel, setSavingModel] = useState(false);
   const [loading, setLoading] = useState(false);
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [selected, setSelected] = useState<AgentRow | null>(null);

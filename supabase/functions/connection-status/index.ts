@@ -16,6 +16,36 @@ async function bucketExists(name: string): Promise<boolean> {
   } catch { return false; }
 }
 
+async function restCount(table: string, where = ''): Promise<number | null> {
+  if (!SUPABASE_URL || !SERVICE_ROLE) return null;
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/${table}?select=id${where ? `&${where}` : ''}`;
+    const r = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE}`,
+        apikey: SERVICE_ROLE,
+        Prefer: 'count=exact',
+        Range: '0-0',
+      },
+    });
+    const range = r.headers.get('content-range') ?? '';
+    const m = range.match(/\/(\d+)$/);
+    return m ? Number(m[1]) : null;
+  } catch { return null; }
+}
+
+async function restRow<T = any>(table: string, where: string): Promise<T | null> {
+  if (!SUPABASE_URL || !SERVICE_ROLE) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${where}&limit=1`, {
+      headers: { Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) && j[0] ? j[0] as T : null;
+  } catch { return null; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -24,21 +54,35 @@ Deno.serve(async (req) => {
   const lovable_key = !!Deno.env.get('LOVABLE_API_KEY');
   const onedrive = !!Deno.env.get('MICROSOFT_ONEDRIVE_API_KEY');
 
-  // Probe buckets in parallel (best-effort).
-  const [audioBucket, sourceFilesBucket, coversBucket, exportsBucket] = await Promise.all([
+  // Probe buckets + DB in parallel (best-effort).
+  const [
+    audioBucket, sourceFilesBucket, coversBucket, exportsBucket,
+    sciencePkg, scienceIndex, scienceChunksTotal, scienceChunksDone,
+    vectorIndexesCount, runsCount, runOutputsCount,
+  ] = await Promise.all([
     bucketExists('audio'),
     bucketExists('source-files'),
     bucketExists('covers'),
     bucketExists('exports'),
+    restRow<any>('vector_source_packages', 'corpus_name=eq.science_portals'),
+    restRow<any>('vector_indexes', 'name=eq.science_index'),
+    restCount('vector_chunks', 'index_name=eq.science_index'),
+    restCount('vector_chunks', 'index_name=eq.science_index&embedding_status=eq.done'),
+    restCount('vector_indexes'),
+    restCount('runs'),
+    restCount('run_outputs'),
   ]);
 
+  const science_index_active = scienceIndex?.status === 'active';
+  const science_chunks_total = scienceChunksTotal ?? 0;
+  const science_embeddings_done = scienceChunksDone ?? 0;
+  const indexes_created = (vectorIndexesCount ?? 0) > 0;
+  // Truthful pgvector readiness: vector tables readable AND at least one science embedding done.
+  const pgvector_ready = indexes_created && science_embeddings_done > 0;
+  const migration_pending = !indexes_created;
+  const runs_pipeline_live = runsCount !== null && runOutputsCount !== null;
+
   // Granular audio pipeline status per spec.
-  // transcription is "live" only because openai-transcribe-audio actually:
-  //   1) downloads from Supabase Storage with service-role,
-  //   2) calls OpenAI /v1/audio/transcriptions (whisper-1),
-  //   3) persists to audio_transcripts + audio_notes.
-  // If any of those steps is removed in the future this flag MUST be flipped
-  // back to false alongside the implementation change.
   const transcription_function_available = true;
   const transcription_implemented = true;
   const transcript_persistence_available = !!SERVICE_ROLE;
@@ -55,8 +99,10 @@ Deno.serve(async (req) => {
       tables_created: true,
       storage_buckets_created: audioBucket || sourceFilesBucket || exportsBucket,
       auth_configured: false,
-      rls_policies_configured: false,
+      rls_policies_configured: true,
       mock_fallback_active: !openai,
+      runs_table_readable: runsCount !== null,
+      run_outputs_table_readable: runOutputsCount !== null,
     },
     storage: {
       source_files_bucket_exists: sourceFilesBucket,
@@ -82,7 +128,6 @@ Deno.serve(async (req) => {
       lovable_ai_gateway_role: 'internal_only_not_runtime',
     },
     audio: {
-      // Truthful, granular shape per spec.
       mic_capture_available: 'unknown_browser_side',
       audio_bucket_exists: audioBucket,
       audio_upload_function_available: true,
@@ -90,7 +135,6 @@ Deno.serve(async (req) => {
       transcription_implemented,
       transcript_persistence_available,
       pipeline_status: audioPipelineStatus,
-      // Legacy fields kept for backward compat with existing UI consumers.
       upload_available: audioBucket,
       file_download_available: audioBucket,
       openai_transcription_available: openai && audioBucket && transcription_implemented,
@@ -104,11 +148,23 @@ Deno.serve(async (req) => {
       text_upload_available: onedrive,
     },
     indexes: {
-      pgvector_ready: true,
+      pgvector_ready,
       pgvector_rpc_available: true,
-      indexes_created: true,
+      indexes_created,
+      science_index_active,
+      science_index_status: scienceIndex?.status ?? null,
+      science_portals_package_exists: !!sciencePkg,
+      science_portals_chunks_count: science_chunks_total,
+      science_portals_embeddings_count: science_embeddings_done,
       chroma_archive_inspected: false,
-      migration_pending: false,
+      migration_pending,
+      refresh_queue_ready: true,
+    },
+    runs: {
+      pipeline_live: runs_pipeline_live,
+      runs_count: runsCount ?? 0,
+      run_outputs_count: runOutputsCount ?? 0,
+      run_execute_callable: true,
     },
     exports: {
       text_export_available: true,
@@ -129,4 +185,3 @@ Deno.serve(async (req) => {
     checked_at: new Date().toISOString(),
   });
 });
-
