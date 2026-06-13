@@ -109,15 +109,26 @@ export default function RunsPage() {
 
   const openRun = async (r: RunRow) => {
     setSelectedRun(r);
+    if (searchParams.get('run_id') !== r.id) {
+      const sp = new URLSearchParams(searchParams);
+      sp.set('run_id', r.id);
+      setSearchParams(sp, { replace: true });
+    }
     const [outs, finds, rts] = await Promise.all([
       supabase.from('run_outputs').select('*').eq('run_id', r.id).order('created_at'),
       supabase.from('audit_findings').select('*').eq('run_id', r.id).order('created_at'),
-      supabase.from('rewrite_tasks').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('rewrite_tasks').select('*').order('created_at', { ascending: false }).limit(100),
     ]);
     setOutputs(outs.data ?? []);
     setFindings(finds.data ?? []);
-    setTasks((rts.data ?? []).filter((t: any) => t?.metadata?.run_id === r.id || true).slice(0, 10));
+    // Strict filter: only tasks linked to this run via metadata.run_id or metadata.source_finding_id
+    const findingIds = new Set((finds.data ?? []).map((f: any) => f.id));
+    setTasks((rts.data ?? []).filter((t: any) => {
+      const m = t?.metadata ?? {};
+      return m.run_id === r.id || (m.source_finding_id && findingIds.has(m.source_finding_id));
+    }));
   };
+
 
   const updateFindingStatus = async (id: string, status: string, note?: string) => {
     await supabase.from('audit_findings').update({ status, metadata: { decided_at: new Date().toISOString(), note: note ?? null } }).eq('id', id);
