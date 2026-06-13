@@ -29,7 +29,7 @@ export default function SciencePortalsIngestionPanel() {
     setSearching(true); setSearchResult(null); setErr(null);
     try {
       const { data, error } = await supabase.functions.invoke('vector-search', {
-        body: { query, index_names: ['science_index'], top_k: topK, similarity_threshold: 0.2 },
+        body: { query, index_name: 'science_index', corpus: 'science_portals', top_k: topK, min_similarity: 0.2 },
       });
       if (error) throw error;
       setSearchResult(data);

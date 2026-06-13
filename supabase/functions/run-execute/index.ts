@@ -18,7 +18,6 @@ type RunType =
   | 'export_test';
 
 const FUTURE_RUN_TYPES = new Set([
-  'generate_chapter_draft',
   'extract_observed_beats',
   'audit_chapter_vs_beats',
   'targeted_rewrite',
@@ -36,18 +35,29 @@ Deno.serve(async (req) => {
       return json({ error: 'run_type_not_available_yet', stage: 'validation', run_type, reason: 'Future run type — disabled in this iteration.' }, 400);
     }
 
+    const { agent_id: rawAgentId = null, agent_slug = null, target_type = null, target_id = null, scope = null, mode = 'live', model: bodyModel = null, payload = {}, instruction = null } = body ?? {};
+
     const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const started = new Date().toISOString();
 
-    const { agent_id = null, target_type = null, target_id = null, scope = null, mode = 'live', model: bodyModel = null, payload = {}, instruction = null } = body ?? {};
+    // Resolve agent_id from slug if provided
+    let agent_id: string | null = (typeof rawAgentId === 'string' && rawAgentId.length === 36) ? rawAgentId : null;
+    let agentRow: any = null;
+    if (agent_slug && typeof agent_slug === 'string') {
+      const { data: a } = await supa.from('agents').select('*').eq('external_id', agent_slug).maybeSingle();
+      if (a) { agent_id = a.id; agentRow = a; }
+    } else if (agent_id) {
+      const { data: a } = await supa.from('agents').select('*').eq('id', agent_id).maybeSingle();
+      agentRow = a;
+    }
 
     // 1. create run row (status=running)
     const { data: runRow, error: runErr } = await supa.from('runs').insert({
-      name: `${run_type}${agent_id ? ` · agent:${agent_id}` : ''}${target_id ? ` · ${target_type}:${String(target_id).slice(0, 8)}` : ''}`,
+      name: `${run_type}${agentRow?.external_id ? ` · ${agentRow.external_id}` : ''}${target_id ? ` · ${target_type}:${String(target_id).slice(0, 8)}` : ''}`,
       mode,
       status: 'running',
       started_at: started,
-      payload: { run_type, agent_id, target_type, target_id, scope, model: bodyModel, instruction, payload },
+      payload: { run_type, agent_id, agent_slug: agentRow?.external_id ?? agent_slug ?? null, target_type, target_id, scope, model: bodyModel, instruction, payload },
     }).select('id').single();
     if (runErr) return json({ error: `runs_insert_failed: ${runErr.message}`, stage: 'runs_insert_failed' }, 500);
     const run_id = runRow.id;
@@ -67,14 +77,8 @@ Deno.serve(async (req) => {
       catch (_) { /* never throw from output insert */ }
     };
 
-    // Resolve model: body override > agent.selected_model > null (let openai-agent-run pick default)
-    let resolvedModel: string | null = bodyModel;
-    let agentRow: any = null;
-    if (agent_id && typeof agent_id === 'string') {
-      const { data: a } = await supa.from('agents').select('*').eq('id', agent_id).maybeSingle();
-      agentRow = a;
-      if (!resolvedModel) resolvedModel = a?.selected_model ?? a?.default_model ?? null;
-    }
+    // Resolve model: body override > agent.selected_model > null
+    let resolvedModel: string | null = bodyModel ?? agentRow?.selected_model ?? agentRow?.default_model ?? null;
 
     try {
       // 2. dispatch
@@ -228,6 +232,34 @@ Deno.serve(async (req) => {
         const failed = !!data?.error;
         await finalize(failed ? 'failed' : 'completed', { ...data, stage: failed ? 'openai_agent_failed' : 'completed' });
         return json({ run_id, stage: failed ? 'openai_agent_failed' : 'completed', ...data });
+      }
+
+      if (run_type === 'generate_chapter_draft') {
+        const chapter_id = target_id ?? payload?.chapter_id ?? null;
+        if (!chapter_id) {
+          await insertOutput('error', { stage: 'validation', reason: 'chapter_id required' });
+          await finalize('failed', { error: 'chapter_id_required', stage: 'validation' });
+          return json({ run_id, error: 'chapter_id required', stage: 'validation' }, 400);
+        }
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/chapter-generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY },
+          body: JSON.stringify({ chapter_id, model: resolvedModel, run_id }),
+        });
+        const data = await r.json().catch(() => ({ error: 'invalid_json' }));
+        await insertOutput('chapter_generated', data);
+        const failed = !!data?.error;
+        await finalize(failed ? 'failed' : 'completed', {
+          ...data, stage: failed ? 'chapter_generate_failed' : 'completed',
+          effective_model: data?.model ?? resolvedModel,
+          chapter_id, version: data?.version ?? null,
+        });
+        return json({
+          run_id, run_type, stage: failed ? 'chapter_generate_failed' : 'completed',
+          effective_model: data?.model ?? resolvedModel, chapter_id,
+          version: data?.version ?? null, version_id: data?.version_id ?? null,
+          ...data,
+        });
       }
 
       await insertOutput('error', { stage: 'unknown_run_type', run_type });

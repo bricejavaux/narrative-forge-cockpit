@@ -206,6 +206,120 @@ const DEFAULT_AGENTS = [
   })),
 ];
 
+// ----- Spec-mandated specialized agents (Batch 3). Idempotent merge: existing rows are skipped untouched. -----
+const SPEC_AGENTS = [
+  {
+    external_id: 'agent_beat_planner',
+    name: 'Planification des beats',
+    category: 'generation',
+    objective: 'Générer les beats prévus d\'un chapitre à partir du plan, du canon, des personnages et des arcs.',
+    description: 'Produit des beats structurés (titre, fonction, tension, conséquence). Aucune écriture directe.',
+    default_model: 'gpt-4.1-mini', selected_model: 'gpt-4.1-mini',
+    system_prompt: 'Tu planifies les beats d\'un chapitre. JSON strict {beats:[{title,objective,function,tension,consequence,characters,canon_links,warnings}]}.',
+    bindings: [
+      { index_name: 'world_index', corpus_name: 'world', required: false },
+      { index_name: 'character_index', corpus_name: 'characters', required: false },
+      { index_name: 'arc_index', corpus_name: 'arcs', required: false },
+      { index_name: 'science_index', corpus_name: 'science_portals', required: false },
+    ],
+    model_recommendations: { fast: 'gpt-4.1-nano', balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' },
+  },
+  {
+    external_id: 'agent_chapter_writer',
+    name: 'Génération chapitre',
+    category: 'generation',
+    objective: 'Produire un brouillon de chapitre à partir des beats validés.',
+    description: 'Génération littéraire. Respecte beats validés et canon. Pas de réécriture autonome.',
+    default_model: 'gpt-4.1', selected_model: 'gpt-4.1',
+    system_prompt: 'Tu écris un chapitre. JSON {chapter_title, full_text, beat_coverage, canon_used, characters_used, risks}.',
+    bindings: [
+      { index_name: 'world_index', corpus_name: 'world', required: true },
+      { index_name: 'character_index', corpus_name: 'characters', required: true },
+      { index_name: 'arc_index', corpus_name: 'arcs', required: true },
+      { index_name: 'science_index', corpus_name: 'science_portals', required: false },
+    ],
+    model_recommendations: { balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' },
+  },
+  {
+    external_id: 'agent_canon_consistency',
+    name: 'Cohérence canon',
+    category: 'audit',
+    objective: 'Vérifier que le texte ne contredit pas les règles du monde.',
+    description: 'Audit canon. Trouve contradictions, propose rewrite_tasks (validation humaine requise).',
+    default_model: 'gpt-4.1-mini', selected_model: 'gpt-4.1-mini',
+    system_prompt: 'Tu audites la cohérence canon. JSON {score, contradictions, warnings, rewrite_tasks}.',
+    bindings: [
+      { index_name: 'world_index', corpus_name: 'world', required: true },
+      { index_name: 'science_index', corpus_name: 'science_portals', required: false },
+    ],
+    model_recommendations: { balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' },
+  },
+  {
+    external_id: 'agent_character_consistency',
+    name: 'Cohérence personnages',
+    category: 'audit',
+    objective: 'Vérifier trajectoires, motivations, secrets, interdits et arcs personnages.',
+    description: 'Audit personnages. Propose rewrite_tasks ciblées (validation humaine requise).',
+    default_model: 'gpt-4.1-mini', selected_model: 'gpt-4.1-mini',
+    system_prompt: 'Tu audites la cohérence des personnages. JSON {score, character_findings, rewrite_tasks}.',
+    bindings: [{ index_name: 'character_index', corpus_name: 'characters', required: true }],
+    model_recommendations: { balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' },
+  },
+  {
+    external_id: 'agent_style_pass',
+    name: 'Style & respiration',
+    category: 'style',
+    objective: 'Recommander ajustements de rythme, densité, respiration, répétitions, sans réécrire automatiquement.',
+    description: 'Recommandations style uniquement. Pas d\'écriture.',
+    default_model: 'gpt-4.1-mini', selected_model: 'gpt-4.1-mini',
+    system_prompt: 'Tu analyses le style. JSON {style_score, recommendations, phrases_to_review, rewrite_tasks}.',
+    bindings: [{ index_name: 'style_index', corpus_name: 'follett', required: false }],
+    model_recommendations: { balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' },
+  },
+  {
+    external_id: 'agent_science_density',
+    name: 'Densité scientifique',
+    category: 'audit',
+    objective: 'Vérifier que les éléments scientifiques sont concrets, non contradictoires et non didactiques.',
+    description: 'Audit densité scientifique. Cite science_portals.',
+    default_model: 'gpt-4.1-mini', selected_model: 'gpt-4.1-mini',
+    system_prompt: 'Tu audites la densité scientifique. JSON {score, findings, missing_details, overexplanations}.',
+    bindings: [{ index_name: 'science_index', corpus_name: 'science_portals', required: false }],
+    model_recommendations: { balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' },
+  },
+  {
+    external_id: 'agent_rewrite_planner',
+    name: 'Plan de réécriture ciblée',
+    category: 'rewrite',
+    objective: 'Transformer les findings validés en commandes correctives actionnables.',
+    description: 'Génère des rewrite_tasks structurées. Application manuelle uniquement.',
+    default_model: 'gpt-4.1-mini', selected_model: 'gpt-4.1-mini',
+    system_prompt: 'Tu produis un plan de réécriture. JSON {rewrite_tasks:[{title,scope,target_id,instruction,priority,requires_human_validation}]}.',
+    bindings: [],
+    model_recommendations: { balanced: 'gpt-4.1-mini', premium: 'gpt-4.1' },
+  },
+].map((a) => ({
+  ...a,
+  quality_profile: 'balanced',
+  permission_level: 'suggest_only',
+  persistence_status: 'suggestions_only',
+  vector_context_status: 'pending_pgvector',
+  rewrite_rights: false,
+  criticality: 'high',
+  simulated_cost: 'low',
+  status: 'live_test_available',
+  is_active: true,
+  operating_script: [
+    { step: 'load_context', detail: 'Charge le contexte cible (Supabase + bindings)' },
+    { step: 'retrieve', detail: 'Recherche vectorielle via vector-search si bindings actifs' },
+    { step: 'run', detail: 'Appel OpenAI avec system_prompt structuré' },
+    { step: 'propose', detail: 'Persiste outputs / findings / rewrite_tasks (pending_review)' },
+  ],
+}));
+
+DEFAULT_AGENTS.push(...(SPEC_AGENTS as any));
+
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
