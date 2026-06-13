@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     },
     indexes: {
       pgvector_ready,
-      pgvector_rpc_available: true,
+      pgvector_rpc_available: pgvector_rpc_ready,
       indexes_created,
       science_index_active,
       science_index_status: scienceIndex?.status ?? null,
@@ -218,6 +218,15 @@ Deno.serve(async (req) => {
       chroma_archive_inspected: false,
       migration_pending,
       refresh_queue_ready: true,
+    },
+    pgvector: {
+      extension_ready: pgvector_extension_ready,
+      table_ready: pgvector_table_ready,
+      rpc_ready: pgvector_rpc_ready,
+      embedding_count_total,
+      embedding_count_by_index: embByIndex,
+      default_embedding_model,
+      status: pgvector_status,
     },
     runs: {
       pipeline_live: runs_pipeline_live,
