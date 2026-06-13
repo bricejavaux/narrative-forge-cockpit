@@ -115,34 +115,44 @@ export default function VectorIngestionPanel() {
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      <button
-                        disabled={!!busy}
-                        onClick={() => runIngest(p.corpus_name, 'metadata_only')}
-                        className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-border hover:border-primary/40 disabled:opacity-30"
-                        title="Insère vector_documents + vector_chunks sans embeddings"
-                      >
-                        {busy === `${p.corpus_name}:metadata_only` && <Loader2 size={9} className="animate-spin" />}
-                        <DbIcon size={10} /> Métadonnées
-                      </button>
-                      <button
-                        disabled={!!busy}
-                        onClick={() => runIngest(p.corpus_name, 'embed_and_store', 8)}
-                        className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-border hover:border-primary/40 disabled:opacity-30"
-                        title="Embeddings OpenAI sur un échantillon de 8 chunks"
-                      >
-                        {busy === `${p.corpus_name}:embed_and_store` && <Loader2 size={9} className="animate-spin" />}
-                        <FlaskConical size={10} /> Échantillon
-                      </button>
-                      <button
-                        disabled={!!busy || isCaution}
-                        onClick={() => runIngest(p.corpus_name, 'embed_and_store')}
-                        className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/5 disabled:opacity-30"
-                        title={isCaution ? 'Caution: privé — validation requise' : 'Embeddings complets'}
-                      >
-                        <Check size={10} /> Corpus complet
-                      </button>
-                    </div>
+                    {isCaution ? (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber/40 bg-amber/10 text-amber">
+                        désactivé — politique droits/style en attente
+                      </span>
+                    ) : isRecommended ? (
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          disabled={!!busy}
+                          onClick={() => runIngest(p.corpus_name, 'metadata_only')}
+                          className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-border hover:border-primary/40 disabled:opacity-30"
+                          title="Dry-run via vector-ingest-science-portals — aucun embedding écrit"
+                        >
+                          {busy === `${p.corpus_name}:metadata_only` && <Loader2 size={9} className="animate-spin" />}
+                          <DbIcon size={10} /> Dry-run
+                        </button>
+                        <button
+                          disabled={!!busy}
+                          onClick={() => runIngest(p.corpus_name, 'embed_and_store', 8)}
+                          className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-border hover:border-primary/40 disabled:opacity-30"
+                          title="Embeddings OpenAI sur un échantillon de 8 chunks via vector-ingest-science-portals"
+                        >
+                          {busy === `${p.corpus_name}:embed_and_store` && <Loader2 size={9} className="animate-spin" />}
+                          <FlaskConical size={10} /> Échantillon 8 chunks
+                        </button>
+                        <button
+                          disabled={!!busy}
+                          onClick={() => runIngest(p.corpus_name, 'embed_and_store')}
+                          className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/5 disabled:opacity-30"
+                          title="Ingestion complète science_portals via vector-ingest-science-portals"
+                        >
+                          <Check size={10} /> Ingestion complète science_portals
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        non autorisé dans cette itération
+                      </span>
+                    )}
                   </td>
                 </tr>
               );
@@ -153,6 +163,7 @@ export default function VectorIngestionPanel() {
           </tbody>
         </table>
       </div>
+
 
       <div className="flex flex-wrap items-end gap-2 pt-2 border-t border-border">
         <div className="flex-1 min-w-[200px]">
