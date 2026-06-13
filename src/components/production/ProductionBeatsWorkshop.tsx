@@ -154,6 +154,7 @@ export default function ProductionBeatsWorkshop({
   const [saveModal, setSaveModal] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditResults, setAuditResults] = useState<Array<{ severity: 'info' | 'warn' | 'error'; beat_key?: string; message: string }>>([]);
+  const [auditScienceContext, setAuditScienceContext] = useState<{ used: boolean; active: string[]; pending: string[]; count: number } | null>(null);
 
   // === LOADERS ===
   const loadPersisted = async (chapter_id: string) => {
@@ -656,6 +657,11 @@ export default function ProductionBeatsWorkshop({
                     });
                     if (error) { alert(`Audit agent: ${error.message}`); return; }
                     const f = (data as any)?.findings ?? [];
+                    const used = !!(data as any)?.vector_context_used;
+                    const active = Array.isArray((data as any)?.indexes_active) ? (data as any).indexes_active : [];
+                    const pending = Array.isArray((data as any)?.indexes_pending) ? (data as any).indexes_pending : [];
+                    const chunkCount = Array.isArray((data as any)?.retrieved_chunks) ? (data as any).retrieved_chunks.length : 0;
+                    setAuditScienceContext({ used, active, pending, count: chunkCount });
                     setAuditResults(f.length === 0
                       ? [{ severity: 'info', message: `Agent: aucun défaut signalé. Trace run ${String((data as any)?.run_id ?? '').slice(0, 8)}.` }]
                       : f.map((x: any) => ({ severity: (x?.severity ?? 'info') as 'info'|'warn'|'error', message: `[${x?.severity ?? 'info'}] ${x?.title ?? ''} — ${x?.note ?? x?.detail ?? ''}` })));
@@ -859,6 +865,19 @@ export default function ProductionBeatsWorkshop({
             <DialogDescription>
               Contrôle local sur les {persisted.length} beats persistés (champs requis, doublons, courbe de tension, liens).
             </DialogDescription>
+            {auditScienceContext && (
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-mono">
+                {auditScienceContext.used && auditScienceContext.active.includes('science_index') ? (
+                  <span className="px-1.5 py-0.5 rounded border bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
+                    Contexte scientifique : science_portals actif ({auditScienceContext.count} chunk{auditScienceContext.count > 1 ? 's' : ''})
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-700 border-amber-500/30">
+                    Contexte scientifique non utilisé{auditScienceContext.pending.includes('science_index') ? ' — science_portals pending_pgvector' : ''}
+                  </span>
+                )}
+              </div>
+            )}
           </DialogHeader>
           <ul className="space-y-1 max-h-[400px] overflow-y-auto">
             {auditResults.map((r, i) => (
