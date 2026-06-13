@@ -3,6 +3,7 @@ import VectorPackagesPanel from '@/components/shared/VectorPackagesPanel';
 import VectorIngestionPanel from '@/components/shared/VectorIngestionPanel';
 import PgvectorReadinessPanel from '@/components/shared/PgvectorReadinessPanel';
 import SciencePortalsIngestionPanel from '@/components/shared/SciencePortalsIngestionPanel';
+import BlockedCorpusCards from '@/components/shared/BlockedCorpusCards';
 import { supabaseService } from '@/services/supabaseService';
 
 type Badge = { label: string; classes: string };
