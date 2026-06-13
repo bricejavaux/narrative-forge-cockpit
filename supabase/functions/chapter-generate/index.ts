@@ -122,7 +122,7 @@ Canon: ${JSON.stringify(canon ?? [])}${contextBlock}`;
           chapter_id, version: nextVersion, version_id: ver.id,
           model: ai.model, word_count,
           beats_total: total, beats_validated: validated,
-          vector_context_used: false,
+          vector_context_used: vectorContextUsed, vector_indexes_active: vectorIndexesActive, vector_indexes_pending: vectorIndexesPending,
           full_text_preview: preview,
         },
       }).then(() => {}, () => {});
@@ -140,7 +140,7 @@ Canon: ${JSON.stringify(canon ?? [])}${contextBlock}`;
       run_id: caller_run_id,
       beats_total: total,
       beats_validated: validated,
-      vector_context_used: false,
+      vector_context_used: vectorContextUsed, vector_indexes_active: vectorIndexesActive, vector_indexes_pending: vectorIndexesPending,
     });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'unknown' }, 500);
