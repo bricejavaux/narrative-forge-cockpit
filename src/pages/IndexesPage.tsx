@@ -18,12 +18,16 @@ export default function IndexesPage() {
 
   const pgvector: Badge = (() => {
     if (!readiness) return { label: 'pgvector : chargement…', classes: 'bg-muted text-muted-foreground border-border' };
-    const idx = readiness.indexes ?? {};
-    if (!idx.indexes_created) return { label: 'pgvector : bloqué — tables/RLS', classes: 'bg-destructive/10 text-destructive border-destructive/30' };
-    if ((idx.science_portals_embeddings_count ?? 0) > 0 && idx.science_index_active) {
-      return { label: 'pgvector : live', classes: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30' };
+    const pg = readiness.pgvector ?? null;
+    const status = pg?.status ?? (readiness.indexes?.pgvector_ready ? 'live' : 'blocked');
+    if (status === 'live') {
+      const total = pg?.embedding_count_total ?? 0;
+      return { label: `pgvector : live · ${total} embeddings`, classes: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30' };
     }
-    return { label: 'pgvector : prêt, embeddings à créer', classes: 'bg-amber-500/10 text-amber-700 border-amber-500/30' };
+    if (status === 'ready_no_embeddings') {
+      return { label: 'pgvector : prêt — aucun embedding', classes: 'bg-amber-500/10 text-amber-700 border-amber-500/30' };
+    }
+    return { label: 'pgvector : bloqué — extension/table/RPC', classes: 'bg-destructive/10 text-destructive border-destructive/30' };
   })();
 
   const metadata: Badge = (() => {
