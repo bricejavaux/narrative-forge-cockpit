@@ -18,7 +18,6 @@ type RunType =
   | 'export_test';
 
 const FUTURE_RUN_TYPES = new Set([
-  'generate_chapter_draft',
   'extract_observed_beats',
   'audit_chapter_vs_beats',
   'targeted_rewrite',
