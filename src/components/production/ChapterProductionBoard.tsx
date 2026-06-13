@@ -55,7 +55,7 @@ export default function ChapterProductionBoard({
       </div>
       <div className="flex items-center gap-1">
         {STAGES.map((s) => {
-          const status = stageStatuses?.[s.id] ?? 'not_started';
+          const status = effectiveStatuses?.[s.id] ?? 'not_started';
           const c = COLOR[statusColor(status as any)];
           return (
             <div key={s.id} className="flex-1 flex flex-col items-center gap-1" title={`${s.label}: ${status}`}>
