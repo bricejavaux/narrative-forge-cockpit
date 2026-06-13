@@ -31,10 +31,18 @@ export default function VectorIngestionPanel() {
   useEffect(() => { load(); }, []);
 
   const runIngest = async (corpus: string, mode: 'metadata_only' | 'embed_and_store', limit?: number) => {
+    if (corpus !== 'science_portals') {
+      setErr(`Corpus "${corpus}" désactivé dans cette itération — politique droits/style en attente. Seul science_portals est autorisé.`);
+      return;
+    }
     setBusy(`${corpus}:${mode}`); setErr(null); setResult(null);
     try {
-      const target_index = CORPUS_TO_INDEX[corpus] ?? `${corpus}_index`;
-      const data = await vectorIngestionService.ingestPackage({ corpus_name: corpus, target_index, mode, limit });
+      // Always route through the restricted wrapper. metadata_only is not
+      // exposed by the science wrapper — fall back to dry_run.
+      const data = await vectorIngestionService.ingestSciencePortals({
+        dry_run: mode === 'metadata_only',
+        limit,
+      });
       setResult({ corpus, mode, data });
       await load();
     } catch (e) {
