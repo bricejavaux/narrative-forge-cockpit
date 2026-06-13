@@ -296,6 +296,42 @@ export default function RunsPage() {
                 'bg-amber-500/10 text-amber-700 border-amber-500/30'}`}>{selectedRun.status}</span>
             </div>
 
+            {/* Run summary header */}
+            {(() => {
+              const p: any = selectedRun.payload ?? {};
+              const r: any = selectedRun.result ?? {};
+              const model = r.resolved_model ?? p.model ?? r.model ?? '—';
+              const agentName = r.agent_name ?? (p.agent_id ? `agent:${String(p.agent_id).slice(0, 8)}` : '—');
+              const target = p.target_id ? `${p.target_type ?? 'target'}:${String(p.target_id).slice(0, 8)}` : '—';
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] font-mono">
+                  <div className="border border-border rounded p-1.5"><span className="text-muted-foreground">type</span><br/>{p.run_type ?? '—'}</div>
+                  <div className="border border-border rounded p-1.5"><span className="text-muted-foreground">model</span><br/>{model}</div>
+                  <div className="border border-border rounded p-1.5"><span className="text-muted-foreground">agent</span><br/>{agentName}</div>
+                  <div className="border border-border rounded p-1.5"><span className="text-muted-foreground">target</span><br/>{target}</div>
+                </div>
+              );
+            })()}
+
+            {/* Rewrite tasks linked to this run */}
+            <div>
+              <p className="editorial-eyebrow mb-1 flex items-center gap-1"><FileEdit size={10} /> Rewrite tasks liés ({tasks.length})</p>
+              {tasks.length === 0 ? <p className="text-[11px] text-muted-foreground italic">Aucune commande corrective créée depuis ce run.</p> : (
+                <ul className="space-y-1">
+                  {tasks.map((t) => (
+                    <li key={t.id} className="text-[11px] border border-border rounded p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium truncate">{t.title}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground">{t.status} {t.requires_validation ? '· requires_validation' : ''}</span>
+                      </div>
+                      {t.proposal && <p className="text-muted-foreground mt-0.5">{String(t.proposal).slice(0, 240)}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+
             {/* Findings + governance */}
             <div>
               <p className="editorial-eyebrow mb-1 flex items-center gap-1"><ListChecks size={10} /> Findings ({findings.length})</p>
