@@ -54,8 +54,9 @@ export default function RunsPage() {
   const [selectedRun, setSelectedRun] = useState<RunRow | null>(null);
   const [outputs, setOutputs] = useState<any[]>([]);
   const [findings, setFindings] = useState<any[]>([]);
-  const [, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const loadRuns = async () => {
     const { data } = await supabase.from('runs')
@@ -71,6 +72,19 @@ export default function RunsPage() {
       setChapters(data ?? []); if (data?.[0]) setChapterId(data[0].id);
     });
   }, []);
+
+  // Auto-open run from ?run_id=
+  useEffect(() => {
+    const rid = searchParams.get('run_id');
+    if (!rid) return;
+    if (selectedRun?.id === rid) return;
+    (async () => {
+      const { data } = await supabase.from('runs').select('*').eq('id', rid).maybeSingle();
+      if (data) await openRun(data as RunRow);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
 
   const def = RUN_TYPES.find((r) => r.id === runType)!;
 
