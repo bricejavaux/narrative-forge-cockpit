@@ -4,6 +4,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import VectorPackagesPanel from '@/components/shared/VectorPackagesPanel';
 import VectorIngestionPanel from '@/components/shared/VectorIngestionPanel';
 import PgvectorReadinessPanel from '@/components/shared/PgvectorReadinessPanel';
+import SciencePortalsIngestionPanel from '@/components/shared/SciencePortalsIngestionPanel';
 import { Database, AlertTriangle, RefreshCcw, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function IndexesPage() {
@@ -33,6 +34,7 @@ export default function IndexesPage() {
         </div>
       </div>
       <PgvectorReadinessPanel />
+      <SciencePortalsIngestionPanel />
 
 
       {/* Vector source packages prepared on OneDrive */}
