@@ -234,6 +234,34 @@ Deno.serve(async (req) => {
         return json({ run_id, stage: failed ? 'openai_agent_failed' : 'completed', ...data });
       }
 
+      if (run_type === 'generate_chapter_draft') {
+        const chapter_id = target_id ?? payload?.chapter_id ?? null;
+        if (!chapter_id) {
+          await insertOutput('error', { stage: 'validation', reason: 'chapter_id required' });
+          await finalize('failed', { error: 'chapter_id_required', stage: 'validation' });
+          return json({ run_id, error: 'chapter_id required', stage: 'validation' }, 400);
+        }
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/chapter-generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY },
+          body: JSON.stringify({ chapter_id, model: resolvedModel, run_id }),
+        });
+        const data = await r.json().catch(() => ({ error: 'invalid_json' }));
+        await insertOutput('chapter_generated', data);
+        const failed = !!data?.error;
+        await finalize(failed ? 'failed' : 'completed', {
+          ...data, stage: failed ? 'chapter_generate_failed' : 'completed',
+          effective_model: data?.model ?? resolvedModel,
+          chapter_id, version: data?.version ?? null,
+        });
+        return json({
+          run_id, run_type, stage: failed ? 'chapter_generate_failed' : 'completed',
+          effective_model: data?.model ?? resolvedModel, chapter_id,
+          version: data?.version ?? null, version_id: data?.version_id ?? null,
+          ...data,
+        });
+      }
+
       await insertOutput('error', { stage: 'unknown_run_type', run_type });
       await finalize('failed', { error: `unknown_run_type:${run_type}`, stage: 'unknown_run_type' });
       return json({ run_id, error: 'unknown_run_type', stage: 'unknown_run_type' }, 400);
