@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Loader2, RefreshCw, Sparkles, AlertTriangle, X, Save, ShieldCheck, Layers,
-  StopCircle, Plus, Copy, Trash2, ArrowUp, ArrowDown, ClipboardCheck,
+  StopCircle, Plus, Copy, Trash2, ClipboardCheck,
 } from 'lucide-react';
 import { OPENAI_MODELS, CUSTOM_MODEL_OPTION_ID } from '@/lib/openaiModels';
 import {
@@ -772,10 +772,9 @@ export default function ProductionBeatsWorkshop({
               <div className="flex flex-wrap gap-1 pt-2 border-t border-border">
                 <IconBtn onClick={() => addBeat(selectedBeat._key)} title="Ajouter après"><Plus size={11} /></IconBtn>
                 <IconBtn onClick={() => duplicateBeat(selectedBeat._key)} title="Dupliquer"><Copy size={11} /></IconBtn>
-                <IconBtn onClick={() => moveBeat(selectedBeat._key, -1)} title="Monter" disabled={(preview?.findIndex((b) => b._key === selectedBeat._key) ?? 0) === 0}><ArrowUp size={11} /></IconBtn>
-                <IconBtn onClick={() => moveBeat(selectedBeat._key, 1)} title="Descendre" disabled={(preview?.findIndex((b) => b._key === selectedBeat._key) ?? 0) === (preview?.length ?? 1) - 1}><ArrowDown size={11} /></IconBtn>
                 <IconBtn onClick={() => deletePreviewBeat(selectedBeat._key)} title="Supprimer" destructive><Trash2 size={11} /></IconBtn>
               </div>
+              <p className="text-[10px] text-muted-foreground">L'ordre des beats suit le champ « n° de beat » dans la liste. Pas de réordonnancement par flèches : modifier le numéro pour replacer un beat.</p>
 
               {!isComplete(selectedBeat) && (
                 <p className="text-[10px] text-amber-700 mt-1">Champs requis : titre, objectif, fonction narrative, conséquence.</p>
