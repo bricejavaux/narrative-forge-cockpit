@@ -93,7 +93,7 @@ Canon: ${JSON.stringify(canon ?? [])}${contextBlock}`;
       full_text: ai.text ?? '',
       model: ai.model,
       generation_log: 'Generated from validated planned beats (OpenAI).',
-      inputs: { planned_beats: total, canon_sample: canon?.length ?? 0 },
+      inputs: { planned_beats: total, canon_sample: canon?.length ?? 0, vector_context_used: vectorContextUsed, vector_indexes_active: vectorIndexesActive, vector_indexes_pending: vectorIndexesPending, vector_chunk_count: vectorChunks.length },
       planned_beat_coverage: 1.0,
       warnings: [],
     }).select().single();
