@@ -38,15 +38,29 @@ Deno.serve(async (req) => {
     const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const started = new Date().toISOString();
 
-    const { agent_id = null, target_type = null, target_id = null, scope = null, mode = 'live', model: bodyModel = null, payload = {}, instruction = null } = body ?? {};
+    const { agent_id: rawAgentId = null, agent_slug = null, target_type = null, target_id = null, scope = null, mode = 'live', model: bodyModel = null, payload = {}, instruction = null } = body ?? {};
+
+    const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+    const started = new Date().toISOString();
+
+    // Resolve agent_id from slug if provided
+    let agent_id: string | null = (typeof rawAgentId === 'string' && rawAgentId.length === 36) ? rawAgentId : null;
+    let agentRow: any = null;
+    if (agent_slug && typeof agent_slug === 'string') {
+      const { data: a } = await supa.from('agents').select('*').eq('external_id', agent_slug).maybeSingle();
+      if (a) { agent_id = a.id; agentRow = a; }
+    } else if (agent_id) {
+      const { data: a } = await supa.from('agents').select('*').eq('id', agent_id).maybeSingle();
+      agentRow = a;
+    }
 
     // 1. create run row (status=running)
     const { data: runRow, error: runErr } = await supa.from('runs').insert({
-      name: `${run_type}${agent_id ? ` · agent:${agent_id}` : ''}${target_id ? ` · ${target_type}:${String(target_id).slice(0, 8)}` : ''}`,
+      name: `${run_type}${agentRow?.external_id ? ` · ${agentRow.external_id}` : ''}${target_id ? ` · ${target_type}:${String(target_id).slice(0, 8)}` : ''}`,
       mode,
       status: 'running',
       started_at: started,
-      payload: { run_type, agent_id, target_type, target_id, scope, model: bodyModel, instruction, payload },
+      payload: { run_type, agent_id, agent_slug: agentRow?.external_id ?? agent_slug ?? null, target_type, target_id, scope, model: bodyModel, instruction, payload },
     }).select('id').single();
     if (runErr) return json({ error: `runs_insert_failed: ${runErr.message}`, stage: 'runs_insert_failed' }, 500);
     const run_id = runRow.id;
@@ -66,14 +80,8 @@ Deno.serve(async (req) => {
       catch (_) { /* never throw from output insert */ }
     };
 
-    // Resolve model: body override > agent.selected_model > null (let openai-agent-run pick default)
-    let resolvedModel: string | null = bodyModel;
-    let agentRow: any = null;
-    if (agent_id && typeof agent_id === 'string') {
-      const { data: a } = await supa.from('agents').select('*').eq('id', agent_id).maybeSingle();
-      agentRow = a;
-      if (!resolvedModel) resolvedModel = a?.selected_model ?? a?.default_model ?? null;
-    }
+    // Resolve model: body override > agent.selected_model > null
+    let resolvedModel: string | null = bodyModel ?? agentRow?.selected_model ?? agentRow?.default_model ?? null;
 
     try {
       // 2. dispatch
