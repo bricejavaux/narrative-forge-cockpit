@@ -129,15 +129,52 @@ export default function DiagnosticsPage() {
             </button>
           </div>
           {liveDiag && (
-            <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2.5">
-              <div className="flex items-center gap-2 mb-1 text-[11px] font-mono">
-                <span className={`px-1.5 py-0.5 rounded border ${liveDiag.mode === 'live' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
-                  {liveDiag.mode ?? 'error'}
+            <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2.5 space-y-2">
+              <div className="flex items-center gap-2 mb-1 text-[11px] font-mono flex-wrap">
+                <span className={`px-1.5 py-0.5 rounded border ${liveDiag.stage === 'completed' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+                  {liveDiag.stage ?? liveDiag.mode ?? 'error'}
                 </span>
+                {liveDiag.run_id && (
+                  <Link to="/runs" className="text-primary hover:underline inline-flex items-center gap-1">
+                    <ExternalLink size={10} /> run {String(liveDiag.run_id).slice(0, 8)}
+                  </Link>
+                )}
                 {liveDiag.model && <span className="text-muted-foreground">{liveDiag.model}</span>}
+                {liveDiag.findings_normalized != null && <span className="text-muted-foreground">{liveDiag.findings_normalized} finding(s) normalisé(s)</span>}
                 {liveDiag.error && <span className="text-rose-600">{liveDiag.error}</span>}
               </div>
-              <pre className="text-[10px] font-mono whitespace-pre-wrap max-h-64 overflow-auto">{JSON.stringify(liveDiag.diagnostic ?? liveDiag, null, 2)}</pre>
+
+              {liveFindings.length > 0 && (
+                <div className="space-y-1">
+                  <p className="editorial-eyebrow">Findings persistés (audit_findings)</p>
+                  {liveFindings.map((f) => (
+                    <div key={f.id} className="text-[11px] border border-border rounded p-2 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                          f.severity === 'error' ? 'bg-destructive/10 text-destructive border-destructive/30' :
+                          f.severity === 'warn' ? 'bg-amber-500/10 text-amber-700 border-amber-500/30' :
+                          'bg-slate-500/10 text-slate-600 border-slate-500/30'
+                        }`}>{f.severity}</span>
+                        <span className="flex-1 font-medium">{f.title}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground">{f.status}</span>
+                      </div>
+                      {f.detail && <p className="text-muted-foreground">{f.detail}</p>}
+                      {f.recommendation && <p className="text-muted-foreground italic">→ {f.recommendation}</p>}
+                      <div className="flex gap-1 flex-wrap">
+                        <button onClick={() => promoteFinding(f)} className="text-[10px] px-1.5 py-0.5 rounded border border-primary/40 text-primary inline-flex items-center gap-1"><FileEdit size={10} /> Créer commande corrective</button>
+                        <button onClick={() => updateFindingStatus(f.id, 'accepted')} className="text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/40 text-emerald-700">Accepter</button>
+                        <button onClick={() => updateFindingStatus(f.id, 'acceptable_as_is')} className="text-[10px] px-1.5 py-0.5 rounded border border-border">Acceptable</button>
+                        <button onClick={() => updateFindingStatus(f.id, 'ignored')} className="text-[10px] px-1.5 py-0.5 rounded border border-border">Ignorer</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <details className="text-[10px]">
+                <summary className="cursor-pointer text-muted-foreground">Payload brut</summary>
+                <pre className="text-[10px] font-mono whitespace-pre-wrap max-h-64 overflow-auto">{JSON.stringify(liveDiag.diagnostic ?? liveDiag, null, 2)}</pre>
+              </details>
             </div>
           )}
           <NoteComposer target="diagnostic global du tome" compact />
