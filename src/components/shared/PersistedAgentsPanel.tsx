@@ -122,31 +122,43 @@ export default function PersistedAgentsPanel() {
         <div>
           <h3 className="editorial-heading text-foreground text-lg">Agents persistés (Supabase)</h3>
           <p className="text-xs text-muted-foreground">
-            Source de vérité : Supabase. Le catalogue local (mock) sert uniquement de fallback si la base est vide.
+            Source de vérité unique : Supabase. Aucun catalogue mock n'est chargé en Production Test.
           </p>
         </div>
         <div className="flex gap-2">
           <button onClick={load} className="text-[10px] font-mono px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground">
             {loading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCcw size={10} />}
           </button>
-          <button
-            onClick={bootstrap}
-            disabled={busy}
-            className="text-[11px] font-mono px-2 py-1 rounded border border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 disabled:opacity-40"
-          >
-            {busy && <Loader2 size={10} className="animate-spin inline mr-1" />}
-            Initialize default agents in Supabase
-          </button>
+          {agents.length > 0 && (
+            <button
+              onClick={bootstrap}
+              disabled={busy}
+              className="text-[11px] font-mono px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground disabled:opacity-40"
+              title="Réapplique idempotemment les agents par défaut manquants."
+            >
+              {busy && <Loader2 size={10} className="animate-spin inline mr-1" />}
+              Upsert defaults
+            </button>
+          )}
         </div>
       </div>
 
       {err && <div className="text-[11px] text-rose flex items-center gap-1"><AlertTriangle size={11} /> {err}</div>}
 
       {agents.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">
-          Aucun agent persisté pour l'instant. Cliquez sur « Initialize » pour insérer les agents par défaut.
-          En attendant, le studio affiche le catalogue mock ci-dessous.
-        </p>
+        <div className="rounded border border-primary/30 bg-primary/5 p-4 text-center space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Aucun agent persisté dans Supabase pour l'instant.
+          </p>
+          <button
+            onClick={bootstrap}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40"
+          >
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
+            Initialiser les agents par défaut
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-12 gap-3">
           <div className="col-span-4 space-y-1 max-h-80 overflow-auto pr-1">
