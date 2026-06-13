@@ -73,10 +73,24 @@ Canon: ${JSON.stringify(canon ?? [])}`;
       metadata: { model: ai.model, version: nextVersion },
     });
 
-    // Best-effort: link to caller run (when invoked from run-execute)
-    const caller_run_id = (await req.clone().json().catch(() => ({})))?.run_id ?? null;
     const word_count = (ai.text ?? '').split(/\s+/).filter(Boolean).length;
     const preview = (ai.text ?? '').slice(0, 600);
+
+    // Best-effort: write a run_output entry if invoked from a tracked run.
+    if (caller_run_id) {
+      await supabase.from('run_outputs').insert({
+        run_id: caller_run_id,
+        output_type: 'chapter_generation',
+        payload: {
+          chapter_id, version: nextVersion, version_id: ver.id,
+          model: ai.model, word_count,
+          beats_total: total, beats_validated: validated,
+          vector_context_used: false,
+          full_text_preview: preview,
+        },
+      }).then(() => {}, () => {});
+      await supabase.from('runs').update({ status: 'success', completed_at: new Date().toISOString() } as any).eq('id', caller_run_id).then(() => {}, () => {});
+    }
 
     return json({
       ok: true,
@@ -89,6 +103,7 @@ Canon: ${JSON.stringify(canon ?? [])}`;
       run_id: caller_run_id,
       beats_total: total,
       beats_validated: validated,
+      vector_context_used: false,
     });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'unknown' }, 500);
