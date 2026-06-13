@@ -2924,7 +2924,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      match_vector_chunks: {
+        Args: {
+          index_names?: string[]
+          match_count?: number
+          query_embedding: string
+          similarity_threshold?: number
+        }
+        Returns: {
+          chunk_id: string
+          chunk_number: number
+          corpus_name: string
+          id: string
+          index_name: string
+          metadata: Json
+          similarity: number
+          source_file: string
+          text: string
+          text_excerpt: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

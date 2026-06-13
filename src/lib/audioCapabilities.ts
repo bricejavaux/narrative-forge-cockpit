@@ -1,6 +1,7 @@
 // Truthful per-capability status for the audio pipeline.
-// Each flag is resolved independently — we never aggregate to a single
-// "Whisper live" badge unless every step actually works.
+// Each flag is resolved independently from connection-status (single source
+// of truth). We never aggregate to one "Whisper live" badge — every step is
+// reported separately.
 import { supabase } from '@/integrations/supabase/client';
 
 export type CapabilityState = 'live' | 'blocked' | 'unsupported' | 'unknown';
@@ -11,6 +12,7 @@ export interface AudioCapabilities {
   audioUpload: { state: CapabilityState; reason: string };
   whisper: { state: CapabilityState; reason: string };
   patchApply: { state: CapabilityState; reason: string };
+  pipelineStatus: string;
   resolvedAt: string;
 }
 
@@ -29,31 +31,37 @@ export async function resolveAudioCapabilities(): Promise<AudioCapabilities> {
   const mic = checkMicCapture();
   const resolvedAt = new Date().toISOString();
 
-  // OpenAI readiness drives text-structure, whisper, and indirectly audio-upload.
-  let openaiReady = false;
+  // Source of truth = connection-status edge function (truthful, granular).
+  let status: any = null;
   try {
-    const { data } = await supabase.from('app_settings').select('value').eq('key', 'openai').maybeSingle();
-    openaiReady = !!(data?.value as any)?.api_key_configured;
-  } catch { /* keep false */ }
+    const { data } = await supabase.functions.invoke('connection-status', { body: {} });
+    status = data;
+  } catch { /* keep null */ }
 
-  const textStructure = openaiReady
-    ? { state: 'live' as const, reason: 'OpenAI configuré — structuration de notes texte disponible.' }
-    : { state: 'blocked' as const, reason: 'OPENAI_API_KEY absent dans app_settings.openai.' };
+  const openai = status?.openai ?? {};
+  const audio = status?.audio ?? {};
+  const pipelineStatus: string = audio?.pipeline_status ?? 'blocked';
 
-  // The audio-upload edge function uses service-role, so anon RLS is not the
-  // blocker. We assume "live" unless the user reports otherwise; explicit
-  // failures bubble up from the function call itself.
-  const audioUpload = openaiReady
-    ? { state: 'live' as const, reason: 'Edge function audio-upload disponible (service-role, contourne RLS storage/audio_notes).' }
-    : { state: 'blocked' as const, reason: 'OpenAI absent — la chaîne audio complète ne peut pas finaliser la transcription.' };
+  const textStructure: { state: CapabilityState; reason: string } = openai.structuring_available
+    ? { state: 'live', reason: 'openai-structure-note disponible (OPENAI_API_KEY configurée).' }
+    : { state: 'blocked', reason: 'OPENAI_API_KEY absent — structuration indisponible.' };
 
-  const whisper = openaiReady
-    ? { state: 'live' as const, reason: 'Edge function openai-transcribe-audio disponible (whisper-1).' }
-    : { state: 'blocked' as const, reason: 'OPENAI_API_KEY absent — Whisper indisponible.' };
+  const audioUpload: { state: CapabilityState; reason: string } = audio.audio_upload_function_available && audio.audio_bucket_exists
+    ? { state: 'live', reason: 'audio-upload disponible (service-role, contourne RLS).' }
+    : { state: 'blocked', reason: audio.audio_bucket_exists ? 'audio-upload indisponible.' : 'Bucket audio absent.' };
 
-  const patchApply = openaiReady
-    ? { state: 'live' as const, reason: 'Application de patch via supabaseService.applyStructuredNotePatch.' }
-    : { state: 'blocked' as const, reason: 'Pas de proposition à appliquer tant que la structuration OpenAI est bloquée.' };
+  let whisper: { state: CapabilityState; reason: string };
+  if (pipelineStatus === 'transcription_live') {
+    whisper = { state: 'live', reason: 'openai-transcribe-audio implémenté de bout en bout (download + Whisper + persist).' };
+  } else if (pipelineStatus === 'upload_live_transcription_pending') {
+    whisper = { state: 'blocked', reason: openai.api_key_configured ? 'Transcription non implémentée côté edge function.' : 'OPENAI_API_KEY absent — Whisper indisponible.' };
+  } else {
+    whisper = { state: 'blocked', reason: 'Bucket audio absent — toute la chaîne audio est bloquée.' };
+  }
+
+  const patchApply: { state: CapabilityState; reason: string } = openai.structuring_available
+    ? { state: 'live', reason: 'Application de patch via governance-update / supabaseService.applyStructuredNotePatch.' }
+    : { state: 'blocked', reason: 'Pas de proposition à appliquer tant que la structuration OpenAI est bloquée.' };
 
   return {
     textStructure,
@@ -61,6 +69,7 @@ export async function resolveAudioCapabilities(): Promise<AudioCapabilities> {
     audioUpload,
     whisper,
     patchApply,
+    pipelineStatus,
     resolvedAt,
   };
 }

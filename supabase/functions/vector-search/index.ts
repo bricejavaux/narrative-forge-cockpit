@@ -70,58 +70,78 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: e instanceof Error ? e.message : 'embed_failed' }, 200);
     }
 
-    // Raw SQL via RPC-like select using <=> cosine distance.
-    // We call the table directly with order on cosine distance via SQL string fallback.
-    // Supabase JS does not expose <=> directly; use postgrest 'rpc' if defined, else a parameterised select using raw filter.
-    // We use a textual cast for the vector.
-    const vectorStr = `[${embedding.join(',')}]`;
+    const fallback_allowed = body.fallback_allowed === true;
 
-    // We cannot easily do <=> via supabase-js. Use the underlying REST with a custom SQL via .rpc?
-    // Simplest path: select all chunks for the active indexes and compute distance in JS. Cap to 5000 to stay safe.
-    const { data: candidates } = await supa
-      .from('vector_chunks')
-      .select('id,index_name,corpus_name,chunk_id,text,text_excerpt,source_file,chunk_number,metadata,embedding')
-      .in('index_name', indexes_active)
-      .eq('embedding_status', 'done')
-      .limit(2000);
-
-    const scored: any[] = [];
-    for (const c of (candidates ?? [])) {
-      const emb: any = (c as any).embedding;
-      let arr: number[] | null = null;
-      if (Array.isArray(emb)) arr = emb;
-      else if (typeof emb === 'string') {
-        try { arr = JSON.parse(emb); } catch { arr = null; }
-      }
-      if (!arr || arr.length !== embedding.length) continue;
-      let dot = 0, na = 0, nb = 0;
-      for (let i = 0; i < arr.length; i++) {
-        dot += arr[i] * embedding[i];
-        na += arr[i] * arr[i];
-        nb += embedding[i] * embedding[i];
-      }
-      const sim = dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-9);
-      if (sim >= similarity_threshold) {
-        scored.push({ ...c, embedding: undefined, similarity: sim });
+    // Primary path: pgvector RPC match_vector_chunks (cosine).
+    let top: any[] = [];
+    let used_path: 'rpc' | 'js_fallback' = 'rpc';
+    let rpc_error: string | null = null;
+    {
+      const { data: rpcData, error: rpcErr } = await supa.rpc('match_vector_chunks', {
+        query_embedding: embedding as any,
+        match_count: top_k,
+        index_names: indexes_active,
+        similarity_threshold,
+      });
+      if (rpcErr) {
+        rpc_error = rpcErr.message;
+      } else if (Array.isArray(rpcData)) {
+        top = rpcData;
       }
     }
-    scored.sort((a, b) => b.similarity - a.similarity);
-    const top = scored.slice(0, top_k);
 
-    await supa.from('retrieval_logs').insert({
+    // Fallback only if explicitly allowed (the RPC is the primary path now).
+    if ((rpc_error || top.length === 0) && fallback_allowed) {
+      used_path = 'js_fallback';
+      const { data: candidates } = await supa
+        .from('vector_chunks')
+        .select('id,index_name,corpus_name,chunk_id,text,text_excerpt,source_file,chunk_number,metadata,embedding')
+        .in('index_name', indexes_active)
+        .eq('embedding_status', 'done')
+        .limit(2000);
+      const scored: any[] = [];
+      for (const c of (candidates ?? [])) {
+        const emb: any = (c as any).embedding;
+        let arr: number[] | null = null;
+        if (Array.isArray(emb)) arr = emb;
+        else if (typeof emb === 'string') { try { arr = JSON.parse(emb); } catch { arr = null; } }
+        if (!arr || arr.length !== embedding.length) continue;
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < arr.length; i++) { dot += arr[i] * embedding[i]; na += arr[i] * arr[i]; nb += embedding[i] * embedding[i]; }
+        const sim = dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-9);
+        if (sim >= similarity_threshold) scored.push({ ...c, embedding: undefined, similarity: sim });
+      }
+      scored.sort((a, b) => b.similarity - a.similarity);
+      top = scored.slice(0, top_k);
+    } else if (rpc_error && !fallback_allowed) {
+      return json({
+        ok: false,
+        error: 'match_vector_chunks RPC failed',
+        rpc_error,
+        hint: 'Pass fallback_allowed=true to use the JS scan fallback.',
+        indexes_active,
+      }, 500);
+    }
+
+    const { data: logRow } = await supa.from('retrieval_logs').insert({
       agent_id, run_id, query, index_names, top_k, similarity_threshold,
       result_count: top.length, model: embed_model,
-      metadata: { indexes_active, indexes_pending, candidates: candidates?.length ?? 0 },
-    });
+      metadata: { indexes_active, indexes_pending, used_path, rpc_error },
+    }).select('id').maybeSingle();
 
     return json({
       ok: true,
       mode: 'live',
+      used_path,
+      index_names: indexes_active,
+      top_k,
       indexes_requested: index_names,
       indexes_active,
       indexes_pending,
       retrieved_chunks: top,
+      retrieval_log_id: logRow?.id ?? null,
     });
+
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : 'unknown' }, 500);
   }

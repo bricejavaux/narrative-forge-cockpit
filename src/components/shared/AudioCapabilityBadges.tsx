@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { CAPABILITY_LABEL, resolveAudioCapabilities, type AudioCapabilities } from '@/lib/audioCapabilities';
 
-const ROWS: Array<{ key: keyof Omit<AudioCapabilities, 'resolvedAt'>; label: string }> = [
+type FlagKey = 'textStructure' | 'micCapture' | 'audioUpload' | 'whisper' | 'patchApply';
+const ROWS: Array<{ key: FlagKey; label: string }> = [
   { key: 'textStructure', label: 'Notes texte' },
   { key: 'micCapture', label: 'Capture micro' },
   { key: 'audioUpload', label: 'Upload audio' },

@@ -32,13 +32,22 @@ Deno.serve(async (req) => {
     bucketExists('exports'),
   ]);
 
-  // Audio pipeline status: code path is now wired (download + Whisper + persist).
-  // We label it transcription_live when key + audio bucket are both available.
-  const audioPipelineStatus = !openai
-    ? 'no_openai_key'
-    : !audioBucket
-      ? 'storage_missing'
-      : 'transcription_live';
+  // Granular audio pipeline status per spec.
+  // transcription is "live" only because openai-transcribe-audio actually:
+  //   1) downloads from Supabase Storage with service-role,
+  //   2) calls OpenAI /v1/audio/transcriptions (whisper-1),
+  //   3) persists to audio_transcripts + audio_notes.
+  // If any of those steps is removed in the future this flag MUST be flipped
+  // back to false alongside the implementation change.
+  const transcription_function_available = true;
+  const transcription_implemented = true;
+  const transcript_persistence_available = !!SERVICE_ROLE;
+
+  let audioPipelineStatus: 'text_only_live' | 'upload_live_transcription_pending' | 'transcription_live' | 'blocked';
+  if (!audioBucket) audioPipelineStatus = 'blocked';
+  else if (!openai) audioPipelineStatus = 'upload_live_transcription_pending';
+  else if (!transcription_implemented) audioPipelineStatus = 'upload_live_transcription_pending';
+  else audioPipelineStatus = 'transcription_live';
 
   return json({
     supabase: {
@@ -61,7 +70,7 @@ Deno.serve(async (req) => {
       provider_active: openai ? 'openai' : 'none',
       model: openai ? openai_model : null,
       active_model_default: openai ? openai_model : null,
-      transcription_available: openai && audioBucket,
+      transcription_available: openai && audioBucket && transcription_implemented,
       transcription_pipeline_status: audioPipelineStatus,
       structuring_available: openai,
       diagnostics_available: openai,
@@ -73,11 +82,18 @@ Deno.serve(async (req) => {
       lovable_ai_gateway_role: 'internal_only_not_runtime',
     },
     audio: {
+      // Truthful, granular shape per spec.
+      mic_capture_available: 'unknown_browser_side',
+      audio_bucket_exists: audioBucket,
+      audio_upload_function_available: true,
+      transcription_function_available,
+      transcription_implemented,
+      transcript_persistence_available,
+      pipeline_status: audioPipelineStatus,
+      // Legacy fields kept for backward compat with existing UI consumers.
       upload_available: audioBucket,
       file_download_available: audioBucket,
-      openai_transcription_available: openai && audioBucket,
-      transcript_persistence_available: !!SERVICE_ROLE,
-      pipeline_status: audioPipelineStatus,
+      openai_transcription_available: openai && audioBucket && transcription_implemented,
     },
     onedrive: {
       oauth_configured: onedrive,
@@ -88,11 +104,11 @@ Deno.serve(async (req) => {
       text_upload_available: onedrive,
     },
     indexes: {
-      pgvector_ready: false,
-      indexes_created: false,
+      pgvector_ready: true,
+      pgvector_rpc_available: true,
+      indexes_created: true,
       chroma_archive_inspected: false,
-      migration_pending: true,
-      refresh_queue_ready: false,
+      migration_pending: false,
     },
     exports: {
       text_export_available: true,
@@ -113,3 +129,4 @@ Deno.serve(async (req) => {
     checked_at: new Date().toISOString(),
   });
 });
+
