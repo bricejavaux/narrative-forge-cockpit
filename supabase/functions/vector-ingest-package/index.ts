@@ -59,7 +59,6 @@ Deno.serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
-        apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       },
       body: JSON.stringify({ corpus: corpus_name, sampleSize: limit ?? 2000 }),
     });
