@@ -1,6 +1,5 @@
 // deno-lint-ignore-file
-// vector-search: embed a query and run cosine top-k against vector_chunks.
-// Falls back to metadata-only message if no embeddings exist for the requested indexes.
+// vector-search: embed a query and run cosine top-k against vector_chunks via match_vector_chunks RPC.
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
@@ -14,7 +13,7 @@ async function embedOne(text: string, model: string): Promise<number[]> {
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, input: text }),
   });
-  if (!res.ok) throw new Error(`openai embeddings ${res.status}`);
+  if (!res.ok) throw new Error(`openai embeddings ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const data = await res.json();
   return data.data[0].embedding as number[];
 }
@@ -24,9 +23,14 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const query = String(body.query ?? '').trim();
-    const index_names: string[] = Array.isArray(body.index_names) ? body.index_names : [];
+    const index_name = body.index_name ? String(body.index_name) : null;
+    const corpus = body.corpus ? String(body.corpus) : null;
+    // Legacy support: index_names[] picks the first.
+    const legacy_index = Array.isArray(body.index_names) && body.index_names.length > 0
+      ? String(body.index_names[0]) : null;
+    const effective_index = index_name ?? legacy_index;
     const top_k = Math.max(1, Math.min(50, Number(body.top_k ?? 8)));
-    const similarity_threshold = Number(body.similarity_threshold ?? 0.72);
+    const min_similarity = Number(body.min_similarity ?? body.similarity_threshold ?? 0.20);
     const agent_id = body.agent_id ?? null;
     const run_id = body.run_id ?? null;
     const embed_model = String(body.embedding_model ?? DEFAULT_EMBED_MODEL);
@@ -39,109 +43,67 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false } },
     );
 
-    // Pre-check: are requested indexes active?
-    const { data: idx } = await supa
-      .from('vector_indexes')
-      .select('name,status,chunk_count')
-      .in('name', index_names.length ? index_names : ['__none__']);
-    const indexes_active = (idx ?? []).filter((i: any) => i.status === 'active' && (i.chunk_count ?? 0) > 0).map((i: any) => i.name);
-    const indexes_pending = index_names.filter((n) => !indexes_active.includes(n));
+    // Pre-check active embeddings
+    let activeQ = supa.from('vector_chunks').select('id', { count: 'exact', head: true })
+      .eq('embedding_status', 'done').not('embedding', 'is', null);
+    if (effective_index) activeQ = activeQ.eq('index_name', effective_index);
+    if (corpus) activeQ = activeQ.eq('corpus_name', corpus);
+    const { count: activeCount } = await activeQ;
 
-    if (indexes_active.length === 0) {
+    if (!activeCount || activeCount === 0) {
       await supa.from('retrieval_logs').insert({
-        agent_id, run_id, query, index_names, top_k, similarity_threshold, result_count: 0,
-        model: embed_model, metadata: { indexes_pending },
+        agent_id, run_id, query,
+        index_names: effective_index ? [effective_index] : [],
+        top_k, similarity_threshold: min_similarity,
+        result_count: 0, model: embed_model,
+        metadata: { reason: 'no_active_embeddings', corpus, index_name: effective_index },
       });
       return json({
         ok: true,
         mode: 'pending_pgvector',
-        warning: 'No active embeddings for requested indexes. Run vector-ingest-package with mode=embed_and_store first.',
-        indexes_requested: index_names,
-        indexes_active,
-        indexes_pending,
+        warning: 'Aucun embedding actif pour ce corpus/index. Lancez vector-ingest-package d\'abord.',
+        index_name: effective_index, corpus,
         retrieved_chunks: [],
       });
     }
 
     let embedding: number[];
-    try {
-      embedding = await embedOne(query, embed_model);
-    } catch (e) {
-      return json({ ok: false, error: e instanceof Error ? e.message : 'embed_failed' }, 200);
+    try { embedding = await embedOne(query, embed_model); }
+    catch (e) { return json({ ok: false, error: e instanceof Error ? e.message : 'embed_failed' }, 200); }
+
+    const { data: rows, error: rpcErr } = await supa.rpc('match_vector_chunks', {
+      query_embedding: embedding as any,
+      match_index_name: effective_index,
+      match_corpus: corpus,
+      match_count: top_k,
+      min_similarity,
+    });
+
+    if (rpcErr) {
+      return json({ ok: false, error: 'match_vector_chunks RPC failed', rpc_error: rpcErr.message }, 500);
     }
 
-    const fallback_allowed = body.fallback_allowed === true;
-
-    // Primary path: pgvector RPC match_vector_chunks (cosine).
-    let top: any[] = [];
-    let used_path: 'rpc' | 'js_fallback' = 'rpc';
-    let rpc_error: string | null = null;
-    {
-      const { data: rpcData, error: rpcErr } = await supa.rpc('match_vector_chunks', {
-        query_embedding: embedding as any,
-        match_count: top_k,
-        index_names: indexes_active,
-        similarity_threshold,
-      });
-      if (rpcErr) {
-        rpc_error = rpcErr.message;
-      } else if (Array.isArray(rpcData)) {
-        top = rpcData;
-      }
-    }
-
-    // Fallback only if explicitly allowed (the RPC is the primary path now).
-    if ((rpc_error || top.length === 0) && fallback_allowed) {
-      used_path = 'js_fallback';
-      const { data: candidates } = await supa
-        .from('vector_chunks')
-        .select('id,index_name,corpus_name,chunk_id,text,text_excerpt,source_file,chunk_number,metadata,embedding')
-        .in('index_name', indexes_active)
-        .eq('embedding_status', 'done')
-        .limit(2000);
-      const scored: any[] = [];
-      for (const c of (candidates ?? [])) {
-        const emb: any = (c as any).embedding;
-        let arr: number[] | null = null;
-        if (Array.isArray(emb)) arr = emb;
-        else if (typeof emb === 'string') { try { arr = JSON.parse(emb); } catch { arr = null; } }
-        if (!arr || arr.length !== embedding.length) continue;
-        let dot = 0, na = 0, nb = 0;
-        for (let i = 0; i < arr.length; i++) { dot += arr[i] * embedding[i]; na += arr[i] * arr[i]; nb += embedding[i] * embedding[i]; }
-        const sim = dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-9);
-        if (sim >= similarity_threshold) scored.push({ ...c, embedding: undefined, similarity: sim });
-      }
-      scored.sort((a, b) => b.similarity - a.similarity);
-      top = scored.slice(0, top_k);
-    } else if (rpc_error && !fallback_allowed) {
-      return json({
-        ok: false,
-        error: 'match_vector_chunks RPC failed',
-        rpc_error,
-        hint: 'Pass fallback_allowed=true to use the JS scan fallback.',
-        indexes_active,
-      }, 500);
-    }
+    const retrieved = Array.isArray(rows) ? rows : [];
 
     const { data: logRow } = await supa.from('retrieval_logs').insert({
-      agent_id, run_id, query, index_names, top_k, similarity_threshold,
-      result_count: top.length, model: embed_model,
-      metadata: { indexes_active, indexes_pending, used_path, rpc_error },
+      agent_id, run_id, query,
+      index_names: effective_index ? [effective_index] : [],
+      top_k, similarity_threshold: min_similarity,
+      result_count: retrieved.length, model: embed_model,
+      metadata: { corpus, index_name: effective_index, embedding_model: embed_model },
     }).select('id').maybeSingle();
 
     return json({
       ok: true,
       mode: 'live',
-      used_path,
-      index_names: indexes_active,
+      index_name: effective_index,
+      corpus,
       top_k,
-      indexes_requested: index_names,
-      indexes_active,
-      indexes_pending,
-      retrieved_chunks: top,
+      min_similarity,
+      retrieved_chunks: retrieved,
       retrieval_log_id: logRow?.id ?? null,
+      embedding_model: embed_model,
     });
-
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : 'unknown' }, 500);
   }
