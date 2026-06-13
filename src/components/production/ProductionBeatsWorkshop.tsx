@@ -636,7 +636,36 @@ export default function ProductionBeatsWorkshop({
                 </button>
                 <button onClick={runPlannedAudit} disabled={persisted.length === 0}
                   className="text-xs px-3 py-1.5 rounded border border-violet-500/40 text-violet-700 hover:bg-violet-500/5 disabled:opacity-50 inline-flex items-center gap-1.5">
-                  <ClipboardCheck size={12} /> 4. Auditer les beats prévus
+                  <ClipboardCheck size={12} /> 4a. Audit local (règles)
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!selectedChapter || persisted.length === 0) { alert('Aucun beat persisté à auditer.'); return; }
+                    // Resolve agent_audit_planned_beats by external_id (no direct openai-agent-run call).
+                    const { data: agentRow } = await supabase.from('agents')
+                      .select('id').or('external_id.eq.agent_audit_planned_beats,external_id.eq.audit_planned_beats')
+                      .limit(1).maybeSingle();
+                    const { data, error } = await supabase.functions.invoke('run-execute', {
+                      body: {
+                        run_type: 'audit_planned_beats',
+                        agent_id: agentRow?.id ?? null,
+                        target_type: 'chapter', target_id: selectedChapter.id, mode: 'live',
+                        instruction: `Audit des beats prévus du chapitre ${selectedChapter.number ?? ''} — ${selectedChapter.title ?? ''}.`,
+                        payload: { beats: persisted.map((p) => ({ beat_number: p.beat_number, title: p.title, objective: p.objective, narrative_function: p.narrative_function })) },
+                      },
+                    });
+                    if (error) { alert(`Audit agent: ${error.message}`); return; }
+                    const f = (data as any)?.findings ?? [];
+                    setAuditResults(f.length === 0
+                      ? [{ severity: 'info', message: `Agent: aucun défaut signalé. Trace run ${String((data as any)?.run_id ?? '').slice(0, 8)}.` }]
+                      : f.map((x: any) => ({ severity: (x?.severity ?? 'info') as 'info'|'warn'|'error', message: `[${x?.severity ?? 'info'}] ${x?.title ?? ''} — ${x?.note ?? x?.detail ?? ''}` })));
+                    setAuditOpen(true);
+                  }}
+                  disabled={persisted.length === 0}
+                  className="text-xs px-3 py-1.5 rounded border border-primary/40 text-primary hover:bg-primary/5 disabled:opacity-50 inline-flex items-center gap-1.5"
+                  title="Lance l'agent d'audit via run-execute (run persisté visible dans Runs)."
+                >
+                  <ClipboardCheck size={12} /> 4b. Audit agent → Runs
                 </button>
               </div>
 
