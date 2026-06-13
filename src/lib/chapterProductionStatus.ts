@@ -65,7 +65,7 @@ export function getChapterProductionStatus(
 }
 
 /** Default fallback so a chapter card is never fully grey if a chapter row exists. */
-export function defaultStageMap(chapter?: { id?: string } | null): StageMap {
+export function defaultStageMap(chapter?: { id: string; full_text?: string | null; locked?: boolean | null } | null): StageMap {
   return getChapterProductionStatus(chapter ?? null, {
     planned: { total: 0, complete: 0, validated: 0 },
     observed: 0,
