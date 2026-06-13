@@ -67,7 +67,23 @@ Canon: ${JSON.stringify(canon ?? [])}`;
       metadata: { model: ai.model, version: nextVersion },
     });
 
-    return json({ ok: true, version: nextVersion, version_id: ver.id, model: ai.model });
+    // Best-effort: link to caller run (when invoked from run-execute)
+    const caller_run_id = (await req.clone().json().catch(() => ({})))?.run_id ?? null;
+    const word_count = (ai.text ?? '').split(/\s+/).filter(Boolean).length;
+    const preview = (ai.text ?? '').slice(0, 600);
+
+    return json({
+      ok: true,
+      version: nextVersion,
+      version_id: ver.id,
+      model: ai.model,
+      chapter_id,
+      word_count,
+      full_text_preview: preview,
+      run_id: caller_run_id,
+      beats_total: total,
+      beats_validated: validated,
+    });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'unknown' }, 500);
   }
