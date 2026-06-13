@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import StatusBadge from '@/components/shared/StatusBadge';
 import NoteComposer from '@/components/shared/NoteComposer';
 import AudioReviewTypesPanel from '@/components/shared/AudioReviewTypesPanel';
+import ReviewSessionsPanel from '@/components/shared/ReviewSessionsPanel';
 import { Mic, X, Copy, CheckCheck, Wand2, Loader2 } from 'lucide-react';
 import { supabaseService, type ConnectionReadiness } from '@/services/supabaseService';
 import { supabase } from '@/integrations/supabase/client';
@@ -191,13 +192,7 @@ export default function AudioPage() {
 
       {activeSection === 'Types de relecture' && <AudioReviewTypesPanel />}
 
-      {activeSection === 'Sessions de lecture' && (
-        <div className="cockpit-card p-6 text-xs text-muted-foreground space-y-1">
-          <p className="font-display text-sm text-foreground">Sessions de relecture</p>
-          <p>Aucune session formalisée — notes ponctuelles disponibles via l'onglet « Notes audio ».</p>
-          <p className="italic">Création de session : non implémenté — formulaire <code>review_sessions</code> à câbler (Phase 2).</p>
-        </div>
-      )}
+      {activeSection === 'Sessions de lecture' && <ReviewSessionsPanel />}
 
       {/* Detail drawer */}
       {openNote && (

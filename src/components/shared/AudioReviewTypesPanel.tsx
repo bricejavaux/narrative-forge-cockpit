@@ -38,7 +38,7 @@ export default function AudioReviewTypesPanel() {
           </p>
         </div>
         <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${hasLive ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30' : 'bg-amber-500/10 text-amber-700 border-amber-500/30'}`}>
-          {hasLive ? `${audioNotesCount} note(s) en base` : 'mock fallback — exemples de notes'}
+          {hasLive ? `${audioNotesCount} note(s) en base` : 'aucune note en base'}
         </span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
