@@ -127,17 +127,22 @@ Deno.serve(async (req) => {
 
     const docId = doc?.id ?? null;
 
-    // Prepare chunk rows
-    const rows = sampleChunks.map((c: any, i: number) => {
+    // Prepare chunk rows (with stable chunk_hash)
+    const rows = await Promise.all(sampleChunks.map(async (c: any, i: number) => {
       const text = c.text ?? c.content ?? c.text_excerpt ?? '';
+      const source_file = c.source_file ?? pkg.onedrive_path;
+      const chunk_hash = await sha256Hex(`${corpus_name}|${source_file}|${i}|${(text || '').slice(0, 8000)}`);
       return {
         index_name: target_index,
         corpus_name,
         chunk_id: c.chunk_id ?? `${corpus_name}-${docId}-${i}`,
         document_id: docId,
-        source_file: c.source_file ?? pkg.onedrive_path,
+        source_package_id: pkg.id,
+        source_file,
+        source_title: c.source_title ?? pkg.title ?? null,
         source_id: c.source_id ?? null,
         chunk_number: c.chunk_number ?? i,
+        chunk_hash,
         target_index,
         usage: c.usage ?? pkg.usage,
         rights: c.rights ?? pkg.rights,
@@ -147,7 +152,8 @@ Deno.serve(async (req) => {
         embedding_model: mode === 'embed_and_store' ? embedding_model : null,
         embedding_status: mode === 'embed_and_store' ? 'pending' : 'metadata_only',
       } as any;
-    });
+    }));
+
 
     let embeddingsWritten = 0;
 
