@@ -126,7 +126,7 @@ Canon: ${JSON.stringify(canon ?? [])}${contextBlock}`;
           full_text_preview: preview,
         },
       }).then(() => {}, () => {});
-      await supabase.from('runs').update({ status: 'success', completed_at: new Date().toISOString() } as any).eq('id', caller_run_id).then(() => {}, () => {});
+      await supabase.from('runs').update({ status: 'completed', completed_at: new Date().toISOString() } as any).eq('id', caller_run_id).then(() => {}, () => {});
     }
 
     return json({

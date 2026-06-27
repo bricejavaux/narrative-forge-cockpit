@@ -31,8 +31,9 @@ export const chapterProductionService = {
   },
 
   async listRewriteTasks(chapter_id: string) {
-    const { data } = await supabase.from('rewrite_tasks').select('*').eq('chapter_id', chapter_id).order('created_at', { ascending: false });
-    return data ?? [];
+    const { data } = await supabase.from('rewrite_tasks').select('*').order('created_at', { ascending: false });
+    const rows = data ?? [];
+    return rows.filter((row: any) => row.target_type === 'chapter' && row.target_id === chapter_id);
   },
 
   async setRewriteStatus(id: string, status: 'pending' | 'accepted' | 'rejected' | 'escalated') {
