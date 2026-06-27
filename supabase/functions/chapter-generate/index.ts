@@ -83,9 +83,22 @@ Canon: ${JSON.stringify(canon ?? [])}${contextBlock}`;
     const ai = await callOpenAI({ user: prompt, model, temperature: 0.7, maxOutputTokens: 4000 });
     if (!ai.ok) return json({ error: ai.error, degraded: true }, 200);
 
-    // New chapter version
+    // Snapshot: preserve the existing full_text before overwriting it.
     const { data: existing } = await supabase.from('chapter_versions').select('version').eq('chapter_id', chapter_id).order('version', { ascending: false }).limit(1);
-    const nextVersion = (existing?.[0]?.version ?? 0) + 1;
+    let nextVersion = (existing?.[0]?.version ?? 0) + 1;
+
+    if ((chapter as any).full_text) {
+      await supabase.from('chapter_versions').insert({
+        chapter_id,
+        version: nextVersion,
+        full_text: (chapter as any).full_text,
+        generation_log: 'Snapshot avant régénération.',
+        inputs: {},
+        planned_beat_coverage: null,
+        warnings: [],
+      });
+      nextVersion += 1;
+    }
 
     const { data: ver, error: verErr } = await supabase.from('chapter_versions').insert({
       chapter_id,

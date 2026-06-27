@@ -85,6 +85,26 @@ Deno.serve(async (req) => {
     }
 
     const client = sb();
+
+    // Guard: beats mutations are blocked if the parent chapter is locked.
+    if (target_table === 'beats') {
+      const { data: beatRows } = await client
+        .from('beats')
+        .select('chapter_id')
+        .in('id', record_ids);
+      const chapterIds = [...new Set((beatRows ?? []).map((r: any) => r.chapter_id).filter(Boolean))];
+      if (chapterIds.length > 0) {
+        const { data: lockedChapters } = await client
+          .from('chapters')
+          .select('id')
+          .in('id', chapterIds)
+          .eq('locked', true);
+        if ((lockedChapters ?? []).length > 0) {
+          return json({ error: 'chapter_locked', blocked: true, locked_chapter_ids: (lockedChapters ?? []).map((r: any) => r.id) }, 409);
+        }
+      }
+    }
+
     const now = new Date().toISOString();
     let basePatch: Record<string, any> = { updated_at: now };
     const hasNeedsReview = target_table === 'canon_objects' || target_table === 'characters';

@@ -195,6 +195,7 @@ Deno.serve(async (req) => {
               status: 'pending',
               requires_validation: true,
               created_by_agent: typeof agent_id === 'string' ? agent_id : null,
+              metadata: { run_id, source: 'run-execute' },
             });
           } catch (_) {}
         }

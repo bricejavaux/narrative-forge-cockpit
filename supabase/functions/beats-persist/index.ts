@@ -25,10 +25,11 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: chapter } = await supabase
       .from('chapters')
-      .select('id,tome_id,number')
+      .select('id,tome_id,number,locked')
       .eq('id', chapter_id)
       .maybeSingle();
     if (!chapter) return json({ error: 'chapter_not_found' }, 404);
+    if ((chapter as any).locked) return json({ error: 'chapter_locked', blocked: true }, 409);
 
     const now = new Date().toISOString();
     let inserted = 0;
