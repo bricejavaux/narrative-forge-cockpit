@@ -1,0 +1,12 @@
+{
+    "format": "v1", "title": "Autoplay sans OK", "version": 1,
+    "stageNodes": [
+        { "uuid": "ap-entry", "name": "Question", "squareOne": true, "image": null, "audio": null,
+          "okTransition": { "actionNode": "act-suite", "optionIndex": 0 }, "homeTransition": null,
+          "controlSettings": { "wheel": false, "ok": false, "home": false, "pause": false, "autoplay": true } },
+        { "uuid": "ap-next", "name": "Suite", "image": null, "audio": null,
+          "okTransition": null, "homeTransition": null,
+          "controlSettings": { "wheel": false, "ok": false, "home": false, "pause": false, "autoplay": false } }
+    ],
+    "actionNodes": [ { "id": "act-suite", "options": [ "ap-next" ] } ]
+}

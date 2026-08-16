@@ -1,0 +1,6 @@
+pack title="Autoplay sans OK" version=1 nightMode=0 stages=2 actions=1 entry=ap-entry
+step=0 event=load status=ACCEPTED stage=ap-entry name="Question" image=- audio=- wheel=0 ok=0 home=0 pause=0 autoplay=1 action=- index=-
+step=1 event=ok status=IGNORED_CONTROL_DISABLED stage=ap-entry name="Question" image=- audio=- wheel=0 ok=0 home=0 pause=0 autoplay=1 action=- index=-
+step=2 event=ended status=ACCEPTED stage=ap-next name="Suite" image=- audio=- wheel=0 ok=0 home=0 pause=0 autoplay=0 action=act-suite index=0/1
+step=3 event=ended status=IGNORED_CONTROL_DISABLED stage=ap-next name="Suite" image=- audio=- wheel=0 ok=0 home=0 pause=0 autoplay=0 action=act-suite index=0/1
+exit=0
