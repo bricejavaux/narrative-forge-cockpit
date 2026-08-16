@@ -1,0 +1,3 @@
+[warn] champ version absent ou illisible : pack refuse
+erreur: chargement de "tests/packs/no-version" impossible (ERR_NO_VERSION)
+exit=1

@@ -1,0 +1,15 @@
+{
+    "format": "v1", "title": "Cycle", "version": 1,
+    "stageNodes": [
+        { "uuid": "c-a", "name": "A", "image": null, "audio": null,
+          "okTransition": { "actionNode": "act-b", "optionIndex": 0 }, "homeTransition": null,
+          "controlSettings": { "wheel": false, "ok": true, "home": true, "pause": false, "autoplay": true } },
+        { "uuid": "c-b", "name": "B", "image": null, "audio": null,
+          "okTransition": { "actionNode": "act-a", "optionIndex": 0 }, "homeTransition": null,
+          "controlSettings": { "wheel": false, "ok": true, "home": true, "pause": false, "autoplay": true } }
+    ],
+    "actionNodes": [
+        { "id": "act-b", "options": [ "c-b" ] },
+        { "id": "act-a", "options": [ "c-a" ] }
+    ]
+}

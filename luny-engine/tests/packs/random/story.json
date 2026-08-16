@@ -1,0 +1,20 @@
+{
+    "format": "v1", "title": "Tirage", "version": 1,
+    "stageNodes": [
+        { "uuid": "s-entry", "name": "Entree", "squareOne": true, "image": "a.png", "audio": null,
+          "okTransition": { "actionNode": "act-random", "optionIndex": -1 }, "homeTransition": null,
+          "controlSettings": { "wheel": true, "ok": true, "home": true, "pause": false, "autoplay": false } },
+        { "uuid": "s-1", "name": "Tirage 1", "image": null, "audio": null,
+          "okTransition": null, "homeTransition": null,
+          "controlSettings": { "wheel": true, "ok": false, "home": true, "pause": false, "autoplay": false } },
+        { "uuid": "s-2", "name": "Tirage 2", "image": null, "audio": null,
+          "okTransition": null, "homeTransition": null,
+          "controlSettings": { "wheel": true, "ok": false, "home": true, "pause": false, "autoplay": false } },
+        { "uuid": "s-3", "name": "Tirage 3", "image": null, "audio": null,
+          "okTransition": null, "homeTransition": null,
+          "controlSettings": { "wheel": true, "ok": false, "home": true, "pause": false, "autoplay": false } }
+    ],
+    "actionNodes": [
+        { "id": "act-random", "name": "Tirage", "options": [ "s-1", "s-2", "s-3" ] }
+    ]
+}
