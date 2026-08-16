@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Luny — maquette 3GS v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1020; --slate:#1B2036; --panel:#232941; --line:#333B58;
+    --moon:#C8D3F2; --dim:#7C88AD; --lamp:#F0B357; --rose:#D98FA6; --sage:#8FC7A8;
+    --disp:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(900px 600px at 15% -10%,#232A4A 0%,transparent 60%),var(--ink);
+    color:var(--moon);font-family:var(--disp);font-weight:300;
+    -webkit-font-smoothing:antialiased;padding:24px 16px 56px;
+  }
+  .wrap{max-width:900px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--dim);margin:0 0 8px}
+  h1{font-size:clamp(26px,6.5vw,40px);font-weight:700;margin:0 0 10px;
+    letter-spacing:-.02em;line-height:1.05}
+  h1 em{font-style:normal;color:var(--lamp)}
+  .lede{margin:0;max-width:58ch;font-size:15px;line-height:1.6;color:#A7B2D4}
+
+  .stage{display:flex;flex-wrap:wrap;gap:28px;margin-top:28px;align-items:flex-start}
+
+  .device{width:356px;flex:0 0 356px;background:linear-gradient(#2B3150,#171B2E);
+    border-radius:30px;padding:18px;
+    box-shadow:0 26px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}
+  .screen{width:320px;height:480px;margin:0 auto;background:#0A0C16;border-radius:3px;
+    overflow:hidden;display:flex;flex-direction:column;position:relative;
+    box-shadow:0 0 0 1px #000,0 0 22px rgba(200,211,242,.07) inset}
+  .caption{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:#5C688C;margin-top:12px}
+
+  /* ---------- bibliothèque ---------- */
+  .library{flex:1;display:flex;flex-direction:column;background:#0C1020}
+  .libhead{padding:14px 14px 10px;flex:0 0 auto}
+  .libhead h2{margin:0;font-size:19px;font-weight:700;color:#E7ECFA;letter-spacing:-.01em}
+  .libhead p{margin:3px 0 0;font-size:11px;color:#5F6B93;font-family:var(--mono);letter-spacing:.06em}
+  .grid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 14px;
+    overflow-y:auto;align-content:start}
+  .tile{border:0;padding:0;background:#141A32;border-radius:12px;overflow:hidden;
+    cursor:pointer;text-align:left;transition:transform .14s,box-shadow .14s}
+  .tile:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.5)}
+  .tile:active{transform:scale(.97)}
+  .tile svg{display:block;width:100%;height:98px}
+  .tile b{display:block;padding:7px 9px 3px;font-size:12px;font-weight:500;color:#E7ECFA}
+  .tile i{display:block;padding:0 9px 9px;font-style:normal;font-family:var(--mono);
+    font-size:9px;color:#5F6B93;letter-spacing:.05em}
+
+  /* ---------- lecteur ---------- */
+  .player{flex:1;display:flex;flex-direction:column}
+  .art{width:320px;height:240px;flex:0 0 240px;position:relative;background:#060812}
+  .art svg{display:block;width:320px;height:240px}
+  .art .empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+    color:#3D4870;font-family:var(--mono);font-size:11px;letter-spacing:.1em}
+  .titlebar{position:absolute;left:0;right:0;bottom:0;padding:7px 10px;font-size:13px;
+    font-weight:500;background:linear-gradient(transparent,rgba(6,8,18,.92));color:#E7ECFA}
+  .backbtn{position:absolute;top:8px;left:8px;width:30px;height:30px;border:0;border-radius:8px;
+    background:rgba(10,12,22,.72);color:#C8D3F2;font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+  .backbtn:hover{background:rgba(30,38,66,.9)}
+
+  .controls{flex:1;display:flex;flex-direction:column;padding:9px 10px 10px;gap:8px;background:#101426}
+  .timeline{display:flex;align-items:center;gap:9px}
+  /* zone tactile haute, trait fin : viser au doigt sur 3,5 pouces */
+  .track{flex:1;height:30px;display:flex;align-items:center;position:relative;
+    cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+  .track .rail{position:absolute;left:0;right:0;height:6px;border-radius:3px;background:#232B47}
+  .track i{position:absolute;left:0;height:6px;width:0;border-radius:3px;background:var(--lamp)}
+  .track .thumb{position:absolute;width:17px;height:17px;border-radius:50%;
+    background:var(--lamp);box-shadow:0 1px 5px rgba(0,0,0,.55);transform:translateX(-8.5px)}
+  .track.off .rail,.track.off i,.track.off .thumb{opacity:.3}
+  .track.drag .thumb{transform:translateX(-8.5px) scale(1.22)}
+  .tlab{font-family:var(--mono);font-size:9px;color:#66739B;letter-spacing:.06em;min-width:64px;text-align:right}
+
+  .wheelrow{display:flex;align-items:center;gap:9px;flex:1;min-height:66px}
+  .arrow{width:58px;align-self:stretch;border:0;border-radius:12px;background:#1C2440;
+    color:var(--moon);font-size:25px;cursor:pointer;display:flex;align-items:center;
+    justify-content:center;transition:background .14s,transform .1s}
+  .arrow:hover:not(:disabled){background:#27314F}
+  .arrow:active:not(:disabled){transform:scale(.95)}
+  .main{flex:1;align-self:stretch;border:0;border-radius:14px;
+    background:linear-gradient(#F3BE6B,#E09B2E);color:#2A1B03;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:7px;
+    font-family:var(--disp);font-weight:700;font-size:16px;letter-spacing:.03em;
+    transition:filter .14s,transform .1s}
+  .main.play{background:linear-gradient(#9FD4B6,#6FB894)}
+  .main svg{width:21px;height:21px;fill:currentColor}
+  .main:hover:not(:disabled){filter:brightness(1.08)}
+  .main:active:not(:disabled){transform:scale(.97)}
+  button:disabled{opacity:.22;cursor:not-allowed}
+  button:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .dots{display:flex;gap:5px;justify-content:center;height:7px;align-items:center}
+  .dots span{width:6px;height:6px;border-radius:50%;background:#2C3554;transition:background .16s}
+  .dots span.on{background:var(--lamp)}
+
+  /* ---------- panneau ---------- */
+  .side{flex:1;min-width:290px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:16px;margin-bottom:16px}
+  .card h2{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);margin:0 0 12px;font-weight:700}
+  .kv{font-family:var(--mono);font-size:12px;line-height:1.85}
+  .kv div{display:flex;gap:10px}
+  .kv b{color:#6E7BA6;font-weight:400;flex:0 0 76px}
+  .kv span{color:#DCE4FA;word-break:break-all}
+  .flags{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
+  .flag{font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:5px;
+    border:1px solid #333D5E;color:#5F6B93;letter-spacing:.05em}
+  .flag.on{border-color:var(--sage);color:#0E1020;background:var(--sage);font-weight:700}
+  .flag.ext{border-style:dashed;border-color:#4A5478;color:#8E9AC2}
+
+  .opt{display:flex;align-items:center;gap:10px;font-size:13px;color:#B4BFDF;
+    padding:9px 0;border-top:1px solid #2C3350}
+  .opt:first-of-type{border-top:0}
+  .opt input{width:17px;height:17px;accent-color:var(--lamp);cursor:pointer;flex:0 0 auto}
+  .opt label{cursor:pointer;line-height:1.4}
+  .opt small{display:block;color:#6E7BA6;font-size:11px;margin-top:2px}
+
+  .log{font-family:var(--mono);font-size:11px;line-height:1.7;max-height:150px;overflow-y:auto}
+  .log p{margin:0;padding:3px 0;border-bottom:1px solid #2A3150;color:#94A0C6}
+  .log p:last-child{border-bottom:0}
+  .st{font-weight:700}
+  .st.ACCEPTED{color:var(--sage)}
+  .st.IGNORED_CONTROL_DISABLED{color:var(--dim)}
+  .st.IGNORED_UNRESOLVED_TARGET{color:var(--rose)}
+  .st.IGNORED_NO_TRANSITION{color:var(--lamp)}
+  .st.LECTEUR{color:#7FA6E0}
+
+  footer{margin-top:32px;padding-top:18px;border-top:1px solid #262E4B;
+    font-size:13px;line-height:1.65;color:#7C88AD;max-width:66ch}
+  footer strong{color:#B4BFDF;font-weight:500}
+  footer code{font-family:var(--mono);font-size:12px;color:#A7B2D4}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  @media (max-width:760px){
+    body{padding:18px 12px 40px}
+    .device{width:100%;flex:1 1 100%;padding:12px;border-radius:22px}
+    .screen{width:320px;max-width:100%}
+    .art,.art svg{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Projet Luny — maquette d'interface v2</p>
+  <h1>Bibliothèque, lecture, <em>et rien qui s'enchaîne</em></h1>
+  <p class="lede">Écran à sa taille réelle : 320 × 480. La bibliothèque est l'écran d'accueil ;
+  une histoire terminée y ramène toujours. La pause et la navigation dans la piste sont des
+  ajouts Luny : elles ne touchent pas au moteur, qui ne connaît que le graphe.</p>
+</header>
+
+<div class="stage">
+  <div>
+    <div class="device">
+      <div class="screen">
+
+        <!-- BIBLIOTHÈQUE -->
+        <div class="library" id="library">
+          <div class="libhead">
+            <h2>Mes histoires</h2>
+            <p id="libcount">—</p>
+          </div>
+          <div class="grid" id="grid"></div>
+        </div>
+
+        <!-- LECTEUR -->
+        <div class="player" id="player" style="display:none">
+          <div class="art" id="art"></div>
+          <div class="controls">
+            <div class="timeline">
+              <div class="track off" id="track" role="slider" aria-label="Position dans l'histoire"
+                   aria-valuemin="0" aria-valuenow="0" tabindex="0">
+                <div class="rail"></div><i id="bar"></i><div class="thumb" id="thumb"></div>
+              </div>
+              <div class="tlab" id="tlab">0:00 / 0:00</div>
+            </div>
+            <div class="wheelrow">
+              <button class="arrow" id="bLeft" aria-label="Option précédente">‹</button>
+              <button class="main" id="bMain"></button>
+              <button class="arrow" id="bRight" aria-label="Option suivante">›</button>
+            </div>
+            <div class="dots" id="dots"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <p class="caption">320 × 480 — taille réelle</p>
+  </div>
+
+  <div class="side">
+    <div class="card">
+      <h2>Réglages parent</h2>
+      <div class="opt">
+        <input type="checkbox" id="optChain">
+        <label for="optChain">Enchaîner les histoires
+          <small>Décoché : une histoire terminée ramène à la bibliothèque.</small></label>
+      </div>
+      <div class="opt">
+        <input type="checkbox" id="optAuto" checked>
+        <label for="optAuto">Autoplay dans les séquences
+          <small>Nécessaire : sans lui, une question ne mène jamais à son menu.</small></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>État du moteur</h2>
+      <div class="kv">
+        <div><b>node</b><span id="sNode">—</span></div>
+        <div><b>name</b><span id="sName">—</span></div>
+        <div><b>audio</b><span id="sAud">—</span></div>
+        <div><b>action</b><span id="sAct">—</span></div>
+        <div><b>index</b><span id="sIdx">—</span></div>
+      </div>
+      <div class="flags" id="flags"></div>
+    </div>
+
+    <div class="card">
+      <h2>Journal</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <strong>Ce que le moteur ignore.</strong> La pause et la navigation dans la piste n'existent
+  ni dans le format STUdio ni sur une Lunii : ce sont des commandes de lecteur, gérées au-dessus
+  du moteur, qui ne connaît que <code>ok</code>, <code>home</code>, <code>wheel_left</code>,
+  <code>wheel_right</code> et <code>audio_ended</code>. Le drapeau <code>pause</code> du pack
+  décide seulement si l'enfant a le droit de s'en servir.<br><br>
+  <strong>La barre fait 30 pixels de haut.</strong> Le trait reste fin, mais la surface sensible
+  est trois fois plus grande : sur 3,5 pouces à 163 ppp, viser un trait de 6 pixels au doigt est
+  hors de portée d'un enfant. Les flèches gauche et droite du clavier déplacent de dix secondes.<br><br>
+  <strong>Le bouton central change de métier.</strong> Quand <code>ok</code> est actif, il valide
+  un choix. Quand le pack le désactive — c'est le cas sur les nœuds d'histoire — il devient
+  lecture/pause. Aucun réglage : ce sont les drapeaux du pack qui décident.
+</footer>
+
+</div>
+
+<script>
+"use strict";
+const P={lamp:"#F0B357",rose:"#D98FA6",sage:"#8FC7A8",night:"#131A33",deep:"#0B1024",moon:"#C8D3F2"};
+function sky(x){let s=`<rect width="320" height="240" fill="${P.deep}"/>`;
+  for(let i=0;i<44;i++){const a=(i*67)%320,b=(i*41)%150,r=(i%3)?.8:1.4,o=.25+((i*13)%50)/100;
+    s+=`<circle cx="${a}" cy="${b}" r="${r}" fill="#DCE4FA" opacity="${o.toFixed(2)}"/>`}return s+x}
+const ART={
+ renard:sky(`<circle cx="248" cy="52" r="26" fill="${P.lamp}" opacity=".92"/><circle cx="238" cy="46" r="24" fill="${P.deep}"/>
+  <path d="M0 190 L60 150 L112 190 L168 138 L232 190 L290 158 L320 186 L320 240 L0 240Z" fill="${P.night}"/>
+  <path d="M0 214 L74 182 L140 214 L206 176 L272 214 L320 194 L320 240 L0 240Z" fill="#0A0F22"/>
+  <ellipse cx="160" cy="228" rx="15" ry="5" fill="#000" opacity=".5"/>
+  <path d="M152 226 q8 -18 16 0 q-8 6 -16 0Z" fill="${P.lamp}"/><circle cx="156" cy="216" r="7" fill="${P.lamp}"/>
+  <path d="M150 211 l2 -7 l5 4Z M162 211 l-2 -7 l-5 4Z" fill="${P.lamp}"/><circle cx="154" cy="216" r="1.4" fill="#060812"/>`),
+ foret:sky(`<g fill="${P.night}"><path d="M56 240 L56 96 L74 96 L74 240Z"/><path d="M132 240 L132 74 L152 74 L152 240Z"/>
+  <path d="M212 240 L212 104 L228 104 L228 240Z"/><path d="M282 240 L282 84 L300 84 L300 240Z"/></g>
+  <g fill="#17203F" opacity=".9"><ellipse cx="65" cy="88" rx="40" ry="26"/><ellipse cx="142" cy="66" rx="48" ry="30"/>
+  <ellipse cx="220" cy="96" rx="38" ry="24"/><ellipse cx="291" cy="76" rx="42" ry="27"/></g>
+  <rect y="228" width="320" height="12" fill="#0A0F22"/>
+  <circle cx="98" cy="176" r="3.5" fill="${P.lamp}" opacity=".9"/><circle cx="186" cy="150" r="3" fill="${P.lamp}" opacity=".75"/>`),
+ riviere:sky(`<path d="M0 176 L92 132 L150 176 L226 128 L320 172 L320 240 L0 240Z" fill="${P.night}"/>
+  <path d="M0 196 Q80 182 160 196 T320 194 L320 240 L0 240Z" fill="#123048"/>
+  <g stroke="${P.moon}" stroke-width="1.6" fill="none" opacity=".45"><path d="M28 210 q22 -7 44 0"/>
+  <path d="M108 220 q24 -7 48 0"/><path d="M196 208 q22 -7 44 0"/></g>
+  <path d="M116 200 q14 -9 28 0 q-14 7 -28 0Z" fill="${P.rose}"/>`),
+ grotte:sky(`<rect width="320" height="240" fill="#0A0F22"/>
+  <path d="M160 34 q86 0 96 206 L64 240 q10 -206 96 -206Z" fill="#060812"/>
+  <g fill="#141C38"><path d="M92 0 l14 42 l12 -42Z"/><path d="M136 0 l10 30 l10 -30Z"/><path d="M188 0 l12 38 l12 -38Z"/></g>
+  <circle cx="160" cy="176" r="20" fill="${P.lamp}" opacity=".14"/><circle cx="160" cy="176" r="8" fill="${P.lamp}" opacity=".55"/>`),
+ mer:sky(`<path d="M0 168 L320 168 L320 240 L0 240Z" fill="#123048"/>
+  <g stroke="${P.moon}" stroke-width="1.5" fill="none" opacity=".4"><path d="M20 196 q24 -8 48 0"/>
+  <path d="M120 214 q24 -8 48 0"/><path d="M216 190 q24 -8 48 0"/></g>
+  <path d="M132 168 L132 108 L136 108 L136 168Z" fill="#DCE4FA" opacity=".7"/>
+  <path d="M136 112 L188 140 L136 158Z" fill="${P.lamp}"/>
+  <path d="M104 168 q30 16 60 0 q-30 10 -60 0Z" fill="${P.night}"/>`),
+ etoile:sky(`<circle cx="160" cy="112" r="46" fill="${P.lamp}" opacity=".1"/><circle cx="160" cy="112" r="30" fill="${P.lamp}" opacity=".16"/>
+  <path d="M160 84 l8.4 17.6 L188 104.4 l-14 13.8 3.4 19.8 -17.4 -9.4 -17.4 9.4 3.4 -19.8 -14 -13.8 19.6 -2.8Z" fill="${P.lamp}"/>
+  <path d="M0 200 L70 168 L140 200 L212 164 L280 200 L320 182 L320 240 L0 240Z" fill="${P.night}"/>`)
+};
+
+/* ---------- bibliothèque de packs ---------- */
+const PACKS=[
+{id:"p1",title:"La nuit du renard",cover:"renard",dur:38,
+ stageNodes:[
+  {uuid:"r-cover",name:"La nuit du renard",art:"renard",image:"cover.png",audio:"cover.mp3",dur:12,squareOne:true,
+   okTransition:{actionNode:"r-menu",optionIndex:0},homeTransition:null,
+   controlSettings:{wheel:false,ok:true,home:false,pause:false,autoplay:false}},
+  {uuid:"r-foret",name:"Par la forêt",art:"foret",image:"f.png",audio:"f.mp3",dur:8,
+   okTransition:{actionNode:"r-a1",optionIndex:0},homeTransition:null,
+   controlSettings:{wheel:true,ok:true,home:true,pause:false,autoplay:false}},
+  {uuid:"r-riviere",name:"Par la rivière",art:"riviere",image:"r.png",audio:"r.mp3",dur:8,
+   okTransition:{actionNode:"r-a2",optionIndex:0},homeTransition:null,
+   controlSettings:{wheel:true,ok:true,home:true,pause:false,autoplay:false}},
+  {uuid:"r-grotte",name:"Par la grotte",art:"grotte",image:"g.png",audio:"g.mp3",dur:8,
+   okTransition:{actionNode:"r-hasard",optionIndex:-1},homeTransition:null,
+   controlSettings:{wheel:true,ok:true,home:true,pause:false,autoplay:false}},
+  {uuid:"r-h1",name:"Le renard et la lanterne",art:"foret",image:null,audio:"h1.mp3",dur:42,
+   okTransition:null,homeTransition:null,
+   controlSettings:{wheel:false,ok:false,home:true,pause:true,autoplay:true}},
+  {uuid:"r-h2",name:"Le renard et le passeur",art:"riviere",image:null,audio:"h2.mp3",dur:36,
+   okTransition:null,homeTransition:null,
+   controlSettings:{wheel:false,ok:false,home:true,pause:true,autoplay:true}},
+  {uuid:"r-h3",name:"Le renard et l'écho",art:"grotte",image:null,audio:"h3.mp3",dur:40,
+   okTransition:null,homeTransition:null,
+   controlSettings:{wheel:false,ok:false,home:true,pause:true,autoplay:true}}],
+ actionNodes:[{id:"r-menu",options:["r-foret","r-riviere","r-grotte"]},
+   {id:"r-a1",options:["r-h1"]},{id:"r-a2",options:["r-h2"]},
+   {id:"r-hasard",options:["r-h1","r-h2","r-h3"]}]},
+
+{id:"p2",title:"Le phare endormi",cover:"mer",dur:52,
+ stageNodes:[
+  {uuid:"m-cover",name:"Le phare endormi",art:"mer",image:"c.png",audio:"c.mp3",dur:10,squareOne:true,
+   okTransition:{actionNode:"m-a",optionIndex:0},homeTransition:null,
+   controlSettings:{wheel:false,ok:true,home:false,pause:false,autoplay:false}},
+  {uuid:"m-h",name:"Le phare endormi",art:"mer",image:null,audio:"m.mp3",dur:52,
+   okTransition:null,homeTransition:null,
+   controlSettings:{wheel:false,ok:false,home:true,pause:true,autoplay:true}}],
+ actionNodes:[{id:"m-a",options:["m-h"]}]},
+
+{id:"p3",title:"L'étoile qui bâille",cover:"etoile",dur:29,
+ stageNodes:[
+  {uuid:"e-cover",name:"L'étoile qui bâille",art:"etoile",image:"c.png",audio:"c.mp3",dur:9,squareOne:true,
+   okTransition:{actionNode:"e-a",optionIndex:0},homeTransition:null,
+   controlSettings:{wheel:false,ok:true,home:false,pause:false,autoplay:false}},
+  {uuid:"e-h",name:"L'étoile qui bâille",art:"etoile",image:null,audio:"e.mp3",dur:29,
+   okTransition:null,homeTransition:null,
+   controlSettings:{wheel:false,ok:false,home:true,pause:true,autoplay:true}}],
+ actionNodes:[{id:"e-a",options:["e-h"]}]},
+
+{id:"p4",title:"Le chemin perdu",cover:"foret",dur:15,
+ stageNodes:[
+  {uuid:"c-cover",name:"Le chemin perdu",art:"foret",image:"c.png",audio:"c.mp3",dur:11,squareOne:true,
+   okTransition:{actionNode:"absent",optionIndex:0},homeTransition:null,
+   controlSettings:{wheel:false,ok:true,home:false,pause:false,autoplay:false}}],
+ actionNodes:[]}
+];
+
+/* ---------- moteur (réplique de la sémantique C) ---------- */
+function Engine(pack,seed){
+  const stages=new Map(pack.stageNodes.map(n=>[n.uuid,n]));
+  const actions=new Map(pack.actionNodes.map(a=>[a.id,a]));
+  let s=seed>>>0||1;
+  const rnd=n=>{s=(s+0x9E3779B9)>>>0;let z=s;
+    z=Math.imul(z^(z>>>16),0x21F0AAAD)>>>0;z=Math.imul(z^(z>>>15),0x735A2D97)>>>0;
+    return ((z^(z>>>15))>>>0)%n};
+  const entry=pack.stageNodes.find(n=>n.squareOne)||pack.stageNodes[0];
+  const st={node:entry,action:null,index:null};
+  function enter(id,want){
+    const a=actions.get(id);
+    if(!a||!a.options.length) return "IGNORED_UNRESOLVED_TARGET";
+    let i;
+    if(want===-1) i=rnd(a.options.length);
+    else if(want<0) i=0;
+    else if(want>=a.options.length) return "IGNORED_UNRESOLVED_TARGET";
+    else i=want;
+    const t=stages.get(a.options[i]);
+    if(!t) return "IGNORED_UNRESOLVED_TARGET";
+    st.node=t;st.action=a.id;st.index=i;return "ACCEPTED";
+  }
+  const follow=tr=>tr?enter(tr.actionNode,tr.optionIndex):"IGNORED_NO_TRANSITION";
+  function wheel(d){
+    if(!st.node.controlSettings.wheel) return "IGNORED_CONTROL_DISABLED";
+    if(st.action===null) return "IGNORED_NO_ACTION_CONTEXT";
+    const a=actions.get(st.action),n=a.options.length;
+    const i=d>0?(st.index+1)%n:(st.index===0?n-1:st.index-1);
+    const t=stages.get(a.options[i]);
+    if(!t) return "IGNORED_UNRESOLVED_TARGET";
+    st.index=i;st.node=t;return "ACCEPTED";
+  }
+  return{state:st,actionOf:id=>actions.get(id),
+    ok(){return st.node.controlSettings.ok?follow(st.node.okTransition):"IGNORED_CONTROL_DISABLED"},
+    home(){if(!st.node.controlSettings.home)return "IGNORED_CONTROL_DISABLED";
+      if(st.node.homeTransition)return follow(st.node.homeTransition);
+      st.node=entry;st.action=null;st.index=null;return "ACCEPTED"},
+    left(){return wheel(-1)}, right(){return wheel(1)},
+    ended(){return st.node.controlSettings.autoplay?follow(st.node.okTransition):"IGNORED_CONTROL_DISABLED"}};
+}
+
+/* ---------- lecteur ---------- */
+const $=id=>document.getElementById(id);
+let eng=null, timer=null, pos=0, dur=0, playing=false, seed=20260816;
+
+const ICON={
+  play:'<svg viewBox="0 0 24 24"><path d="M7 4v16l14-8z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
+  check:'<svg viewBox="0 0 24 24"><path d="M9.6 17.6 4 12l1.8-1.8 3.8 3.8L18.2 5.4 20 7.2z"/></svg>'
+};
+const mmss=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
+
+function log(ev,status){
+  const p=document.createElement("p");
+  const n=eng?eng.state.node:null;
+  p.innerHTML=`<span class="st ${status}">${status}</span> · ${ev}${n?" → "+n.uuid:""}`;
+  $("log").prepend(p);
+}
+
+function buildLibrary(){
+  $("libcount").textContent=PACKS.length+" histoires · hors ligne";
+  $("grid").innerHTML=PACKS.map(p=>
+    `<button class="tile" data-p="${p.id}"><svg viewBox="0 0 320 240" preserveAspectRatio="xMidYMid slice">${ART[p.cover]}</svg>
+     <b>${p.title}</b><i>${mmss(p.dur)}</i></button>`).join("");
+  $("grid").querySelectorAll(".tile").forEach(b=>b.onclick=()=>openPack(b.dataset.p));
+}
+
+function openPack(id){
+  const pack=PACKS.find(p=>p.id===id);
+  eng=Engine(pack,seed++);
+  $("library").style.display="none";
+  $("player").style.display="flex";
+  $("log").innerHTML="";
+  log("ouverture "+pack.title,"LECTEUR");
+  render(); startAudio();
+}
+
+function toLibrary(why){
+  stopAudio();
+  $("player").style.display="none";
+  $("library").style.display="flex";
+  log(why,"LECTEUR");
+}
+
+function stopAudio(){clearInterval(timer);timer=null;playing=false;pos=0;dur=0;paint()}
+
+function startAudio(){
+  clearInterval(timer); pos=0;
+  const n=eng.state.node;
+  dur=n.audio?(n.dur||20):0;
+  playing=!!n.audio;
+  if(playing) tick();
+  paint();
+}
+function tick(){
+  clearInterval(timer);
+  timer=setInterval(()=>{
+    pos+=0.25;
+    if(pos>=dur){pos=dur;clearInterval(timer);timer=null;playing=false;paint();onEnded();return}
+    paint();
+  },120);
+}
+function togglePlay(){
+  if(!dur) return;
+  playing=!playing;
+  if(playing){ if(pos>=dur) pos=0; tick(); } else clearInterval(timer);
+  log(playing?"lecture":"pause","LECTEUR"); paint();
+}
+function seek(d){
+  if(!dur) return;
+  pos=Math.max(0,Math.min(dur,pos+d));
+  log((d>0?"+":"")+d+" s","LECTEUR"); paint();
+}
+
+function onEnded(){
+  const n=eng.state.node;
+  const chain=$("optChain").checked;
+  const auto=$("optAuto").checked;
+  // fin de branche : pas de transition -> retour bibliothèque
+  if(!n.okTransition){ toLibrary("fin de l'histoire → bibliothèque"); return; }
+  // nœud d'histoire terminé qui enchaînerait ailleurs : bloqué si l'option est décochée
+  if(!chain && n.controlSettings.pause){ toLibrary("enchaînement bloqué → bibliothèque"); return; }
+  if(!auto){ log("audio_ended","IGNORED_CONTROL_DISABLED"); return; }
+  const s=eng.ended(); log("audio_ended",s); render();
+  if(s==="ACCEPTED") startAudio();
+}
+
+function fire(ev){
+  const s=eng[ev]();
+  log(ev,s); render();
+  if(s==="ACCEPTED") startAudio();
+}
+
+function paint(){
+  const pct=dur?(pos/dur*100):0;
+  $("bar").style.width=pct+"%";
+  $("thumb").style.left=pct+"%";
+  $("tlab").textContent=mmss(pos)+" / "+mmss(dur);
+  const tr=$("track");
+  tr.classList.toggle("off",!dur);
+  tr.setAttribute("aria-valuemax",Math.round(dur));
+  tr.setAttribute("aria-valuenow",Math.round(pos));
+  const n=eng?eng.state.node:null;
+  if(!n) return;
+  const c=n.controlSettings;
+  const isOk=c.ok;
+  $("bMain").className="main"+(isOk?"":" play");
+  $("bMain").innerHTML=isOk?ICON.check+"Choisir"
+                           :(playing?ICON.pause+"Pause":ICON.play+"Lire");
+  $("bMain").disabled=isOk?false:!c.pause||!dur;
+}
+
+function render(){
+  const n=eng.state.node,c=n.controlSettings;
+  $("art").innerHTML=(n.image
+    ?`<svg viewBox="0 0 320 240">${ART[n.art]}</svg>`
+    :`<div class="empty">— aucune image —</div>`)
+    +`<button class="backbtn" id="bBack" aria-label="Retour à la bibliothèque">‹</button>`
+    +`<div class="titlebar">${n.name}</div>`;
+  $("bBack").onclick=()=>toLibrary("retour bibliothèque");
+
+  $("sNode").textContent=n.uuid; $("sName").textContent=n.name;
+  $("sAud").textContent=n.audio||"null";
+  $("sAct").textContent=eng.state.action||"null";
+  const a=eng.state.action?eng.actionOf(eng.state.action):null;
+  $("sIdx").textContent=a?`${eng.state.index} / ${a.options.length}`:"null";
+
+  $("flags").innerHTML=["wheel","ok","home","pause","autoplay"]
+    .map(f=>`<span class="flag${c[f]?" on":""}">${f}</span>`).join("")
+    +`<span class="flag ext">navigation — Luny</span>`;
+
+  $("dots").innerHTML=a?a.options.map((_,i)=>
+    `<span class="${i===eng.state.index?"on":""}"></span>`).join(""):"";
+
+  $("bLeft").disabled=!c.wheel||eng.state.action===null;
+  $("bRight").disabled=!c.wheel||eng.state.action===null;
+  paint();
+}
+
+$("bMain").onclick=()=>{ eng.state.node.controlSettings.ok?fire("ok"):togglePlay(); };
+$("bLeft").onclick=()=>fire("left");
+$("bRight").onclick=()=>fire("right");
+/* navigation par glissement — souris et doigt */
+(function(){
+  const tr=$("track"); let dragging=false;
+  const at=x=>{const r=tr.getBoundingClientRect();
+    pos=Math.max(0,Math.min(dur,(x-r.left)/r.width*dur)); paint();};
+  const down=e=>{ if(!dur)return; dragging=true; tr.classList.add("drag");
+    at(e.touches?e.touches[0].clientX:e.clientX); e.preventDefault(); };
+  const move=e=>{ if(!dragging)return; at(e.touches?e.touches[0].clientX:e.clientX); e.preventDefault(); };
+  const up=()=>{ if(!dragging)return; dragging=false; tr.classList.remove("drag");
+    log("navigation "+mmss(pos),"LECTEUR"); };
+  tr.addEventListener("mousedown",down); tr.addEventListener("touchstart",down,{passive:false});
+  window.addEventListener("mousemove",move); window.addEventListener("touchmove",move,{passive:false});
+  window.addEventListener("mouseup",up); window.addEventListener("touchend",up);
+  tr.addEventListener("keydown",e=>{
+    if(!dur)return;
+    if(e.key==="ArrowLeft") seek(-10);
+    else if(e.key==="ArrowRight") seek(10);
+    else return;
+    e.preventDefault();
+  });
+})();
+
+buildLibrary();
+</script>
+</body>
+</html>
