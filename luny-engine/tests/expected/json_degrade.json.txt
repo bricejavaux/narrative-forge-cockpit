@@ -1,0 +1,4 @@
+{"node":"d-ok","image":"present.png","audio":null,"event":"ok","status":"ACCEPTED","image_ref":"present.png","audio_ref":null,"action":"act-trous","index":0,"options":4}
+{"node":"d-ok","image":"present.png","audio":null,"event":"home","status":"IGNORED_UNRESOLVED_TARGET","image_ref":"present.png","audio_ref":null,"action":"act-trous","index":0,"options":4}
+{"node":"d-ok","image":"present.png","audio":null,"event":"ok","status":"IGNORED_UNRESOLVED_TARGET","image_ref":"present.png","audio_ref":null,"action":"act-trous","index":0,"options":4}
+exit=0

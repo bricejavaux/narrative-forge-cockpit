@@ -4,12 +4,13 @@
 [warn] ActionNode act-trous : option #1 nulle, emplacement conserve non resolu
 [warn] ActionNode act-trous : option #2 designe un uuid inconnu (uuid-inconnu), non resolue
 [warn] okTransition du noeud d-ok designe un actionNode inconnu (act-inconnu) : transition inoperante
-[warn] homeTransition du noeud d-ok : optionIndex 99 hors bornes (4 options), borne a 3
+[warn] homeTransition du noeud d-ok : optionIndex 99 hors bornes (4 options), transition inoperante
 [warn] okTransition du noeud d-neg : optionIndex negatif (-3) hors du cas -1, index 0 retenu
 [warn] 2 noeuds squareOne : le premier rencontre (d-entry) est retenu
+[warn] ActionNode act-trous : optionIndex 99 hors bornes (4 options), etat inchange
 pack title="Degrade" version=2 nightMode=0 stages=3 actions=1 entry=d-entry
 step=0 event=load status=ACCEPTED stage=d-entry name="Entree" image=- audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=- index=-
 step=1 event=ok status=ACCEPTED stage=d-ok name="Cible valide" image=present.png audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act-trous index=0/4
-step=2 event=home status=ACCEPTED stage=d-neg name="Index negatif" image=- audio=- wheel=0 ok=1 home=0 pause=0 autoplay=0 action=act-trous index=3/4
-step=3 event=ok status=ACCEPTED stage=d-ok name="Cible valide" image=present.png audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act-trous index=0/4
+step=2 event=home status=IGNORED_UNRESOLVED_TARGET stage=d-ok name="Cible valide" image=present.png audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act-trous index=0/4
+step=3 event=ok status=IGNORED_UNRESOLVED_TARGET stage=d-ok name="Cible valide" image=present.png audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act-trous index=0/4
 exit=0

@@ -6,8 +6,10 @@ Ce document sépare strictement **ce qui vient du code de STUdio** de **ce que j
 - Chemins Java : `core/src/main/java/studio/core/v1/…`
 - Chemins JavaScript : `web-ui/javascript/src/…`
 
-> Règle de lecture : tout ce qui figure au §2 et au §3 est **un choix Luny**, pas une contrainte
-> du format. Aucune règle du §1 n'est inventée ; chacune porte son fichier et ses lignes.
+> Règle de lecture : le §1 ne contient que des règles **tirées du code**, chacune avec son fichier
+> et ses lignes ; aucune n'est inventée. Le §2 contient les **choix Luny**, qui ne sont pas des
+> contraintes du format — à deux exceptions signalées en place : le point 2, requalifié après
+> correction parce qu'il était en réalité déterminé par le viewer, et le point 9, arbitré et figé.
 
 ---
 
@@ -29,6 +31,7 @@ Ce document sépare strictement **ce qui vient du code de STUdio** de **ce que j
 | HOME sans transition → retour au point d'entrée, contexte ActionNode vidé | `StageNodeModel.js:172-183` — renvoie `mainNode` avec `{node: null, index: null}` |
 | Le point d'entrée est le **premier** nœud `squareOne` | `PackDiagramModel.js:26-29` — `filter(...)[0]` |
 | Une cible non résolue laisse l'état **inchangé** (pas d'avance d'index) | `ActionNodeModel.js:63-66`, `:82-84`, `:100-102` renvoient `[]` ; `EditorPackViewer.js:57-62` et `:82-91` ne mettent alors à jour ni l'étape ni l'index |
+| **Un `optionIndex` hors bornes rend la transition inopérante** — pas de repli sur une autre option | `EditorPackViewer.js:79-93` — si `onOk()` ne renvoie pas un couple `stage`/`action` valide, ni `setViewerStage` ni `setViewerAction` n'est appelé |
 
 ### 1.2 Structure et robustesse (reader Java)
 
@@ -61,10 +64,18 @@ l'exécution quand ils se déclenchent, pour rester visibles.
    extrapolation. Le repli sur 0 est le comportement le moins surprenant.
    → `resolve_transition()`, message « optionIndex negatif (…) hors du cas -1, index 0 retenu ».
 
-2. **`optionIndex` hors bornes → borné à `option_count - 1`**, avec avertissement.
-   *Choix Luny.* Le reader Java ne vérifie rien ; le reader JavaScript, lui, **crée les options
-   manquantes** (`utils/reader.js:378-380`), ce qui a un sens dans un éditeur de diagramme mais
-   aucun dans un moteur d'exécution — un moteur ne peut pas inventer une destination.
+2. ~~**`optionIndex` hors bornes → borné à `option_count - 1`.**~~
+   **CORRIGÉ — ce n'était pas un choix ouvert : le comportement est déterminé par le viewer.**
+   Un `optionIndex >= option_count` rend désormais la **transition inopérante** : le nœud courant,
+   le contexte ActionNode et l'index restent inchangés, et l'événement renvoie
+   `LUNY_EVENT_IGNORED_UNRESOLVED_TARGET`.
+   Source : `EditorPackViewer.js:79-93` — quand `onOk()` ne renvoie pas un couple valide, le viewer
+   n'appelle ni `setViewerStage` ni `setViewerAction`.
+   Le bornage initial était doublement fautif : il contredisait cette source, et il était incohérent
+   avec le traitement déjà appliqué aux trois autres cibles non résolues de ce même moteur.
+   Le reader JavaScript, lui, **crée les options manquantes** (`utils/reader.js:378-380`) : c'est une
+   commodité d'éditeur de diagramme, pas une règle d'exécution — un moteur ne peut pas inventer une
+   destination.
 
 3. **`controlSettings` présent mais une clé manquante → drapeau à `false`**, avec avertissement.
    *Choix Luny.* La spec ne couvre que le cas « `controlSettings` absent → refuser le nœud »,
@@ -86,40 +97,53 @@ l'exécution quand ils se déclenchent, pour rester visibles.
    `optionIndex`, qui est positionnel. Le comportement quand on atterrit dessus (état inchangé)
    vient, lui, du JS — voir §1.1.
 
+8. **Statut unique pour les quatre cibles non résolues.**
+   `actionNode` introuvable, `optionIndex` hors bornes, uuid d'option introuvable et `null` littéral
+   renvoient tous `LUNY_EVENT_IGNORED_UNRESOLVED_TARGET`. Du point de vue de l'exécution ces cas sont
+   indistinguables : la transition ne désigne aucune destination et l'état ne bouge pas. *Choix Luny*
+   sur la granularité seule — le cas précis reste identifiable dans l'avertissement journalisé.
+   `LUNY_EVENT_IGNORED_EMPTY_OPTIONS` (ActionNode sans aucune option) reste distinct : c'est une
+   malformation de structure, pas une référence fautive.
+
 ### 2.3 Nœud d'entrée
 
-8. **Plusieurs `squareOne` → le premier rencontré**, avec avertissement.
-   Aligné sur `PackDiagramModel.js:26-29` (`[0]`). **Divergence assumée avec le reader Java**, qui
-   réassigne la variable à chaque occurrence (`ArchiveStoryPackReader.java:171-173`) et retient
-   donc *le dernier* — un hasard d'implémentation qu'il ne faut pas reproduire.
+9. **Plusieurs `squareOne` → le premier rencontré**, avec avertissement.
+   **DÉCISION ARBITRÉE ET FIGÉE** — ce n'est plus un choix par défaut susceptible d'évoluer.
+   Le comportement s'aligne sur le viewer : `PackDiagramModel.js:26-29` sélectionne le point
+   d'entrée par `filter(...)[0]`, donc le **premier** nœud marqué.
+   Il **diverge volontairement** du reader Java, qui réassigne sa variable à chaque occurrence
+   (`ArchiveStoryPackReader.java:171-173`) et retient donc *le dernier* : c'est un effet de bord
+   d'implémentation, pas une règle, et il ne doit pas être reproduit.
+   Un pack conforme ne comporte de toute façon qu'un seul `squareOne` ; l'avertissement signale
+   la malformation sans rendre le pack injouable.
 
-9. **Aucun `squareOne` → premier StageNode retenu du tableau**, avec avertissement.
+10. **Aucun `squareOne` → premier StageNode retenu du tableau**, avec avertissement.
    Cohérent avec `ArchiveStoryPackReader.java:254` (pas de réordonnancement si aucun marqueur).
 
 ### 2.4 Assets
 
-10. **L'extension doit correspondre à la famille du champ** : un `image` pointant un `.mp3` est
+11. **L'extension doit correspondre à la famille du champ** : un `image` pointant un `.mp3` est
     ignoré. *Choix Luny.* Le reader Java attribue l'asset **d'après son extension seule**, quel que
     soit le champ qui le référence (`ArchiveStoryPackReader.java:213-247`) : un `.mp3` déclaré en
     `image` finit dans `audio`. Comportement déroutant, non reproduit.
 
-11. **Nom sans point → asset ignoré**, avec avertissement (au lieu de l'exception Java).
+12. **Nom sans point → asset ignoré**, avec avertissement (au lieu de l'exception Java).
 
 ### 2.5 Encodage
 
-12. **BOM UTF-8 retiré ; si le contenu n'est pas de l'UTF-8 valide, relecture en Latin-1** et
+13. **BOM UTF-8 retiré ; si le contenu n'est pas de l'UTF-8 valide, relecture en Latin-1** et
     transcodage, avec avertissement. *Choix Luny* : le format ne spécifie aucun encodage, il fallait
     bien un repli déterministe. Latin-1 est retenu parce que le transcodage ne peut pas échouer.
 
 ### 2.6 Fin de branche
 
-13. **`okTransition` nulle → `IGNORED_NO_TRANSITION`, état inchangé.**
+14. **`okTransition` nulle → `IGNORED_NO_TRANSITION`, état inchangé.**
     *Choix Luny.* La synthèse suggérait « retour à la bibliothèque », mais ce moteur n'a aucune
     notion de bibliothèque : c'est à la couche appelante de décider quoi faire de ce statut.
 
 ### 2.7 Générateur aléatoire
 
-14. **splitmix32 avec échantillonnage par rejet, injectable.**
+15. **splitmix32 avec échantillonnage par rejet, injectable.**
     *Choix Luny.* Le JS utilise `Math.random()` (`ActionNodeModel.js:62`), non reproductible.
     Le générateur par défaut est à graine fixe ; `luny_options.rng` permet de l'injecter pour les
     tests. Le rejet élimine le biais du modulo — vérifié empiriquement, écart < 0,4 % sur 600 000
@@ -139,6 +163,39 @@ l'exécution quand ils se déclenchent, pour rester visibles.
 
 3. **`readMetadata()` ignore `squareOne`** (`ArchiveStoryPackReader.java:63-64`), ce qui peut faire
    diverger l'uuid du pack selon le chemin de lecture. Luny honore toujours `squareOne`.
+
+---
+
+## 3 bis. Contrat de la ligne de commande
+
+Le mode par défaut de `luny_cli` est le **contrat de conformité**, et non un format d'affichage :
+
+```
+luny_cli <repertoire> <ev1,ev2,...>
+```
+
+- événements séparés par des virgules en **un seul argument** ; noms canoniques `ok`, `home`,
+  `wheel_left`, `wheel_right`, `audio_ended` (alias courts `left`, `right`, `ended` tolérés,
+  plus `reset` propre à ce moteur) ;
+- **stdout : exactement une ligne JSON par événement**, aucune ligne pour le chargement ;
+- champs minimaux `node`, `image`, `audio` — `image` et `audio` sont le **nom de ressource**
+  référencé dans `story.json`, ou `null` ;
+- champs supplémentaires : `event`, `status`, `image_ref`, `audio_ref`, `action`, `index`,
+  `options` ;
+- tous les messages humains sur **stderr** ;
+- code de sortie **1** si le chargement échoue, **2** si un nom d'événement est invalide — et dans
+  ce dernier cas rien n'est écrit sur stdout, la liste étant validée avant exécution ;
+- graine du tirage : `LUNY_RANDOM_SEED`, que `--seed N` surcharge.
+
+Le mode texte lisible (une ligne `cle=valeur` par événement, précédée d'un en-tête de pack) est
+passé derrière `--verbose`.
+
+**Point d'attention sur `image` / `audio`.** Ces champs portent le nom **validé** : `null` si
+l'asset est absent du dossier `assets/`, si son extension est inconnue ou si son nom n'a pas de
+point. C'est le comportement décrit par la spécification de référence (« asset référencé mais absent
+→ `image`/`audio` à `null`, pas d'erreur ») et par `ArchiveStoryPackReader.java:219-220`.
+Si une suite de conformité attend au contraire la référence **brute**, elle est disponible sans
+ambiguïté dans `image_ref` / `audio_ref` sur la même ligne.
 
 ---
 
@@ -164,4 +221,5 @@ l'exécution quand ils se déclenchent, pour rester visibles.
 | Fuzzing par mutation d'octets (400 itérations, ASan) | 0 crash |
 | Uniformité du tirage (600 000 tirages, bornes 2→6) | écart < 0,4 % |
 | Reproductibilité à graine égale | vérifiée |
-| Jeu de tests `make test` | 11 scénarios, tous au vert |
+| Jeu de tests `make test` | 20 scénarios (texte + JSON), tous au vert |
+| Homogénéité des 4 cibles non résolues | vérifiée sur un pack qui atteint réellement les 4 cas |

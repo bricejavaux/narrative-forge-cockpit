@@ -48,10 +48,18 @@ typedef enum {
     LUNY_EVENT_ACCEPTED = 0,
     LUNY_EVENT_IGNORED_CONTROL_DISABLED,  /* le drapeau controlSettings est faux   */
     LUNY_EVENT_IGNORED_NO_TRANSITION,     /* okTransition / homeTransition == null */
-    LUNY_EVENT_IGNORED_DANGLING_ACTION,   /* actionNode reference introuvable       */
-    LUNY_EVENT_IGNORED_DANGLING_OPTION,   /* option null / uuid introuvable         */
+    /*
+     * La transition ne designe aucune destination exploitable. Statut unique pour
+     * les quatre cas, qui sont indistinguables du point de vue de l'execution :
+     *   - actionNode reference introuvable
+     *   - optionIndex >= nombre d'options
+     *   - uuid d'option introuvable
+     *   - option null litteral
+     * Le cas precis figure dans l'avertissement journalise.
+     */
+    LUNY_EVENT_IGNORED_UNRESOLVED_TARGET,
     LUNY_EVENT_IGNORED_NO_ACTION_CONTEXT, /* molette hors contexte ActionNode       */
-    LUNY_EVENT_IGNORED_EMPTY_OPTIONS,     /* ActionNode sans option exploitable     */
+    LUNY_EVENT_IGNORED_EMPTY_OPTIONS,     /* ActionNode sans aucune option          */
     LUNY_EVENT_IGNORED_NO_PACK            /* moteur nul ou sans noeud courant       */
 } luny_event_status;
 
@@ -114,13 +122,19 @@ typedef struct {
  * image / audio : nom de fichier tel qu'ecrit dans story.json, garanti present
  * sous <dir>/assets/ et porteur d'une extension reconnue. NULL sinon (absent,
  * null JSON, extension inconnue, nom sans point, fichier manquant).
+ *
+ * image_ref / audio_ref : la reference brute telle qu'ecrite dans story.json,
+ * sans aucune validation. Utile pour diagnostiquer pourquoi image ou audio vaut
+ * NULL alors que le champ etait renseigne.
  */
 typedef struct {
     const char   *uuid;
-    const char   *name;     /* metadonnee enrichie, peut etre NULL */
-    const char   *type;     /* metadonnee enrichie, peut etre NULL */
-    const char   *image;    /* peut etre NULL */
-    const char   *audio;    /* peut etre NULL */
+    const char   *name;      /* metadonnee enrichie, peut etre NULL */
+    const char   *type;      /* metadonnee enrichie, peut etre NULL */
+    const char   *image;     /* validee, peut etre NULL */
+    const char   *audio;     /* validee, peut etre NULL */
+    const char   *image_ref; /* brute, peut etre NULL */
+    const char   *audio_ref; /* brute, peut etre NULL */
     luny_controls controls;
     int           square_one;
 } luny_stage_view;

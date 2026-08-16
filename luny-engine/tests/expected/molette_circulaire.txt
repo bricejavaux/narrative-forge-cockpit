@@ -1,7 +1,7 @@
 pack title="Deux chemins" version=1 nightMode=0 stages=5 actions=2 entry=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1001
 step=0 event=load status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1001 name="Couverture" image=cover.png audio=cover.ogg wheel=0 ok=1 home=0 pause=0 autoplay=0 action=- index=-
 step=1 event=ok status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1002 name="Option A" image=option-a.png audio=option-a.ogg wheel=1 ok=1 home=1 pause=0 autoplay=0 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001 index=0/2
-step=2 event=left status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1003 name="Option B" image=option-b.png audio=option-b.ogg wheel=1 ok=1 home=1 pause=0 autoplay=0 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001 index=1/2
-step=3 event=left status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1002 name="Option A" image=option-a.png audio=option-a.ogg wheel=1 ok=1 home=1 pause=0 autoplay=0 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001 index=0/2
+step=2 event=wheel_left status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1003 name="Option B" image=option-b.png audio=option-b.ogg wheel=1 ok=1 home=1 pause=0 autoplay=0 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001 index=1/2
+step=3 event=wheel_left status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1002 name="Option A" image=option-a.png audio=option-a.ogg wheel=1 ok=1 home=1 pause=0 autoplay=0 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001 index=0/2
 step=4 event=home status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1001 name="Couverture" image=cover.png audio=cover.ogg wheel=0 ok=1 home=0 pause=0 autoplay=0 action=- index=-
 exit=0

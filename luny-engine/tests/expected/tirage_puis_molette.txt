@@ -1,7 +1,7 @@
 pack title="Tirage" version=1 nightMode=0 stages=4 actions=1 entry=s-entry
 step=0 event=load status=ACCEPTED stage=s-entry name="Entree" image=a.png audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=- index=-
 step=1 event=ok status=ACCEPTED stage=s-2 name="Tirage 2" image=- audio=- wheel=1 ok=0 home=1 pause=0 autoplay=0 action=act-random index=1/3
-step=2 event=right status=ACCEPTED stage=s-3 name="Tirage 3" image=- audio=- wheel=1 ok=0 home=1 pause=0 autoplay=0 action=act-random index=2/3
-step=3 event=right status=ACCEPTED stage=s-1 name="Tirage 1" image=- audio=- wheel=1 ok=0 home=1 pause=0 autoplay=0 action=act-random index=0/3
-step=4 event=right status=ACCEPTED stage=s-2 name="Tirage 2" image=- audio=- wheel=1 ok=0 home=1 pause=0 autoplay=0 action=act-random index=1/3
+step=2 event=wheel_right status=ACCEPTED stage=s-3 name="Tirage 3" image=- audio=- wheel=1 ok=0 home=1 pause=0 autoplay=0 action=act-random index=2/3
+step=3 event=wheel_right status=ACCEPTED stage=s-1 name="Tirage 1" image=- audio=- wheel=1 ok=0 home=1 pause=0 autoplay=0 action=act-random index=0/3
+step=4 event=wheel_right status=ACCEPTED stage=s-2 name="Tirage 2" image=- audio=- wheel=1 ok=0 home=1 pause=0 autoplay=0 action=act-random index=1/3
 exit=0

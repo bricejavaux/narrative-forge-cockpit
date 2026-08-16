@@ -21,23 +21,38 @@ make test           # rejoue les scenarios de tests/
 L'entrée est un **répertoire déjà extrait** contenant `story.json` et `assets/`.
 
 ```sh
-./luny_cli [--seed N] [--quiet] <repertoire-du-pack> [evenement...]
+./luny_cli <repertoire-du-pack> <ev1,ev2,...>
 ```
 
-Événements : `ok`, `home`, `left`, `right`, `ended`, `reset`.
-`--seed` rend le tirage de l'option aléatoire déterministe. `--quiet` masque les avertissements.
+Événements : `ok`, `home`, `wheel_left`, `wheel_right`, `audio_ended` (alias `left`, `right`,
+`ended`, plus `reset`). **Une ligne JSON par événement sur `stdout`, rien pour le chargement**,
+tous les messages humains sur `stderr`.
 
 ```console
-$ ./luny_cli tests/packs/two-branches ok right ok
-pack title="Deux chemins" version=1 nightMode=0 stages=5 actions=2 entry=3f2b6c68-…-1001
-step=0 event=load  status=ACCEPTED stage=…-1001 name="Couverture" image=cover.png … action=- index=-
-step=1 event=ok    status=ACCEPTED stage=…-1002 name="Option A"   image=option-a.png … index=0/2
-step=2 event=right status=ACCEPTED stage=…-1003 name="Option B"   image=option-b.png … index=1/2
-step=3 event=ok    status=ACCEPTED stage=…-1005 name="Histoire B" image=-           … index=1/2
+$ ./luny_cli tests/packs/two-branches ok,wheel_right,ok
+{"node":"…-1002","image":"option-a.png","audio":"option-a.ogg","event":"ok",…,"index":0,"options":2}
+{"node":"…-1003","image":"option-b.png","audio":"option-b.ogg","event":"wheel_right",…,"index":1,…}
+{"node":"…-1005","image":null,"audio":"story-b.ogg","event":"ok",…,"index":1,"options":2}
 ```
 
-Une ligne `cle=valeur` par événement sur `stdout`, les avertissements du parseur sur `stderr` :
-la sortie se compare directement avec `diff`.
+Champs minimaux `node` / `image` / `audio` ; s'y ajoutent `event`, `status`, `image_ref`,
+`audio_ref` (les références brutes de `story.json`, avant validation), `action`, `index`, `options`.
+
+Sortie : **1** si le chargement échoue, **2** si un nom d'événement est invalide — auquel cas
+`stdout` reste vide, la liste étant validée avant exécution.
+
+Graine du tirage aléatoire : `LUNY_RANDOM_SEED`, que `--seed N` surcharge.
+
+Le mode texte lisible est derrière `--verbose` :
+
+```console
+$ ./luny_cli --verbose tests/packs/two-branches ok,wheel_right,ok
+pack title="Deux chemins" version=1 nightMode=0 stages=5 actions=2 entry=3f2b6c68-…-1001
+step=0 event=load        status=ACCEPTED stage=…-1001 name="Couverture" image=cover.png … index=-
+step=1 event=ok          status=ACCEPTED stage=…-1002 name="Option A"   … index=0/2
+step=2 event=wheel_right status=ACCEPTED stage=…-1003 name="Option B"   … index=1/2
+step=3 event=ok          status=ACCEPTED stage=…-1005 name="Histoire B" … index=1/2
+```
 
 ## Utiliser comme bibliothèque
 
@@ -75,17 +90,16 @@ laisse l'état du moteur strictement inchangé** — un bouton désactivé ne pr
 | `ACCEPTED` | l'état a changé |
 | `IGNORED_CONTROL_DISABLED` | le drapeau `controlSettings` correspondant est faux |
 | `IGNORED_NO_TRANSITION` | `okTransition` / `homeTransition` nulle |
-| `IGNORED_DANGLING_ACTION` | `actionNode` référencé introuvable |
-| `IGNORED_DANGLING_OPTION` | option `null` ou uuid introuvable |
+| `IGNORED_UNRESOLVED_TARGET` | la transition ne désigne aucune destination : `actionNode` introuvable, `optionIndex` hors bornes, uuid d'option introuvable, ou option `null` |
 | `IGNORED_NO_ACTION_CONTEXT` | molette hors d'un contexte ActionNode |
-| `IGNORED_EMPTY_OPTIONS` | ActionNode sans option |
+| `IGNORED_EMPTY_OPTIONS` | ActionNode sans aucune option |
 | `IGNORED_NO_PACK` | moteur nul ou sans nœud courant |
 
 ## Robustesse
 
 Le parseur est tolérant et explicite dans ses journaux. Sont couverts sans crash ni fuite :
 `version` absent (pack refusé), `controlSettings` absent (nœud refusé), `actionNode` pendant,
-uuid d'option pendant, `null` littéral dans `options`, `optionIndex` hors bornes ou négatif,
+uuid d'option pendant, `null` littéral dans `options`, `optionIndex` hors bornes (transition inopérante, jamais bornée) ou négatif,
 nom d'asset sans point, asset manquant, `squareOne` absent ou multiple, cycles et références avant.
 
 Vérifié sous valgrind, ASan/UBSan et par fuzzing de mutation — détail dans `NOTES.md` §5.

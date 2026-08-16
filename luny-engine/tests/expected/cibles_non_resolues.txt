@@ -1,0 +1,16 @@
+[warn] ActionNode act : option #1 nulle, emplacement conserve non resolu
+[warn] ActionNode act : option #2 designe un uuid inconnu (uuid-fantome), non resolue
+[warn] okTransition du noeud u-oob : optionIndex 9 hors bornes (3 options), transition inoperante
+[warn] homeTransition du noeud u-oob designe un actionNode inconnu (act-inconnu) : transition inoperante
+[warn] ActionNode act : option #1 non resolue, etat inchange
+[warn] ActionNode act : option #2 non resolue, etat inchange
+[warn] ActionNode act : optionIndex 9 hors bornes (3 options), etat inchange
+pack title="Cibles non resolues" version=1 nightMode=0 stages=3 actions=2 entry=u-entry
+step=0 event=load status=ACCEPTED stage=u-entry name="Entree" image=- audio=- wheel=1 ok=1 home=0 pause=0 autoplay=0 action=- index=-
+step=1 event=ok status=ACCEPTED stage=u-null name="Teste null et uuid pendant" image=- audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act2 index=0/2
+step=2 event=ok status=IGNORED_UNRESOLVED_TARGET stage=u-null name="Teste null et uuid pendant" image=- audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act2 index=0/2
+step=3 event=home status=IGNORED_UNRESOLVED_TARGET stage=u-null name="Teste null et uuid pendant" image=- audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act2 index=0/2
+step=4 event=wheel_right status=ACCEPTED stage=u-oob name="Teste hors bornes et action pendante" image=- audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act2 index=1/2
+step=5 event=ok status=IGNORED_UNRESOLVED_TARGET stage=u-oob name="Teste hors bornes et action pendante" image=- audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act2 index=1/2
+step=6 event=home status=IGNORED_UNRESOLVED_TARGET stage=u-oob name="Teste hors bornes et action pendante" image=- audio=- wheel=1 ok=1 home=1 pause=0 autoplay=0 action=act2 index=1/2
+exit=0

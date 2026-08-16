@@ -1,0 +1,7 @@
+{"node":"u-null","image":null,"audio":null,"event":"ok","status":"ACCEPTED","image_ref":null,"audio_ref":null,"action":"act2","index":0,"options":2}
+{"node":"u-null","image":null,"audio":null,"event":"ok","status":"IGNORED_UNRESOLVED_TARGET","image_ref":null,"audio_ref":null,"action":"act2","index":0,"options":2}
+{"node":"u-null","image":null,"audio":null,"event":"home","status":"IGNORED_UNRESOLVED_TARGET","image_ref":null,"audio_ref":null,"action":"act2","index":0,"options":2}
+{"node":"u-oob","image":null,"audio":null,"event":"wheel_right","status":"ACCEPTED","image_ref":null,"audio_ref":null,"action":"act2","index":1,"options":2}
+{"node":"u-oob","image":null,"audio":null,"event":"ok","status":"IGNORED_UNRESOLVED_TARGET","image_ref":null,"audio_ref":null,"action":"act2","index":1,"options":2}
+{"node":"u-oob","image":null,"audio":null,"event":"home","status":"IGNORED_UNRESOLVED_TARGET","image_ref":null,"audio_ref":null,"action":"act2","index":1,"options":2}
+exit=0

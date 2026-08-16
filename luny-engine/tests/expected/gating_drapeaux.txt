@@ -3,7 +3,7 @@ step=0 event=load status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1001 nam
 step=1 event=ok status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1002 name="Option A" image=option-a.png audio=option-a.ogg wheel=1 ok=1 home=1 pause=0 autoplay=0 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001 index=0/2
 step=2 event=ok status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1004 name="Histoire A" image=- audio=story-a.ogg wheel=0 ok=0 home=1 pause=1 autoplay=1 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2002 index=0/2
 step=3 event=ok status=IGNORED_CONTROL_DISABLED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1004 name="Histoire A" image=- audio=story-a.ogg wheel=0 ok=0 home=1 pause=1 autoplay=1 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2002 index=0/2
-step=4 event=left status=IGNORED_CONTROL_DISABLED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1004 name="Histoire A" image=- audio=story-a.ogg wheel=0 ok=0 home=1 pause=1 autoplay=1 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2002 index=0/2
+step=4 event=wheel_left status=IGNORED_CONTROL_DISABLED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1004 name="Histoire A" image=- audio=story-a.ogg wheel=0 ok=0 home=1 pause=1 autoplay=1 action=7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2002 index=0/2
 step=5 event=home status=ACCEPTED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1001 name="Couverture" image=cover.png audio=cover.ogg wheel=0 ok=1 home=0 pause=0 autoplay=0 action=- index=-
 step=6 event=home status=IGNORED_CONTROL_DISABLED stage=3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1001 name="Couverture" image=cover.png audio=cover.ogg wheel=0 ok=1 home=0 pause=0 autoplay=0 action=- index=-
 exit=0

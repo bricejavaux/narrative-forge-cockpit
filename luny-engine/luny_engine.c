@@ -22,8 +22,9 @@ typedef struct {
     int   present;       /* 0 -> transition nulle ou absente          */
     char *action_id;     /* identifiant brut lu dans story.json       */
     int   action_ref;    /* index dans engine->actions, -1 si pendant */
-    int   option_index;  /* normalise apres resolution                */
+    int   option_index;  /* index demande, jamais borne               */
     int   random;        /* 1 si optionIndex valait -1                */
+    int   out_of_range;  /* 1 si option_index >= nombre d'options     */
 } transition_t;
 
 typedef struct {
@@ -32,6 +33,8 @@ typedef struct {
     char         *type;
     char         *image;
     char         *audio;
+    char         *image_ref;
+    char         *audio_ref;
     luny_controls controls;
     int           square_one;
     transition_t  ok;
@@ -92,8 +95,7 @@ const char *luny_event_status_str(luny_event_status s)
         case LUNY_EVENT_ACCEPTED:                  return "ACCEPTED";
         case LUNY_EVENT_IGNORED_CONTROL_DISABLED:  return "IGNORED_CONTROL_DISABLED";
         case LUNY_EVENT_IGNORED_NO_TRANSITION:     return "IGNORED_NO_TRANSITION";
-        case LUNY_EVENT_IGNORED_DANGLING_ACTION:   return "IGNORED_DANGLING_ACTION";
-        case LUNY_EVENT_IGNORED_DANGLING_OPTION:   return "IGNORED_DANGLING_OPTION";
+        case LUNY_EVENT_IGNORED_UNRESOLVED_TARGET: return "IGNORED_UNRESOLVED_TARGET";
         case LUNY_EVENT_IGNORED_NO_ACTION_CONTEXT: return "IGNORED_NO_ACTION_CONTEXT";
         case LUNY_EVENT_IGNORED_EMPTY_OPTIONS:     return "IGNORED_EMPTY_OPTIONS";
         case LUNY_EVENT_IGNORED_NO_PACK:           return "IGNORED_NO_PACK";
@@ -477,6 +479,7 @@ static void transition_init(transition_t *t)
     t->action_ref   = -1;
     t->option_index = 0;
     t->random       = 0;
+    t->out_of_range = 0;
 }
 
 static void parse_transition(luny_engine *e, const cJSON *node, const char *key,
@@ -613,8 +616,10 @@ static luny_status parse_stage_nodes(luny_engine *e, const cJSON *root)
 
         img = json_str(it, "image");
         aud = json_str(it, "audio");
-        s->image = validate_asset(e, img, ASSET_IMAGE, uuid);
-        s->audio = validate_asset(e, aud, ASSET_AUDIO, uuid);
+        s->image_ref = dup_str(img);
+        s->audio_ref = dup_str(aud);
+        s->image     = validate_asset(e, img, ASSET_IMAGE, uuid);
+        s->audio     = validate_asset(e, aud, ASSET_AUDIO, uuid);
 
         parse_transition(e, it, "okTransition",   &s->ok,   uuid);
         parse_transition(e, it, "homeTransition", &s->home, uuid);
@@ -807,10 +812,14 @@ static void resolve_transition(luny_engine *e, transition_t *t, const char *node
                    what, node_uuid, t->option_index);
         t->option_index = 0;
     } else if (t->option_index >= a->option_count) {
+        /*
+         * Aucun bornage : un moteur ne peut pas inventer une destination. La
+         * transition devient inoperante, comme toute cible non resolue.
+         */
         engine_log(e, LUNY_LOG_WARN,
-                   "%s du noeud %s : optionIndex %d hors bornes (%d options), borne a %d",
-                   what, node_uuid, t->option_index, a->option_count, a->option_count - 1);
-        t->option_index = a->option_count - 1;
+                   "%s du noeud %s : optionIndex %d hors bornes (%d options), transition inoperante",
+                   what, node_uuid, t->option_index, a->option_count);
+        t->out_of_range = 1;
     }
 }
 
@@ -867,6 +876,8 @@ static void free_engine_contents(luny_engine *e)
         free(e->stages[i].type);
         free(e->stages[i].image);
         free(e->stages[i].audio);
+        free(e->stages[i].image_ref);
+        free(e->stages[i].audio_ref);
         free(e->stages[i].ok.action_id);
         free(e->stages[i].home.action_id);
     }
@@ -1064,6 +1075,8 @@ int luny_current_stage(const luny_engine *engine, luny_stage_view *out)
     out->type       = s->type;
     out->image      = s->image;
     out->audio      = s->audio;
+    out->image_ref  = s->image_ref;
+    out->audio_ref  = s->audio_ref;
     out->controls   = s->controls;
     out->square_one = s->square_one;
     return 1;
@@ -1135,7 +1148,7 @@ static luny_event_status follow_transition(luny_engine *e, const transition_t *t
         return LUNY_EVENT_IGNORED_NO_TRANSITION;
     }
     if (t->action_ref < 0) {
-        return LUNY_EVENT_IGNORED_DANGLING_ACTION;
+        return LUNY_EVENT_IGNORED_UNRESOLVED_TARGET;
     }
 
     a = &e->actions[t->action_ref];
@@ -1146,20 +1159,26 @@ static luny_event_status follow_transition(luny_engine *e, const transition_t *t
     if (t->random) {
         index = (int)engine_random(e, (unsigned int)a->option_count);
     } else {
+        if (t->out_of_range) {
+            engine_log(e, LUNY_LOG_WARN,
+                       "ActionNode %s : optionIndex %d hors bornes (%d options), etat inchange",
+                       a->id, t->option_index, a->option_count);
+            return LUNY_EVENT_IGNORED_UNRESOLVED_TARGET;
+        }
         index = t->option_index;
     }
-    if (index < 0) {
-        index = 0;
-    }
-    if (index >= a->option_count) {
-        index = a->option_count - 1;
+    if (index < 0 || index >= a->option_count) {
+        engine_log(e, LUNY_LOG_WARN,
+                   "ActionNode %s : index %d hors bornes (%d options), etat inchange",
+                   a->id, index, a->option_count);
+        return LUNY_EVENT_IGNORED_UNRESOLVED_TARGET;
     }
 
     target = a->option_ref[index];
     if (target < 0) {
         engine_log(e, LUNY_LOG_WARN,
                    "ActionNode %s : option #%d non resolue, etat inchange", a->id, index);
-        return LUNY_EVENT_IGNORED_DANGLING_OPTION;
+        return LUNY_EVENT_IGNORED_UNRESOLVED_TARGET;
     }
 
     e->current    = target;
@@ -1252,7 +1271,7 @@ static luny_event_status wheel_move(luny_engine *engine, int delta)
     if (target < 0) {
         engine_log(engine, LUNY_LOG_WARN,
                    "ActionNode %s : option #%d non resolue, molette sans effet", a->id, next);
-        return LUNY_EVENT_IGNORED_DANGLING_OPTION;
+        return LUNY_EVENT_IGNORED_UNRESOLVED_TARGET;
     }
 
     engine->current    = target;

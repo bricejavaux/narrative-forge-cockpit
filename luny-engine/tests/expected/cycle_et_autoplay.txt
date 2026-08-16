@@ -1,7 +1,7 @@
 [warn] aucun noeud squareOne : le premier StageNode du tableau (c-a) sert d'entree
 pack title="Cycle" version=1 nightMode=0 stages=2 actions=2 entry=c-a
 step=0 event=load status=ACCEPTED stage=c-a name="A" image=- audio=- wheel=0 ok=1 home=1 pause=0 autoplay=1 action=- index=-
-step=1 event=ended status=ACCEPTED stage=c-b name="B" image=- audio=- wheel=0 ok=1 home=1 pause=0 autoplay=1 action=act-b index=0/1
-step=2 event=ended status=ACCEPTED stage=c-a name="A" image=- audio=- wheel=0 ok=1 home=1 pause=0 autoplay=1 action=act-a index=0/1
-step=3 event=ended status=ACCEPTED stage=c-b name="B" image=- audio=- wheel=0 ok=1 home=1 pause=0 autoplay=1 action=act-b index=0/1
+step=1 event=audio_ended status=ACCEPTED stage=c-b name="B" image=- audio=- wheel=0 ok=1 home=1 pause=0 autoplay=1 action=act-b index=0/1
+step=2 event=audio_ended status=ACCEPTED stage=c-a name="A" image=- audio=- wheel=0 ok=1 home=1 pause=0 autoplay=1 action=act-a index=0/1
+step=3 event=audio_ended status=ACCEPTED stage=c-b name="B" image=- audio=- wheel=0 ok=1 home=1 pause=0 autoplay=1 action=act-b index=0/1
 exit=0

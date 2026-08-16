@@ -1,0 +1,20 @@
+{
+    "format": "v1", "title": "Cibles non resolues", "version": 1,
+    "stageNodes": [
+        { "uuid": "u-entry", "name": "Entree", "squareOne": true,
+          "okTransition": { "actionNode": "act2", "optionIndex": 0 }, "homeTransition": null,
+          "controlSettings": { "wheel": true, "ok": true, "home": false, "pause": false, "autoplay": false } },
+        { "uuid": "u-null", "name": "Teste null et uuid pendant",
+          "okTransition": { "actionNode": "act", "optionIndex": 1 },
+          "homeTransition": { "actionNode": "act", "optionIndex": 2 },
+          "controlSettings": { "wheel": true, "ok": true, "home": true, "pause": false, "autoplay": false } },
+        { "uuid": "u-oob", "name": "Teste hors bornes et action pendante",
+          "okTransition": { "actionNode": "act", "optionIndex": 9 },
+          "homeTransition": { "actionNode": "act-inconnu", "optionIndex": 0 },
+          "controlSettings": { "wheel": true, "ok": true, "home": true, "pause": false, "autoplay": false } }
+    ],
+    "actionNodes": [
+        { "id": "act2", "options": [ "u-null", "u-oob" ] },
+        { "id": "act",  "options": [ "u-null", null, "uuid-fantome" ] }
+    ]
+}

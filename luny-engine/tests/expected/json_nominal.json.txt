@@ -1,0 +1,4 @@
+{"node":"3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1002","image":"option-a.png","audio":"option-a.ogg","event":"ok","status":"ACCEPTED","image_ref":"option-a.png","audio_ref":"option-a.ogg","action":"7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001","index":0,"options":2}
+{"node":"3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1003","image":"option-b.png","audio":"option-b.ogg","event":"wheel_right","status":"ACCEPTED","image_ref":"option-b.png","audio_ref":"option-b.ogg","action":"7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001","index":1,"options":2}
+{"node":"3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1005","image":null,"audio":"story-b.ogg","event":"ok","status":"ACCEPTED","image_ref":null,"audio_ref":"story-b.ogg","action":"7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2002","index":1,"options":2}
+exit=0
