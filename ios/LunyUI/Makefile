@@ -12,6 +12,9 @@ LUNY_ENGINE_DIR = ../../luny-engine
 #   make LUNY_DEBUG=1 package install
 LUNY_DEBUG ?= 0
 
+# Palette : 0 = sombre (defaut), 1 = claire chaleureuse. Voir LunyTheme.h.
+LUNY_THEME_LIGHT ?= 0
+
 LunyUI_FILES = main.m \
                XXAppDelegate.m \
                RootViewController.m \
@@ -28,7 +31,7 @@ LunyUI_FRAMEWORKS = UIKit CoreGraphics QuartzCore
 # CFLAGS s'applique aussi aux sources C (Theos les compile avec -x c et sans
 # OBJCFLAGS) : -fobjc-arc doit donc rester dans OBJCFLAGS, sinon clang le
 # recoit sur du C pur.
-LunyUI_CFLAGS = -I$(LUNY_ENGINE_DIR) -DLUNY_DEBUG=$(LUNY_DEBUG)
+LunyUI_CFLAGS = -I$(LUNY_ENGINE_DIR) -DLUNY_DEBUG=$(LUNY_DEBUG) -DLUNY_THEME_LIGHT=$(LUNY_THEME_LIGHT)
 LunyUI_OBJCFLAGS = -fobjc-arc
 
 include $(THEOS_MAKE_PATH)/application.mk

@@ -24,6 +24,7 @@ static const CGFloat kLunyPad = 10.0f;
 static const CGFloat kLunyTrackZoneHeight = 30.0f;
 static const CGFloat kLunyTrackRailHeight = 6.0f;
 static const CGFloat kLunyTimeLabelWidth = 74.0f;
+static const CGFloat kLunyThumbSize = 17.0f;
 
 /* Meme principe pour les fleches : zone large, glyphe fin. */
 static const CGFloat kLunyArrowWidth = 58.0f;
@@ -57,6 +58,14 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     NSTimeInterval _duration;
     BOOL _playing;
 
+    /* Vrai si le noeud courant reference une piste. Distinct de
+     * _duration > 0 : un pack peut n'avoir aucun audio du tout. */
+    BOOL _hasTrack;
+
+    /* Etat du glissement sur la barre. */
+    BOOL _scrubbing;
+    BOOL _wasPlayingBeforeScrub;
+
     /* Arme par -applyEvent: quand le moteur a reellement change de noeud :
      * seul ce cas merite un fondu, pas un simple rafraichissement. */
     BOOL _fadeNextRender;
@@ -72,6 +81,8 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
 @property (nonatomic, strong) UIView *trackRail;
 @property (nonatomic, strong) UIView *trackFill;
+@property (nonatomic, strong) UIView *trackThumb;
+@property (nonatomic, strong) UIView *trackTouchZone;
 @property (nonatomic, strong) UILabel *timeLabel;
 
 @property (nonatomic, strong) UIButton *leftButton;
@@ -170,7 +181,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     _homeButton.clipsToBounds = YES;
     [_homeButton setTitle:@"Début" forState:UIControlStateNormal];
     [_homeButton setTitleColor:[LunyTheme textPrimary] forState:UIControlStateNormal];
-    [_homeButton setTitleColor:[LunyTheme textDisabled] forState:UIControlStateDisabled];
+    [_homeButton setTitleColor:[LunyTheme textMuted] forState:UIControlStateDisabled];
     [self applyBackgroundColor:[LunyTheme overlaySurface] toButton:_homeButton];
     [_homeButton addTarget:self action:@selector(homeTapped:) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:_homeButton];
@@ -190,6 +201,29 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     _trackFill.layer.cornerRadius = kLunyTrackRailHeight / 2.0f;
     [_controlsPanel addSubview:_trackFill];
 
+    _trackThumb = [[UIView alloc] initWithFrame:CGRectZero];
+    _trackThumb.backgroundColor = [LunyTheme accentAmber];
+    _trackThumb.layer.cornerRadius = kLunyThumbSize / 2.0f;
+    [_controlsPanel addSubview:_trackThumb];
+
+    /*
+     * Zone de saisie de 30pt de haut pour un trait visuel de 6, decision
+     * actee sur la maquette : sur 3,5 pouces a 163 ppp, viser 6 pixels au
+     * doigt est hors de portee d'un enfant. Le trait fin est esthetique, la
+     * surface est fonctionnelle.
+     */
+    _trackTouchZone = [[UIView alloc] initWithFrame:CGRectZero];
+    _trackTouchZone.backgroundColor = [UIColor clearColor];
+    [_controlsPanel addSubview:_trackTouchZone];
+
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
+                                   initWithTarget:self action:@selector(trackPanned:)];
+    [_trackTouchZone addGestureRecognizer:pan];
+
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
+                                   initWithTarget:self action:@selector(trackTapped:)];
+    [_trackTouchZone addGestureRecognizer:tap];
+
     _timeLabel = [self labelWithFont:[UIFont systemFontOfSize:11.0f]
                                color:[LunyTheme textDisabled]];
     _timeLabel.textAlignment = NSTextAlignmentRight;
@@ -203,7 +237,9 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     _mainButton.layer.cornerRadius = 14.0f;
     _mainButton.clipsToBounds = YES;
     [_mainButton setTitleColor:[LunyTheme textOnAccent] forState:UIControlStateNormal];
-    [_mainButton setTitleColor:[LunyTheme textDisabled] forState:UIControlStateDisabled];
+    // textMuted et non textDisabled : mesure a 4,9:1 sur le fond desature,
+    // contre 1,0:1 pour l'ancienne combinaison.
+    [_mainButton setTitleColor:[LunyTheme textMuted] forState:UIControlStateDisabled];
     [_mainButton addTarget:self action:@selector(mainTapped:) forControlEvents:UIControlEventTouchUpInside];
     [_controlsPanel addSubview:_mainButton];
 
@@ -233,7 +269,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     button.clipsToBounds = YES;
     [button setTitle:title forState:UIControlStateNormal];
     [button setTitleColor:[LunyTheme textPrimary] forState:UIControlStateNormal];
-    [button setTitleColor:[LunyTheme textDisabled] forState:UIControlStateDisabled];
+    [button setTitleColor:[LunyTheme textMuted] forState:UIControlStateDisabled];
     [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
     [_controlsPanel addSubview:button];
     return button;
@@ -251,6 +287,8 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
                       forState:UIControlStateNormal];
     [button setBackgroundImage:[LunyTheme solidImageWithColor:[LunyTheme pressedVariantOf:color]]
                       forState:UIControlStateHighlighted];
+    [button setBackgroundImage:[LunyTheme solidImageWithColor:[LunyTheme disabledVariantOf:color]]
+                      forState:UIControlStateDisabled];
 }
 
 - (UILabel *)labelWithFont:(UIFont *)font color:(UIColor *)color
@@ -324,6 +362,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     self.trackRail.frame = CGRectMake(kLunyPad, railY, railWidth, kLunyTrackRailHeight);
     self.timeLabel.frame = CGRectMake(kLunyPad + railWidth + kLunyPad, y,
                                       kLunyTimeLabelWidth, kLunyTrackZoneHeight);
+    self.trackTouchZone.frame = CGRectMake(kLunyPad, y, railWidth, kLunyTrackZoneHeight);
     [self layoutTrackFill];
 
     // Rangee de commandes.
@@ -368,6 +407,13 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
     self.trackFill.frame = CGRectMake(rail.origin.x, rail.origin.y,
                                       floorf(rail.size.width * ratio), rail.size.height);
+
+    // La pastille est centree sur la tete de lecture, bornee au rail pour ne
+    // pas deborder a 0 % ni a 100 %.
+    CGFloat centre = rail.origin.x + (rail.size.width * ratio);
+    self.trackThumb.frame = CGRectMake(centre - (kLunyThumbSize / 2.0f),
+                                       CGRectGetMidY(rail) - (kLunyThumbSize / 2.0f),
+                                       kLunyThumbSize, kLunyThumbSize);
 }
 
 - (void)layoutDots
@@ -390,6 +436,103 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
         UIView *dot = self.dots[index];
         dot.frame = CGRectMake(x, 0.0f, kLunyDotSize, kLunyDotSize);
         x += kLunyDotSize + kLunyDotGap;
+    }
+}
+
+#pragma mark - Navigation dans la piste
+
+- (void)setTrackEnabled:(BOOL)enabled
+{
+    self.trackTouchZone.userInteractionEnabled = enabled;
+
+    // Rail, remplissage et pastille sont purement decoratifs : les attenuer
+    // ne pose aucun probleme de contraste de texte, contrairement aux boutons.
+    CGFloat alpha = enabled ? 1.0f : 0.35f;
+    self.trackRail.alpha = alpha;
+    self.trackFill.alpha = alpha;
+    self.trackThumb.alpha = alpha;
+    self.trackThumb.hidden = !enabled;
+}
+
+/*
+ * Aucun seek audio reel : rien ne joue. On repositionne le minuteur simule et
+ * son affichage, ce qui est exactement ce que la barre represente.
+ */
+- (CGFloat)ratioForTouchAtX:(CGFloat)x
+{
+    CGFloat width = self.trackTouchZone.bounds.size.width;
+
+    if (width <= 0.0f) {
+        return 0.0f;
+    }
+
+    CGFloat ratio = x / width;
+
+    if (ratio < 0.0f) {
+        ratio = 0.0f;
+    }
+    if (ratio > 1.0f) {
+        ratio = 1.0f;
+    }
+    return ratio;
+}
+
+- (void)seekToRatio:(CGFloat)ratio
+{
+    _position = _duration * (NSTimeInterval)ratio;
+    [self refreshTransportLabels];
+}
+
+- (void)trackTapped:(UITapGestureRecognizer *)tap
+{
+    if (!self.trackTouchZone.userInteractionEnabled || _duration <= 0.0) {
+        return;
+    }
+
+    [self seekToRatio:[self ratioForTouchAtX:[tap locationInView:self.trackTouchZone].x]];
+}
+
+- (void)trackPanned:(UIPanGestureRecognizer *)pan
+{
+    if (!self.trackTouchZone.userInteractionEnabled || _duration <= 0.0) {
+        return;
+    }
+
+    CGFloat ratio = [self ratioForTouchAtX:[pan locationInView:self.trackTouchZone].x];
+
+    switch (pan.state) {
+        case UIGestureRecognizerStateBegan:
+            // Le minuteur est suspendu pendant la saisie, sinon il continuerait
+            // d'avancer sous le doigt.
+            _scrubbing = YES;
+            _wasPlayingBeforeScrub = _playing;
+            [self stopTicking];
+            [self seekToRatio:ratio];
+            break;
+
+        case UIGestureRecognizerStateChanged:
+            [self seekToRatio:ratio];
+            break;
+
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled:
+        case UIGestureRecognizerStateFailed:
+            [self seekToRatio:ratio];
+            _scrubbing = NO;
+
+            // On ne reprend que si la piste avancait avant la saisie, et
+            // seulement si elle n'est pas deja au bout.
+            if (_wasPlayingBeforeScrub && _position < _duration) {
+                _playing = YES;
+                [self startTicking];
+            } else {
+                _playing = NO;
+            }
+            [self refreshMainButtonForCurrentStage];
+            break;
+
+        default:
+            break;
     }
 }
 
@@ -503,21 +646,34 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     // drapeau qui les concerne.
     [self setButton:self.homeButton enabled:(stage.controls.home != 0)];
 
+    // La barre se saisit si le pack autorise la pause et qu'il y a une piste.
+    // Grisee, pas silencieusement inerte : on doit voir qu'elle ne repond pas.
+    [self setTrackEnabled:((stage.controls.pause != 0) && _hasTrack)];
+
     [self refreshMainButtonForStage:&stage];
     [self refreshTransportLabels];
+}
+
+- (void)refreshMainButtonForCurrentStage
+{
+    luny_stage_view stage;
+
+    if (_engine && luny_current_stage(_engine, &stage)) {
+        [self refreshMainButtonForStage:&stage];
+    }
 }
 
 - (void)refreshMainButtonForStage:(const luny_stage_view *)stage
 {
     if (stage->controls.ok) {
-        self.mainButton.backgroundColor = [LunyTheme accentAmber];
+        [self applyBackgroundColor:[LunyTheme accentAmber] toButton:self.mainButton];
         [self.mainButton setTitle:@"Choisir" forState:UIControlStateNormal];
         [self setButton:self.mainButton enabled:YES];
         return;
     }
 
     // ok inactif : le bouton devient lecture/pause, en vert.
-    self.mainButton.backgroundColor = [LunyTheme accentSage];
+    [self applyBackgroundColor:[LunyTheme accentSage] toButton:self.mainButton];
     [self.mainButton setTitle:(_playing ? @"Pause" : @"Lire") forState:UIControlStateNormal];
 
     // Inactif si le pack n'autorise pas la pause ou si aucune piste n'est
@@ -528,10 +684,15 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
 - (void)setButton:(UIButton *)button enabled:(BOOL)enabled
 {
-    // UIButtonTypeCustom n'a pas d'etat desactive visuel : sans intervention
-    // explicite, un bouton inactif serait indiscernable d'un bouton actif.
+    /*
+     * Pas de baisse d'alpha ici, contrairement a la version precedente.
+     * Attenuer le bouton entier faisait fondre son fond ET son titre vers la
+     * couleur du panneau : le contraste interne tombait a 1,03:1, et le
+     * libelle devenait invisible — c'est ce qui a ete rapporte comme "le
+     * bouton disparait". L'etat desactive passe desormais par une image de
+     * fond desaturee et un titre a contraste conserve.
+     */
     button.enabled = enabled;
-    button.alpha = enabled ? 1.0f : 0.55f;
 }
 
 /*
@@ -619,8 +780,19 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     _position = 0.0;
     _duration = 0.0;
     _playing = NO;
+    _hasTrack = NO;
+    _scrubbing = NO;
 
+    /*
+     * Un noeud peut n'avoir aucune piste : le moteur rend alors audio = NULL.
+     * C'est le cas de TOUS les noeuds du pack "random", verifie au CLI sur
+     * l'appareil — d'ou la duree 0:00 qui y a ete rapportee comme un defaut.
+     * Ce n'est pas le hachage qui echoue, il n'y a rien a hacher. On le dit
+     * a l'ecran au lieu d'afficher un compteur a zero, qui se lit comme une
+     * panne.
+     */
     if (_engine && luny_current_stage(_engine, &stage) && stage.audio) {
+        _hasTrack = YES;
         _duration = [LunySimulatedAudio durationForTrackNamed:@(stage.audio)];
         _playing = (_duration > 0.0);
     }
@@ -631,10 +803,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
     // Le libelle du bouton central depend de _playing et de _duration, tous
     // deux fixes a l'instant : il faut donc le recalculer apres.
-    if (_engine && luny_current_stage(_engine, &stage)) {
-        [self refreshMainButtonForStage:&stage];
-    }
-
+    [self refreshMainButtonForCurrentStage];
     [self refreshTransportLabels];
 }
 
@@ -655,12 +824,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
         [self stopTicking];
     }
 
-    luny_stage_view stage;
-
-    if (_engine && luny_current_stage(_engine, &stage)) {
-        [self refreshMainButtonForStage:&stage];
-    }
-
+    [self refreshMainButtonForCurrentStage];
     [self refreshTransportLabels];
 }
 
@@ -698,9 +862,13 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
 - (void)refreshTransportLabels
 {
-    self.timeLabel.text = [NSString stringWithFormat:@"%@ / %@",
-                           [LunySimulatedAudio formattedSeconds:_position],
-                           [LunySimulatedAudio formattedSeconds:_duration]];
+    // Sans piste, un "0:00 / 0:00" laisserait croire a un minuteur bloque.
+    self.timeLabel.text = _hasTrack
+        ? [NSString stringWithFormat:@"%@ / %@",
+           [LunySimulatedAudio formattedSeconds:_position],
+           [LunySimulatedAudio formattedSeconds:_duration]]
+        : @"pas de piste";
+
     [self layoutTrackFill];
 }
 

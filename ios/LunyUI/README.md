@@ -89,6 +89,19 @@ hors du binaire par defaut :
 make LUNY_DEBUG=1 package install   # la retablit, ne pas livrer ainsi
 ```
 
+## Palettes
+
+Deux jeux de couleurs coexistent, bascule a la compilation :
+
+```sh
+make package install                     # sombre (defaut) : nuit et ambre
+make LUNY_THEME_LIGHT=1 package install  # claire : bois et creme
+```
+
+`LunyTheme` reste la source unique — aucun appelant ne change entre les deux,
+seuls les tokens different. Les deux palettes ont ete verifiees au contraste
+WCAG sur tous les couples texte/fond de l'app (`NOTES.md` §2.26).
+
 Les sources C sont compilees directement depuis `../../luny-engine`, sans
 copie. Deux details de build :
 

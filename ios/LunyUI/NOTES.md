@@ -271,6 +271,101 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    l'écran n'explique pourquoi les chevrons sont éteints. À traiter comme une
    question d'interface, pas de correction.
 
+22. **Durée bloquée à 0:00 sur « Tirage » : le pack n'a aucune piste.**
+
+   Rapporté comme un défaut du minuteur. Vérifié au CLI moteur sur
+   l'appareil, contre le bundle installé :
+
+   | pack | nœud | `image` | `audio` |
+   |---|---|---|---|
+   | two-branches | Couverture | cover.png | cover.ogg |
+   | two-branches | Option A | option-a.png | option-a.ogg |
+   | two-branches | Histoire A | — | story-a.ogg |
+   | random | Entree | a.png | **—** |
+   | random | Tirage 1/2/3 | — | **—** |
+
+   `random` ne référence **aucun** fichier audio, sur aucun nœud. Le hachage
+   ne défaille pas : il n'y a rien à hacher, et `durationForTrackNamed:`
+   renvoie 0 pour un nom nul, ce qui est correct.
+
+   **Correction de la cause, pas de l'affichage :** fabriquer une durée pour
+   un nœud sans piste serait mentir sur la donnée. L'app distingue désormais
+   « pas de piste » de « piste à zéro » — le libellé indique *pas de piste*,
+   et la barre est grisée. Un `0:00 / 0:00` se lit comme un minuteur en
+   panne ; l'absence de piste est un fait du pack, il faut le dire.
+
+23. **Bouton central « invisible » sur les options de « Tirage » : bug réel,
+    et il était de contraste.**
+
+   Les trois nœuds d'option de `random` ont `ok = 0` **et** `pause = 0`
+   (relevé au CLI). Le bouton devait donc s'afficher « Lire » et grisé — ce
+   qui était le cas. Mais l'état désactivé passait par `alpha = 0.55`
+   appliqué au **bouton entier**, ce qui fait fondre son fond *et* son titre
+   vers la couleur du panneau : le contraste interne s'effondrait.
+
+   Mesuré : **1,03:1** entre le libellé et son propre fond, soit un texte
+   littéralement invisible. Le rapport « le bouton disparaît » était donc
+   exact, et l'explication n'était ni le gating ni la logique.
+
+   Corrigé en supprimant l'atténuation globale : l'état désactivé est
+   maintenant une **image de fond désaturée** (accent fondu à 18 % dans le
+   panneau) avec un titre en `textMuted`. Mesuré après correction sur
+   l'appareil : **4,93:1**. Les flèches passent de 1,85:1 à **10,22:1** en
+   actif et 5,89:1 en inactif.
+
+   Règle à retenir : atténuer une vue entière préserve le contraste avec le
+   fond de l'écran, jamais le contraste **interne** entre ses éléments.
+
+24. **Bouton « Début » qui ramènerait à un nœud « A » : requalifié, pas un
+    bug.**
+
+   Vérifié au CLI sur les trois contextes de `random` — depuis la couverture,
+   depuis l'option atteinte par OK, depuis une autre option après molette.
+   HOME ramène **à chaque fois** à `s-entry`, nommé « Entree », qui est bien
+   le nœud d'entrée déclaré par le pack (`entry=s-entry`).
+
+   Aucun nœud nommé « A » n'existe dans `random`. Il en existe un dans
+   **`cycle`**, dont c'est précisément le nœud d'entrée (`c-a`, nom « A »).
+   L'observation a donc été faite sur « Cycle » et non sur « Tirage » — et
+   HOME s'y comportait correctement.
+
+25. **Barre de progression saisissable.**
+
+   Zone tactile de 30pt pour un trait de 6, avec pastille de 17pt — reprise
+   de la doc d'interface, qui note que viser 6 pixels au doigt est hors de
+   portée d'un enfant sur 3,5 pouces à 163 ppp.
+
+   Aucun `seek` audio réel n'est possible puisque rien ne joue : le geste
+   repositionne le minuteur simulé et son affichage, ce qui est exactement ce
+   que la barre représente. Le minuteur est suspendu pendant la saisie — sinon
+   il continuerait d'avancer sous le doigt — et ne reprend au relâchement que
+   s'il tournait avant, et si la position n'est pas déjà en fin de piste.
+
+   Conditionnée par `controlSettings.pause` **et** la présence d'une piste,
+   grisée sinon plutôt que silencieusement inerte.
+
+26. **Deuxième palette : bois et crème, en option de compilation.**
+
+   `make LUNY_THEME_LIGHT=1` bascule tout l'écran sur une palette chaude —
+   fond crème, surfaces de bois clair, encre brune — sans toucher à la
+   sombre. Les deux compilent, aucun appelant ne change : seuls les tokens de
+   `LunyTheme` diffèrent.
+
+   **Un point de conception mérite d'être noté**, parce qu'il n'est pas une
+   simple inversion : dans la palette sombre les accents sont *clairs*
+   (ambre #F0B357) ; dans la claire ils doivent être *profonds* (#7C4910).
+   Un accent sert à deux choses — remplir un bouton et encrer un glyphe sur
+   une couverture — et sur fond clair seule une teinte profonde tient les
+   deux rôles : elle porte alors un libellé crème en remplissage, et se
+   détache en encre sur la couverture.
+
+   Les deux palettes ont été vérifiées sur **tous** les couples texte/fond de
+   l'app (titres, durées, en-têtes, libellés de boutons actifs et désactivés,
+   initiales sur couverture). Les deux passent, seuil 4,5:1 pour le texte
+   courant et 3:1 pour le grand. Toute retouche de valeur doit refaire cette
+   vérification : un token n'est pas une préférence isolée, il vit dans une
+   paire.
+
 ---
 
 ## 3. Ce qui reste à vérifier localement
@@ -343,6 +438,31 @@ cette passe, à regarder un par un :
   l'ancienne à la nouvelle en **fondu court** (~0,2 s), pas d'un coup sec.
 - Un appui **ignoré** par le moteur ne doit produire **aucun** fondu — sinon
   l'écran laisserait croire qu'il s'est passé quelque chose.
+
+**Barre de progression saisissable**
+- Sur `two-branches`, glisser la pastille : le temps de gauche doit suivre le
+  doigt en direct et le remplissage ambre s'ajuster.
+- Au relâchement, si la piste avançait, elle doit **reprendre depuis la
+  nouvelle position**, pas depuis l'ancienne.
+- Sur `random`, la barre doit être **grisée et sans pastille** — ce pack n'a
+  aucune piste.
+
+**Libellé de durée sans piste**
+- Sur `random`, le bloc temps doit afficher **« pas de piste »**, pas
+  « 0:00 / 0:00 ».
+- Sur `two-branches`, il doit afficher une vraie durée simulée (0:31 sur la
+  couverture, 0:41 sur Option A).
+
+**Bouton central désactivé — le point qui avait été rapporté**
+- Sur les options de `random`, le bouton doit afficher **« Lire » lisible**
+  sur un fond vert désaturé, clairement inactif mais jamais effacé.
+- S'il redevient illisible, c'est qu'une atténuation globale a été
+  réintroduite : voir §2.23.
+
+**Palette claire (si compilée avec `LUNY_THEME_LIGHT=1`)**
+- Fond crème, tuiles bois clair, texte brun foncé.
+- Les mêmes vérifications que ci-dessus s'appliquent : aucun libellé ne doit
+  perdre en lisibilité par rapport à la palette sombre.
 
 **Absence de télémétrie**
 - Aucun uuid, aucun `wheel_left -> ACCEPTED`, aucun `option 2/3` nulle part.

@@ -1,62 +1,81 @@
 /*
  * LunyTheme.h
  *
- * Tokens de couleur de l'app, repris de mockup/luny_maquette_v3.html
- * (palette sombre, accent ambre, esthetique lune/lanterne).
+ * Tokens de couleur de l'app. Source unique : aucune valeur hex ne doit etre
+ * ecrite ailleurs.
  *
- * Source unique : aucune couleur ne doit etre ecrite en dur ailleurs dans
- * l'app. Les valeurs hex sont notees en commentaire face a chaque token.
+ * DEUX PALETTES coexistent, pour comparaison avant decision :
+ *
+ *   sombre  (defaut) — nuit et ambre, reprise de mockup/luny_maquette_v3.html
+ *   claire            — bois et creme, texte brun sur fond chaud
+ *
+ * Bascule a la compilation, les deux compilent :
+ *
+ *     make LUNY_THEME_LIGHT=1 package install
+ *
+ * Les deux jeux ont ete verifies au contraste WCAG sur tous les couples
+ * texte/fond de l'app — voir NOTES.md. Toute retouche de valeur doit refaire
+ * cette verification : un token n'est pas une preference isolee, il vit dans
+ * une paire.
  */
 #import <UIKit/UIKit.h>
 
+#ifndef LUNY_THEME_LIGHT
+#define LUNY_THEME_LIGHT 0
+#endif
+
 @interface LunyTheme : NSObject
 
+/* Nom de la palette active, pour le diagnostic. */
++ (NSString *)paletteName;
+
 /* Fonds */
-+ (UIColor *)backgroundDeep;    /* #0B1024 — fond de la bibliotheque et du lecteur */
-+ (UIColor *)surface;           /* #141A32 — fond de tuile */
-+ (UIColor *)artBase;           /* #060812 — fond de la zone d'art */
-+ (UIColor *)controlsSurface;   /* #101426 — panneau de commandes du lecteur */
-+ (UIColor *)raisedSurface;     /* #1C2440 — fond des fleches, au-dessus du fond general */
-+ (UIColor *)trackRail;         /* #232B47 — rail de la barre de progression */
-+ (UIColor *)dotIdle;           /* #2C3554 — point de pagination inactif */
++ (UIColor *)backgroundDeep;    /* fond de la bibliotheque et du lecteur */
++ (UIColor *)surface;           /* fond de tuile */
++ (UIColor *)artBase;           /* fond de la zone d'art */
++ (UIColor *)controlsSurface;   /* panneau de commandes du lecteur */
++ (UIColor *)raisedSurface;     /* fond des fleches, au-dessus du fond general */
++ (UIColor *)trackRail;         /* rail de la barre de progression */
++ (UIColor *)dotIdle;           /* point de pagination inactif */
 
-/* Textes */
-+ (UIColor *)textPrimary;       /* #C8D3F2 — texte clair courant */
-+ (UIColor *)textBright;        /* #E7ECFA — titres, contraste maximal */
-+ (UIColor *)textMuted;         /* #94A0C6 — texte secondaire ; c'est la couleur
-                                 * appelee "duration" dans la doc d'interface */
-+ (UIColor *)textDisabled;      /* #5F6B93 — glyphe d'une commande indisponible ;
-                                 * faible contraste assume, il signale l'inaction */
-+ (UIColor *)textOnAccent;      /* #2A1B03 — texte pose sur un aplat d'accent */
-
-/* Fond d'une commande posee par-dessus l'illustration : doit rester lisible
- * quelle que soit l'image en dessous. */
+/* Fond d'une commande posee par-dessus l'illustration. */
 + (UIColor *)overlaySurface;
 
-/* Accents */
-+ (UIColor *)accentAmber;       /* #F0B357 — validation, focus */
-+ (UIColor *)accentSage;        /* #8FC7A8 — succes */
-+ (UIColor *)accentRose;        /* #D98FA6 — alerte douce */
-+ (UIColor *)accentBlue;        /* #7FA6E0 — quatrieme teinte de la maquette */
+/* Textes */
++ (UIColor *)textPrimary;       /* texte courant */
++ (UIColor *)textBright;        /* titres, contraste maximal */
++ (UIColor *)textMuted;         /* texte secondaire ; c'est la couleur appelee
+                                 * "duration" dans la doc d'interface */
++ (UIColor *)textDisabled;      /* metadonnee discrete */
++ (UIColor *)textOnAccent;      /* texte pose sur un aplat d'accent */
 
-/*
- * Accent attribue a une tuile selon sa position, pour differencier les
- * couvertures sans sortir de la palette. Cycle sur les quatre accents.
- */
+/* Accents */
++ (UIColor *)accentAmber;
++ (UIColor *)accentSage;
++ (UIColor *)accentRose;
++ (UIColor *)accentBlue;
+
+/* Accent attribue a une tuile selon sa position. Cycle sur les quatre. */
 + (UIColor *)accentAtIndex:(NSUInteger)index;
 
-/*
- * Teinte de couverture : l'accent fondu dans artBase, de facon a garder un
- * panneau sombre lisible tout en identifiant chaque histoire.
- */
+/* Teinte de couverture : l'accent fondu dans artBase. */
 + (UIColor *)coverTintForAccent:(UIColor *)accent;
 
 /*
  * Variante assombrie, pour l'etat highlighted d'un bouton. UIKit ne fournit
- * aucun retour visuel automatique sur UIButtonTypeCustom : il faut une image
- * de fond par etat.
+ * aucun retour visuel automatique sur UIButtonTypeCustom.
  */
 + (UIColor *)pressedVariantOf:(UIColor *)color;
+
+/*
+ * Variante desaturee, pour l'etat desactive d'un bouton.
+ *
+ * A ne PAS remplacer par une simple baisse d'alpha sur le bouton : attenuer
+ * la vue entiere fait fondre son fond ET son titre vers la couleur du
+ * panneau, et le contraste interne s'effondre — mesure a 1,03:1, soit un
+ * libelle invisible. Ici seul le fond se desature, le titre garde le sien.
+ */
++ (UIColor *)disabledVariantOf:(UIColor *)color;
 
 /* Aplat 1x1 etirable, a poser en backgroundImage d'un bouton. */
 + (UIImage *)solidImageWithColor:(UIColor *)color;
