@@ -29,6 +29,17 @@ static const CGFloat kLunyTimeLabelWidth = 74.0f;
 static const CGFloat kLunyArrowWidth = 58.0f;
 static const CGFloat kLunyButtonHeight = 52.0f;
 
+/* Bouton HOME pose sur l'illustration. 44pt minimum : c'est la plus petite
+ * cible tactile confortable, et il n'y a pas de raison d'etre plus avare ici
+ * que sur les fleches. */
+static const CGFloat kLunyHomeHeight = 44.0f;
+static const CGFloat kLunyHomeWidth = 78.0f;
+static const CGFloat kLunyHomeInset = 10.0f;
+
+/* Fondu entre deux noeuds. Court : sur un 3GS une transition longue se voit
+ * comme une lenteur, pas comme une intention. */
+static const NSTimeInterval kLunyFadeDuration = 0.22;
+
 static const CGFloat kLunyDotSize = 7.0f;
 static const CGFloat kLunyDotGap = 6.0f;
 static const NSInteger kLunyDotMax = 10;
@@ -45,12 +56,18 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     NSTimeInterval _position;
     NSTimeInterval _duration;
     BOOL _playing;
+
+    /* Arme par -applyEvent: quand le moteur a reellement change de noeud :
+     * seul ce cas merite un fondu, pas un simple rafraichissement. */
+    BOOL _fadeNextRender;
 }
 @property (nonatomic, copy) NSString *packPath;
 @property (nonatomic, copy) NSString *packTitle;
 
+@property (nonatomic, strong) UIView *artContainer;
 @property (nonatomic, strong) UIImageView *imageView;
 @property (nonatomic, strong) UILabel *imagePlaceholder;
+@property (nonatomic, strong) UIButton *homeButton;
 @property (nonatomic, strong) UIView *controlsPanel;
 
 @property (nonatomic, strong) UIView *trackRail;
@@ -119,18 +136,44 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
 - (void)buildSubviews
 {
+    // L'illustration et son texte de remplacement vivent dans un conteneur :
+    // c'est lui qu'on fait fondre d'un noeud a l'autre, en un seul geste.
+    _artContainer = [[UIView alloc] initWithFrame:CGRectZero];
+    _artContainer.backgroundColor = [LunyTheme artBase];
+    _artContainer.clipsToBounds = YES;
+    [self.view addSubview:_artContainer];
+
     _imageView = [[UIImageView alloc] initWithFrame:CGRectZero];
     _imageView.contentMode = UIViewContentModeScaleAspectFill;
     _imageView.backgroundColor = [LunyTheme artBase];
     _imageView.clipsToBounds = YES;
-    _imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    [self.view addSubview:_imageView];
+    [_artContainer addSubview:_imageView];
 
     _imagePlaceholder = [self labelWithFont:[UIFont boldSystemFontOfSize:17.0f]
                                       color:[LunyTheme textDisabled]];
     _imagePlaceholder.textAlignment = NSTextAlignmentCenter;
     _imagePlaceholder.numberOfLines = 2;
-    [self.view addSubview:_imagePlaceholder];
+    [_artContainer addSubview:_imagePlaceholder];
+
+    /*
+     * HOME du graphe narratif, distinct du bouton retour de la barre de
+     * navigation : celui-ci quitte l'histoire, celui-la la recommence.
+     * Pose hors du conteneur d'art pour ne pas fondre avec l'illustration.
+     *
+     * Libelle textuel et non pictogramme : la police du 3GS n'a ni maison
+     * (U+2302) ni fleche circulaire (U+21BA) — verifie sur l'appareil, les
+     * deux rendent .notdef.
+     */
+    _homeButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _homeButton.titleLabel.font = [UIFont boldSystemFontOfSize:13.0f];
+    _homeButton.layer.cornerRadius = 12.0f;
+    _homeButton.clipsToBounds = YES;
+    [_homeButton setTitle:@"Début" forState:UIControlStateNormal];
+    [_homeButton setTitleColor:[LunyTheme textPrimary] forState:UIControlStateNormal];
+    [_homeButton setTitleColor:[LunyTheme textDisabled] forState:UIControlStateDisabled];
+    [self applyBackgroundColor:[LunyTheme overlaySurface] toButton:_homeButton];
+    [_homeButton addTarget:self action:@selector(homeTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_homeButton];
 
     _controlsPanel = [[UIView alloc] initWithFrame:CGRectZero];
     _controlsPanel.backgroundColor = [LunyTheme controlsSurface];
@@ -158,6 +201,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     _mainButton = [UIButton buttonWithType:UIButtonTypeCustom];
     _mainButton.titleLabel.font = [UIFont boldSystemFontOfSize:17.0f];
     _mainButton.layer.cornerRadius = 14.0f;
+    _mainButton.clipsToBounds = YES;
     [_mainButton setTitleColor:[LunyTheme textOnAccent] forState:UIControlStateNormal];
     [_mainButton setTitleColor:[LunyTheme textDisabled] forState:UIControlStateDisabled];
     [_mainButton addTarget:self action:@selector(mainTapped:) forControlEvents:UIControlEventTouchUpInside];
@@ -183,15 +227,30 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     // Le fond reste opaque meme desactive : la cible tactile doit rester
     // lisible, seul le glyphe s'eteint. Un bouton qui disparait se lit comme
     // un bouton absent.
-    button.backgroundColor = [LunyTheme raisedSurface];
+    [self applyBackgroundColor:[LunyTheme raisedSurface] toButton:button];
     button.titleLabel.font = [UIFont systemFontOfSize:26.0f];
     button.layer.cornerRadius = 12.0f;
+    button.clipsToBounds = YES;
     [button setTitle:title forState:UIControlStateNormal];
     [button setTitleColor:[LunyTheme textPrimary] forState:UIControlStateNormal];
     [button setTitleColor:[LunyTheme textDisabled] forState:UIControlStateDisabled];
     [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
     [_controlsPanel addSubview:button];
     return button;
+}
+
+/*
+ * UIButtonTypeCustom n'a aucun retour visuel au contact : ni fond, ni
+ * assombrissement automatique. Sans vibreur sur ce materiel, l'etat
+ * highlighted est le seul accuse de reception possible d'un appui — on le
+ * fournit donc par une image de fond par etat, mecanisme standard d'UIKit.
+ */
+- (void)applyBackgroundColor:(UIColor *)color toButton:(UIButton *)button
+{
+    [button setBackgroundImage:[LunyTheme solidImageWithColor:color]
+                      forState:UIControlStateNormal];
+    [button setBackgroundImage:[LunyTheme solidImageWithColor:[LunyTheme pressedVariantOf:color]]
+                      forState:UIControlStateHighlighted];
 }
 
 - (UILabel *)labelWithFont:(UIFont *)font color:(UIColor *)color
@@ -234,8 +293,15 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
         artHeight = maxArt;
     }
 
-    self.imageView.frame = CGRectMake(0.0f, 0.0f, width, artHeight);
-    self.imagePlaceholder.frame = self.imageView.frame;
+    self.artContainer.frame = CGRectMake(0.0f, 0.0f, width, artHeight);
+    self.imageView.frame = self.artContainer.bounds;
+    self.imagePlaceholder.frame = self.artContainer.bounds;
+
+    // HOME en haut a droite de l'illustration : la barre de navigation occupe
+    // deja le haut a gauche pour quitter l'histoire, les deux gestes ne
+    // doivent pas se confondre.
+    self.homeButton.frame = CGRectMake(width - kLunyHomeWidth - kLunyHomeInset,
+                                       kLunyHomeInset, kLunyHomeWidth, kLunyHomeHeight);
 
     CGFloat panelHeight = bounds.size.height - artHeight;
     self.controlsPanel.frame = CGRectMake(0.0f, artHeight, width, panelHeight);
@@ -357,6 +423,11 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     }
 }
 
+- (void)homeTapped:(id)sender
+{
+    [self applyEvent:luny_home label:@"home"];
+}
+
 - (void)wheelLeftTapped:(id)sender
 {
     [self applyEvent:luny_wheel_left label:@"wheel_left"];
@@ -379,7 +450,13 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     }
 
     luny_event_status status = event(_engine);
+
+    // Seul un changement de noeud merite un fondu. Un evenement ignore laisse
+    // l'etat inchange : l'animer donnerait l'illusion qu'il s'est passe
+    // quelque chose.
+    _fadeNextRender = (status == LUNY_EVENT_ACCEPTED);
     [self renderCurrentStage];
+    _fadeNextRender = NO;
 
     if (status == LUNY_EVENT_ACCEPTED) {
         [self startTrackForCurrentStage];
@@ -400,6 +477,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
         [self setButton:self.mainButton enabled:NO];
         [self setButton:self.leftButton enabled:NO];
         [self setButton:self.rightButton enabled:NO];
+        [self setButton:self.homeButton enabled:NO];
         return;
     }
 
@@ -420,6 +498,10 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     BOOL wheelUsable = (stage.controls.wheel != 0) && hasAction && (action.option_count > 0);
     [self setButton:self.leftButton enabled:wheelUsable];
     [self setButton:self.rightButton enabled:wheelUsable];
+
+    // HOME suit controlSettings.home, comme les autres commandes suivent le
+    // drapeau qui les concerne.
+    [self setButton:self.homeButton enabled:(stage.controls.home != 0)];
 
     [self refreshMainButtonForStage:&stage];
     [self refreshTransportLabels];
@@ -469,6 +551,19 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
         if (needed >= 0 && needed < (int)sizeof(path)) {
             image = [UIImage imageWithContentsOfFile:@(path)];
         }
+    }
+
+    if (_fadeNextRender) {
+        UIView *container = self.artContainer;
+        [UIView transitionWithView:container
+                          duration:kLunyFadeDuration
+                           options:UIViewAnimationOptionTransitionCrossDissolve
+                        animations:^{
+                            self.imageView.image = image;
+                            self.imagePlaceholder.text = image ? nil : self.packTitle;
+                        }
+                        completion:NULL];
+        return;
     }
 
     self.imageView.image = image;

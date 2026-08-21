@@ -61,6 +61,13 @@ Disposition reprise de la maquette : zone d'art 320x240 en haut, panneau de
 commandes compact dessous (barre de progression, molette gauche / bouton
 central / molette droite, points de pagination).
 
+Trois commandes de graphe, chacune conditionnee par le drapeau qui la
+concerne : molette (`wheel` + contexte ActionNode), bouton central (`ok`), et
+« Debut » (`home`, via `luny_home()`). « Debut » recommence l'histoire au
+noeud d'entree ; le bouton retour de la barre de navigation, lui, la quitte —
+deux gestes distincts, volontairement separes a l'ecran (cf. `NOTES.md`
+§2.20).
+
 Le bouton central change de metier selon `controlSettings.ok` du noeud, sans
 aucun reglage :
 
@@ -70,10 +77,10 @@ aucun reglage :
 | `ok` inactif | vert sauge, « Lire » / « Pause » | pilote la piste |
 
 **Le minuteur de lecture est un simulateur.** Rien n'est decode : voir
-`LunySimulatedAudio.h` et `NOTES.md` §2.14. En fin de piste simulee,
+`LunySimulatedAudio.h` et `NOTES.md` §2.16. En fin de piste simulee,
 `luny_audio_ended()` est emis ; si le moteur repond
 `IGNORED_NO_TRANSITION`, l'histoire est finie et l'app revient a la
-bibliotheque (reserve documentee en `NOTES.md` §2.15).
+bibliotheque (reserve documentee en `NOTES.md` §2.17).
 
 La telemetrie technique (uuid, nom d'evenement, statut brut) est compilee
 hors du binaire par defaut :

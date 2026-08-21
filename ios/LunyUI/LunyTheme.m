@@ -37,6 +37,8 @@ static UIColor *LunyColorFromHex(uint32_t hex)
 + (UIColor *)textDisabled   { return LunyColorFromHex(0x5F6B93); }
 + (UIColor *)textOnAccent   { return LunyColorFromHex(0x2A1B03); }
 
++ (UIColor *)overlaySurface { return [LunyColorFromHex(0x1C2440) colorWithAlphaComponent:0.88f]; }
+
 + (UIColor *)accentAmber    { return LunyColorFromHex(0xF0B357); }
 + (UIColor *)accentSage     { return LunyColorFromHex(0x8FC7A8); }
 + (UIColor *)accentRose     { return LunyColorFromHex(0xD98FA6); }
@@ -47,6 +49,33 @@ static UIColor *LunyColorFromHex(uint32_t hex)
 	NSArray *accents = @[ [self accentAmber], [self accentSage], [self accentRose], [self accentBlue] ];
 	NSAssert(accents.count == kLunyAccentCount, @"kLunyAccentMask suppose exactement kLunyAccentCount accents");
 	return accents[index & kLunyAccentMask];
+}
+
++ (UIColor *)pressedVariantOf:(UIColor *)color
+{
+    CGFloat red = 0.0f, green = 0.0f, blue = 0.0f, alpha = 0.0f;
+
+    if (![color getRed:&red green:&green blue:&blue alpha:&alpha]) {
+        return color;
+    }
+
+    // Assombrissement multiplicatif : garde la teinte, ne la desature pas.
+    static const CGFloat factor = 0.82f;
+    return [UIColor colorWithRed:red * factor green:green * factor
+                            blue:blue * factor alpha:alpha];
+}
+
++ (UIImage *)solidImageWithColor:(UIColor *)color
+{
+    CGRect rect = CGRectMake(0.0f, 0.0f, 1.0f, 1.0f);
+
+    UIGraphicsBeginImageContextWithOptions(rect.size, NO, 0.0f);
+    [color setFill];
+    UIRectFill(rect);
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+
+    return image;
 }
 
 + (UIColor *)coverTintForAccent:(UIColor *)accent

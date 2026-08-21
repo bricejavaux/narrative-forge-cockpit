@@ -29,6 +29,10 @@
                                  * faible contraste assume, il signale l'inaction */
 + (UIColor *)textOnAccent;      /* #2A1B03 — texte pose sur un aplat d'accent */
 
+/* Fond d'une commande posee par-dessus l'illustration : doit rester lisible
+ * quelle que soit l'image en dessous. */
++ (UIColor *)overlaySurface;
+
 /* Accents */
 + (UIColor *)accentAmber;       /* #F0B357 — validation, focus */
 + (UIColor *)accentSage;        /* #8FC7A8 — succes */
@@ -46,5 +50,15 @@
  * panneau sombre lisible tout en identifiant chaque histoire.
  */
 + (UIColor *)coverTintForAccent:(UIColor *)accent;
+
+/*
+ * Variante assombrie, pour l'etat highlighted d'un bouton. UIKit ne fournit
+ * aucun retour visuel automatique sur UIButtonTypeCustom : il faut une image
+ * de fond par etat.
+ */
++ (UIColor *)pressedVariantOf:(UIColor *)color;
+
+/* Aplat 1x1 etirable, a poser en backgroundImage d'un bouton. */
++ (UIImage *)solidImageWithColor:(UIColor *)color;
 
 @end

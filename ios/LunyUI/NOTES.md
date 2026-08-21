@@ -83,6 +83,25 @@ capture de l'appareil.
    Ce n'est pas propre à iOS 6, mais c'est une fuite silencieuse : rien ne la
    signale à l'exécution.
 
+8. **La police du 3GS n'a presque aucun pictogramme.**
+   Vérifié sur l'appareil par `CTFontGetGlyphsForCharacters` : Helvetica et
+   Helvetica-Bold rendent `.notdef` pour la maison `U+2302`, la flèche
+   circulaire `U+21BA`, la flèche retour `U+21A9`, la flèche gauche `U+2190`
+   et la puce ronde `U+25CF`. Seul le Latin-1 est couvert, plus les
+   guillemets simples `U+2039`/`U+203A` déjà utilisés pour la molette.
+
+   Conséquence directe : toute commande a besoin d'un **libellé texte**, pas
+   d'un symbole. Le bouton HOME s'appelle donc « Début ». Ne pas y remettre un
+   pictogramme sans avoir refait cette mesure.
+
+9. **`UIButtonTypeCustom` n'a aucun retour visuel au contact.**
+   Complément du point 5, qui traitait l'état désactivé. L'état *highlighted*
+   n'est pas davantage fourni : un bouton custom à `backgroundColor` ne change
+   rien sous le doigt. Sans vibreur sur ce matériel, l'appui n'aurait donc
+   aucun accusé de réception. Les boutons passent par
+   `setBackgroundImage:forState:` avec un aplat 1×1 par état — mécanisme
+   standard d'UIKit — au lieu de `backgroundColor`.
+
 ---
 
 ## 2. Choix de code — décidés faute de visibilité sur le projet réel
@@ -91,7 +110,7 @@ Ces points ne sont pas imposés par iOS 6 : ce sont des décisions prises
 parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
 `AppDelegate`, `RootViewController` généré par le gabarit).
 
-8. **`RootViewController` reste un `UIViewController`, pas un
+10. **`RootViewController` reste un `UIViewController`, pas un
    `UICollectionViewController`.**
    `UICollectionViewController` impose `-initWithCollectionViewLayout:`
    comme initialiseur désigné. Cette session ne voit pas comment
@@ -110,7 +129,7 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    l'enregistrement de la cellule) qui avaient fait planter au lancement
    l'implémentation concurrente.
 
-9. **Emplacement des fichiers sources : racine du projet, pas de dossier
+11. **Emplacement des fichiers sources : racine du projet, pas de dossier
    `Classes/`.**
    Hypothèse tirée de la convention généralement documentée pour le
    gabarit Theos `application_modern`, **non vérifiée par une lecture
@@ -122,7 +141,7 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    **Tranché :** hypothèse correcte. Les sources sont à la racine et la
    liste est intégrée au `Makefile`.
 
-10. **Downcast explicite au lieu de generics légers.**
+12. **Downcast explicite au lieu de generics légers.**
    `dequeueReusableCellWithReuseIdentifier:forIndexPath:` renvoie un
    `UICollectionViewCell *` générique ; le code caste explicitement vers
    `LunyLibraryCell *` plutôt que de s'appuyer sur des generics Objective-C
@@ -131,7 +150,7 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    une exigence : une convention plus simple à auditer sans compilateur
    sous la main pour vérifier une syntaxe plus récente.
 
-11. **Les métadonnées de la bibliothèque sont lues dans les packs, plus codées
+13. **Les métadonnées de la bibliothèque sont lues dans les packs, plus codées
    en dur.**
    `LunyLibraryItem` ouvre chaque pack au démarrage, lit `luny_pack_info()`,
    puis referme. Le titre affiché est donc celui du pack. La deuxième ligne de
@@ -140,7 +159,7 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    précédente était inventée. Afficher une donnée réelle plutôt qu'un nombre
    plausible est un choix, pas une contrainte.
 
-12. **Choix des quatre packs embarqués.**
+14. **Choix des quatre packs embarqués.**
    `two-branches` (2 options), `random` (3), `degraded` (4), `cycle` (1), pour
    couvrir des formes de graphe différentes plutôt que le même pack copié.
 
@@ -151,13 +170,13 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    tourne réellement** : ses trois options sont valides et tous ses nœuds ont
    `controlSettings.wheel`.
 
-13. **Répartition des événements par pointeur de fonction.**
+15. **Répartition des événements par pointeur de fonction.**
    Les trois commandes passent par un `-applyEvent:label:` prenant un
    `luny_event_status (*)(luny_engine *)`. Les trois fonctions du moteur ont
    la même signature ; une méthode par bouton aurait triplé le même
    enchaînement émettre / réafficher / rapporter le statut.
 
-14. **Le minuteur de lecture est un simulateur, pas le lecteur final.**
+16. **Le minuteur de lecture est un simulateur, pas le lecteur final.**
    Voir l'en-tête de `LunySimulatedAudio.h`, volontairement bavard. Rien
    n'est décodé : les durées sont **inventées**, dérivées par hachage FNV-1a
    du nom de fichier. Le hachage n'apporte qu'une garantie — la même piste a
@@ -169,7 +188,7 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    de ses pistes : le moteur n'expose pas la liste des nœuds, cette somme
    n'est donc pas calculable côté app.
 
-15. **Fin d'histoire détectée via `IGNORED_NO_TRANSITION`.**
+17. **Fin d'histoire détectée via `IGNORED_NO_TRANSITION`.**
    `luny_stage_view` n'expose pas `okTransition`. L'app ne lit donc pas le
    champ : elle envoie `luny_audio_ended()` et lit le verdict du moteur.
    `LUNY_EVENT_IGNORED_NO_TRANSITION` signifie « pas de transition » et sert
@@ -189,7 +208,7 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    inobservable. Elle deviendra réelle sur de vrais packs convertis : c'est
    à ce moment qu'il faudra trancher, comme la doc le prévoit déjà.
 
-16. **Télémétrie derrière `LUNY_DEBUG`, à zéro par défaut.**
+18. **Télémétrie derrière `LUNY_DEBUG`, à zéro par défaut.**
    uuid, noms d'événements et statuts bruts du moteur sont compilés hors du
    binaire (`LunyDebug.h`). `make LUNY_DEBUG=1` les rétablit dans un libellé
    sous les commandes. À noter : les chaînes littérales des noms d'événements
@@ -198,10 +217,59 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    part, ce qui est l'exigence ; elles ne sont pas pour autant effacées du
    fichier.
 
-17. **Deux colonnes, conservées délibérément.**
+19. **Deux colonnes, conservées délibérément.**
    Sur 320pt, une troisième colonne ramènerait chaque couverture sous 90pt.
    L'espacement a été augmenté (marges 16pt, gouttières 14pt) plutôt que la
    densité.
+
+20. **Retour en arrière : option A retenue — l'événement HOME du moteur.**
+
+   `luny_home()` (nom vérifié dans `luny_engine.h`, non supposé) suit
+   `homeTransition` si elle existe, et à défaut ramène au **nœud d'entrée** du
+   pack en vidant le contexte ActionNode. C'est un « recommencer cette
+   histoire », pas un « annuler mon dernier choix ».
+
+   **Pourquoi A plutôt que B.** L'option B — une pile d'états côté UI —
+   se heurte à un fait du moteur : il ne se recule pas. Afficher un état
+   antérieur sans rejouer les événements désynchroniserait l'écran et le
+   moteur, et le prochain OK partirait du nœud le plus avancé, pas de celui
+   affiché. La rendre correcte imposerait de rejouer toute la séquence depuis
+   l'entrée à chaque retour — coûteux, et faux dès qu'un pack tire au sort :
+   `random` choisit son option d'entrée par RNG, un rejeu ne retomberait pas
+   forcément sur le même nœud. A est déjà supporté, exact, et sans état
+   dupliqué à maintenir.
+
+   **Ce que A ne fait pas.** Il ne revient pas au nœud précédent. Un retour
+   d'un seul cran reste à concevoir, et suppose soit un moteur capable de
+   reculer, soit un rejeu déterministe — donc un RNG rejouable à graine
+   mémorisée. Hors périmètre ici.
+
+   Le bouton est distinct de la barre de navigation, volontairement : « Début »
+   recommence l'histoire, le bouton retour la quitte. Il est en haut à droite
+   de l'illustration pour ne pas se confondre avec le retour, en haut à
+   gauche. Son conditionnement suit `controlSettings.home`, comme les autres
+   commandes suivent le drapeau qui les concerne.
+
+21. **La molette a été rapportée cassée : elle ne l'était pas.**
+   Gardé en note parce que le constat est reproductible et reviendra.
+
+   Vérifié à trois niveaux sur l'appareil : le moteur fait tourner l'index
+   (1→0→2→0→1 sur `random`) ; le prédicat de conditionnement de l'app,
+   rejoué tel quel en C, renvoie vrai après le premier « Choisir » ; et un
+   harnais UIKit interrogeant la vraie vue confirme
+   `enabled=1`, `alpha=1.00`, `hitTest` aboutissant au bouton et
+   `wheelLeftTapped:` toujours câblé.
+
+   **L'explication est ailleurs : au nœud d'entrée de *tous* les packs, il
+   n'existe aucun contexte ActionNode**, donc la molette est correctement
+   inactive — précisément là où on l'essaie en premier. Sur `random`, le
+   nœud d'entrée a pourtant `wheel = true`, ce qui rend l'inactivité encore
+   plus déroutante. Il faut appuyer une fois sur « Choisir » pour entrer dans
+   la liste d'options et voir les chevrons s'activer.
+
+   Ce n'est pas un défaut de code mais un défaut de lisibilité : rien à
+   l'écran n'explique pourquoi les chevrons sont éteints. À traiter comme une
+   question d'interface, pas de correction.
 
 ---
 
@@ -258,6 +326,24 @@ cette passe, à regarder un par un :
   ligne » en dessous.
 - Deux colonnes, marges franches — l'écran doit respirer, pas être rempli.
 
+**Bouton « Début » (HOME du graphe)**
+- Présent en haut à **droite** de l'illustration, pastille sombre translucide.
+- Sur `two-branches`, il doit être **grisé sur la couverture** (`home` y est
+  faux) et **actif** dès « Option A ».
+- Un appui doit ramener à la **couverture** de l'histoire — pas à la
+  bibliothèque, c'est le rôle du bouton retour de la barre.
+
+**Retour au contact (highlighted)**
+- Tout bouton — « Début », chevrons, bouton central — doit **s'assombrir sous
+  le doigt** et reprendre sa teinte au relâchement. C'est le seul accusé de
+  réception possible : ce matériel n'a pas de vibreur.
+
+**Fondu entre deux nœuds**
+- Sur `two-branches`, appuyer sur « Choisir » : l'illustration doit passer de
+  l'ancienne à la nouvelle en **fondu court** (~0,2 s), pas d'un coup sec.
+- Un appui **ignoré** par le moteur ne doit produire **aucun** fondu — sinon
+  l'écran laisserait croire qu'il s'est passé quelque chose.
+
 **Absence de télémétrie**
 - Aucun uuid, aucun `wheel_left -> ACCEPTED`, aucun `option 2/3` nulle part.
   S'il en reste un, le paquet a été construit avec `LUNY_DEBUG=1`.
@@ -276,7 +362,7 @@ Volontairement non commencés, pour ne pas laisser de moitiés en place :
   navigation actuel, qui est une simple dépile de `UINavigationController`.
 - **Volume et réglages parentaux** — la maquette prévoit « Enchaîner les
   histoires » et « Autoplay dans les séquences » ; leur absence est la raison
-  pour laquelle la règle de fin d'histoire reste partielle (§2.15).
+  pour laquelle la règle de fin d'histoire reste partielle (§2.17).
 - **Barre de progression saisissable** : la doc d'interface décrit une zone
   tactile de 30pt avec pastille déplaçable. La zone de 30pt est en place, la
   saisie ne l'est pas — la barre est aujourd'hui en lecture seule.
