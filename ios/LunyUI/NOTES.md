@@ -7,14 +7,16 @@ session, faute d'un élément que je n'avais pas sous les yeux.
 
 ---
 
-## 0. Ce que cette session n'a pas pu vérifier
+## 0. Ce qui n'a pas pu être vérifié
 
-**Contrainte d'environnement, pas d'iOS 6.** Cette session tourne dans un
-bac à sable cloud : ni Theos, ni SDK iOS, ni accès SSH à l'appareil. Rien
-ci-dessous n'a été compilé avec un vrai `clang` armv7, ni exécuté sur le
-3GS. Le code est écrit à partir de la connaissance des API UIKit — pas
-vérifié par un build. Voir `README.md` pour ce que ça change concrètement
-pour l'intégration.
+**Mise à jour.** Cette section décrivait une session sans Theos ni SDK ni
+appareil : rien n'y avait été compilé. Ce n'est plus le cas — le code est
+depuis compilé en armv7 et installé sur le 3GS (voir `README.md`). Les
+points 5 et 6 ci-dessous, pris comme hypothèses à l'époque, sont désormais
+tranchés par le projet réel et annotés comme tels.
+
+Reste non vérifié : le **rendu visuel** à l'écran, aucune session n'ayant de
+capture de l'appareil.
 
 ---
 
@@ -74,6 +76,12 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    `UICollectionViewController` — c'est un simple changement de classe
    mère une fois `AppDelegate` sous les yeux.
 
+   **Tranché :** conservé tel quel. `AppDelegate` appelle bien `-init`, et
+   rester un `UIViewController` évite au passage les pièges d'initialisation
+   de `UICollectionViewController` (layout nil, `reloadData` déclenché avant
+   l'enregistrement de la cellule) qui avaient fait planter au lancement
+   l'implémentation concurrente.
+
 6. **Emplacement des fichiers sources : racine du projet, pas de dossier
    `Classes/`.**
    Hypothèse tirée de la convention généralement documentée pour le
@@ -81,7 +89,10 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    directe** du gabarit réel (accès réseau de cette session trop limité
    pour récupérer le fichier `.nic.tar` exact et sa version). Un
    `grep _FILES Makefile` sur le projet réel confirme ou infirme en dix
-   secondes — voir `Makefile.snippet.mk`.
+   secondes.
+
+   **Tranché :** hypothèse correcte. Les sources sont à la racine et la
+   liste est intégrée au `Makefile`.
 
 7. **Downcast explicite au lieu de generics légers.**
    `dequeueReusableCellWithReuseIdentifier:forIndexPath:` renvoie un

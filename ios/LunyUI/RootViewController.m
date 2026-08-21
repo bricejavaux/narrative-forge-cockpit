@@ -2,6 +2,7 @@
 #import "LunyLibraryCell.h"
 #import "LunyLibraryItem.h"
 #import "DetailViewController.h"
+#import "LunyTheme.h"
 
 /*
  * Grille a deux colonnes, entierement calculee a la main : iOS 6 n'a ni
@@ -26,8 +27,7 @@ static const CGFloat   kLunyCellHeight        = 150.0f;
     [super viewDidLoad];
 
     self.title = @"Mes histoires";
-    // #0C1020 — fond de bibliotheque du mockup (.library)
-    self.view.backgroundColor = [UIColor colorWithRed:0.047f green:0.063f blue:0.125f alpha:1.0f];
+    self.view.backgroundColor = [LunyTheme backgroundDeep];
 
     self.items = [LunyLibraryItem sampleLibrary];
 
@@ -71,7 +71,7 @@ static const CGFloat   kLunyCellHeight        = 150.0f;
         dequeueReusableCellWithReuseIdentifier:[LunyLibraryCell reuseIdentifier]
                                    forIndexPath:indexPath];
     LunyLibraryItem *item = self.items[(NSUInteger)indexPath.item];
-    [cell configureWithItem:item];
+    [cell configureWithItem:item accent:[LunyTheme accentAtIndex:(NSUInteger)indexPath.item]];
     return cell;
 }
 
