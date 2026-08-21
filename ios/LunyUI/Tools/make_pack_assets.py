@@ -1,48 +1,65 @@
 #!/usr/bin/env python3
 """
-Genere les images du pack de test embarque dans l'app.
+Construit les packs embarques dans l'app depuis les fixtures du moteur.
 
-Pourquoi ce script existe : les assets de luny-engine/tests/packs/two-branches
-font 0 octet. C'est correct pour le moteur, qui ne verifie que la presence du
+Pourquoi ce script existe : les assets de luny-engine/tests/packs/ font tous
+0 octet. C'est correct pour le moteur, qui ne verifie que la presence du
 fichier et son extension sans jamais le decoder — mais UIImage renvoie nil sur
 un fichier vide, et l'ecran n'aurait donc rien a afficher.
 
-Les fixtures du moteur ne sont pas touchees (les tests du moteur en dependent) :
-seule la copie du pack embarquee dans Resources/packs/ recoit de vraies images.
-Le story.json, lui, est copie a l'identique.
+Regle de construction, a ne pas assouplir : la copie embarquee reflete
+*exactement* la liste de fichiers de la fixture. Seul le contenu des .png est
+remplace par une vraie image ; tout le reste est copie octet pour octet, et
+aucun fichier n'est ajoute. C'est ce qui garantit que le pack embarque se
+comporte comme la fixture — "degraded" reference par exemple absent.mp3 et
+sans-extension qui n'existent pas, et cette absence est precisement ce que le
+moteur y teste.
 
-Chaque image porte l'initiale du nom de son noeud sur un aplat de la palette,
-dans le meme esprit que les couvertures de la grille.
+Les fixtures elles-memes ne sont jamais modifiees.
 
 Usage :  python3 Tools/make_pack_assets.py
 """
 
 import os
+import shutil
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lunypng import write_png  # noqa: E402
 
 WIDTH, HEIGHT = 240, 240
-
 ART_BASE = (0x06, 0x08, 0x12)
 
-# Un asset par noeud porteur d'image dans two-branches/story.json, avec
-# l'accent correspondant a sa place dans la grille.
-ASSETS = {
-    "cover.png": ((0xF0, 0xB3, 0x57), "C"),      # ambre  — Couverture
-    "option-a.png": ((0x8F, 0xC7, 0xA8), "A"),   # sauge  — Option A
-    "option-b.png": ((0xD9, 0x8F, 0xA6), "B"),   # rose   — Option B
+# Un accent de la palette par pack, pour que les ecrans restent distinguables.
+PACK_ACCENTS = {
+    "two-branches": (0xF0, 0xB3, 0x57),  # ambre
+    "random": (0x8F, 0xC7, 0xA8),        # sauge
+    "degraded": (0xD9, 0x8F, 0xA6),      # rose
+    "cycle": (0x7F, 0xA6, 0xE0),         # bleu
 }
 
 # Glyphes 5x7, dessines a la main : pas de police disponible sans PIL.
 GLYPHS = {
-    "C": ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
     "A": ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
     "B": ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
+    "C": ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
+    "P": ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
+    "?": ["01110", "10001", "00001", "00110", "00100", "00000", "00100"],
 }
 
 GLYPH_W, GLYPH_H = 5, 7
+
+
+def letter_for_asset(filename):
+    """
+    cover.png -> C, option-a.png -> A, option-b.png -> B, present.png -> P.
+    Le dernier segment prime pour que option-a et option-b ne donnent pas
+    tous deux "O".
+    """
+    stem = os.path.splitext(filename)[0]
+    segment = stem.split("-")[-1] if "-" in stem else stem
+    letter = segment[:1].upper()
+    return letter if letter in GLYPHS else "?"
 
 
 def blend(accent, base, k):
@@ -50,58 +67,77 @@ def blend(accent, base, k):
 
 
 def render(accent, letter):
-    """Aplat teinte + cadre accent + initiale centree."""
+    """Aplat teinte + cadre accent + lettre centree."""
     background = blend(accent, ART_BASE, 0.18)
+    border_color = blend(accent, background, 0.55)
     scale = min(WIDTH // (GLYPH_W * 2), HEIGHT // (GLYPH_H * 2))
     glyph = GLYPHS[letter]
-    glyph_px_w = GLYPH_W * scale
-    glyph_px_h = GLYPH_H * scale
-    left = (WIDTH - glyph_px_w) // 2
-    top = (HEIGHT - glyph_px_h) // 2
+    glyph_w, glyph_h = GLYPH_W * scale, GLYPH_H * scale
+    left, top = (WIDTH - glyph_w) // 2, (HEIGHT - glyph_h) // 2
     border = 6
 
     rows = []
     for y in range(HEIGHT):
         row = bytearray()
         for x in range(WIDTH):
-            on_border = (
-                x < border or x >= WIDTH - border or y < border or y >= HEIGHT - border
-            )
-            if on_border:
-                pixel = blend(accent, background, 0.55)
+            if x < border or x >= WIDTH - border or y < border or y >= HEIGHT - border:
+                pixel = border_color
             else:
                 pixel = background
-                gx = (x - left) // scale
-                gy = (y - top) // scale
-                if 0 <= gx < GLYPH_W and 0 <= gy < GLYPH_H:
-                    if left <= x < left + glyph_px_w and top <= y < top + glyph_px_h:
-                        if glyph[gy][gx] == "1":
-                            pixel = accent
+                if left <= x < left + glyph_w and top <= y < top + glyph_h:
+                    if glyph[(y - top) // scale][(x - left) // scale] == "1":
+                        pixel = accent
             row += bytes(pixel)
         rows.append(bytes(row))
     return rows
 
 
+def build_pack(name, fixtures_dir, out_root):
+    src = os.path.join(fixtures_dir, name)
+    dst = os.path.join(out_root, name)
+
+    if not os.path.isdir(src):
+        raise SystemExit("fixture introuvable : %s" % src)
+
+    # Reconstruction complete : garantit que la copie ne conserve aucun
+    # fichier absent de la fixture.
+    if os.path.isdir(dst):
+        shutil.rmtree(dst)
+    os.makedirs(dst)
+
+    shutil.copyfile(os.path.join(src, "story.json"), os.path.join(dst, "story.json"))
+    print("  %s/story.json" % name)
+
+    src_assets = os.path.join(src, "assets")
+    if not os.path.isdir(src_assets):
+        print("  %s : pas de dossier assets/ dans la fixture, aucun cree" % name)
+        return
+
+    dst_assets = os.path.join(dst, "assets")
+    os.makedirs(dst_assets)
+    accent = PACK_ACCENTS.get(name, (0xF0, 0xB3, 0x57))
+
+    for filename in sorted(os.listdir(src_assets)):
+        src_file = os.path.join(src_assets, filename)
+        dst_file = os.path.join(dst_assets, filename)
+
+        if filename.lower().endswith(".png"):
+            letter = letter_for_asset(filename)
+            write_png(dst_file, WIDTH, HEIGHT, render(accent, letter))
+            print("  %s/assets/%-16s image %dx%d, lettre %s" % (name, filename, WIDTH, HEIGHT, letter))
+        else:
+            shutil.copyfile(src_file, dst_file)
+            print("  %s/assets/%-16s copie tel quel (%d o)" % (name, filename, os.path.getsize(dst_file)))
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
-    out_dir = os.path.normpath(
-        os.path.join(here, "..", "Resources", "packs", "two-branches", "assets")
-    )
-    os.makedirs(out_dir, exist_ok=True)
+    fixtures = os.path.normpath(os.path.join(here, "..", "..", "..", "luny-engine", "tests", "packs"))
+    out_root = os.path.normpath(os.path.join(here, "..", "Resources", "packs"))
+    os.makedirs(out_root, exist_ok=True)
 
-    for name in sorted(ASSETS):
-        accent, letter = ASSETS[name]
-        write_png(os.path.join(out_dir, name), WIDTH, HEIGHT, render(accent, letter))
-        print("  %-16s %dx%d" % (name, WIDTH, HEIGHT))
-
-    # Le moteur exige que tout asset reference existe sous assets/ : les .ogg
-    # doivent donc etre presents meme sans audio dans cette iteration. Ils
-    # restent vides, personne ne les decode.
-    for name in ("cover.ogg", "option-a.ogg", "option-b.ogg", "story-a.ogg", "story-b.ogg"):
-        path = os.path.join(out_dir, name)
-        if not os.path.exists(path):
-            open(path, "wb").close()
-            print("  %-16s (vide, place-tenu audio)" % name)
+    for name in sorted(PACK_ACCENTS):
+        build_pack(name, fixtures, out_root)
 
 
 if __name__ == "__main__":

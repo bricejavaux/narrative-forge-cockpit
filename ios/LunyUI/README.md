@@ -1,7 +1,6 @@
-# LunyUI — écran de bibliothèque
+# LunyUI — bibliothèque et lecteur de packs
 
-Première brique d'interface : une grille de couvertures qui pousse un écran
-de détail. Le moteur narratif n'est pas branché.
+Grille de couvertures poussant un écran de lecture branché sur `luny-engine`.
 
 ---
 
@@ -12,11 +11,13 @@ Intégré au projet Theos réel et **vérifié par un build armv7** (`make clean
 s'installe sur le 3GS de test et l'app ne produit aucun rapport de crash.
 
 Le moteur, lui, est vérifié **sur le 3GS**. Le CLI de `luny-engine` compilé
-en armv7 avec la même chaîne rejoue sur l'appareil, depuis
-`/Applications/LunyUI.app/packs/two-branches`, des sorties identiques octet
-pour octet à `tests/expected/nominal_deux_branches` et
+en armv7 avec la même chaîne rejoue sur l'appareil des sorties identiques
+octet pour octet à `tests/expected/nominal_deux_branches` et
 `tests/expected/tirage_graine_3` — ce dernier exerçant le générateur
-aléatoire, donc les helpers de division de `LunyARMSupport.c`.
+aléatoire, donc les helpers de division de `LunyARMSupport.c`. La rotation
+circulaire de la molette y est vérifiée de même sur le pack `random` :
+`wheel_left` depuis l'option 0 va à la dernière, `wheel_right` depuis la
+dernière revient à 0.
 
 Ce que rien de tout cela **ne** prouve : le rendu visuel à l'écran. Aucune
 session n'a de capture d'écran de l'appareil ; `uiopen` n'accepte qu'une URL
@@ -36,16 +37,16 @@ ios/LunyUI/
 ├── main.m                      handler d'exception -> /tmp/LunyUI-crash.txt
 ├── XXAppDelegate.h/.m          fenetre, UINavigationController, barre sombre
 ├── RootViewController.h/.m     grille de bibliotheque (UICollectionView, 2 colonnes)
-├── LunyLibraryCell.h/.m        tuile : couverture a initiale, titre, duree
-├── LunyLibraryItem.h/.m        4 entrees factices, codees en dur
+├── LunyLibraryCell.h/.m        tuile : couverture a initiale, titre, nombre de noeuds
+├── LunyLibraryItem.h/.m        4 packs embarques, metadonnees lues du moteur
 ├── DetailViewController.h/.m   lecteur de pack, branche sur luny-engine
 ├── LunyTheme.h/.m              tokens de couleur, source unique de la palette
 ├── LunyARMSupport.c            helpers de division entiere armv7 (voir plus bas)
 ├── Tools/lunypng.py            ecriture de PNG en Python pur
 ├── Tools/make_icons.py         generateur d'icones
-├── Tools/make_pack_assets.py   images du pack de test embarque
+├── Tools/make_pack_assets.py   construit les 4 packs embarques
 ├── NOTES.md                    contraintes iOS 6 vs choix de code
-└── Resources/                  icones, Info.plist, packs/two-branches/
+└── Resources/                  icones, Info.plist, packs/ (4 packs)
 ```
 
 ## Moteur narratif
@@ -67,28 +68,37 @@ copie. Deux details de build :
   fichier, le lien echoue sur `___umodsi3` et `___modsi3`, references par
   l'echantillonnage par rejet du generateur aleatoire du moteur.
 
-### Pack de test embarque
+### Packs embarques
 
-`Resources/packs/two-branches/` est une copie de
-`luny-engine/tests/packs/two-branches`. Le `story.json` est identique octet
-pour octet ; seules les images different. Les assets de la fixture font
-**0 octet** — suffisant pour le moteur, qui ne verifie que la presence et
-l'extension sans jamais decoder, mais `UIImage` renvoie `nil` sur un fichier
-vide. `Tools/make_pack_assets.py` genere donc de vraies images pour la copie
-embarquee. Les fixtures du moteur ne sont pas touchees.
+`Resources/packs/` contient quatre packs copies depuis
+`luny-engine/tests/packs/`, choisis pour couvrir des formes de graphe
+differentes :
+
+| pack | options d'ActionNode | interet |
+|---|---|---|
+| `two-branches` | 2 et 2 | parcours de reference |
+| `random` | 3 | entree tiree au sort, molette active partout |
+| `degraded` | 4 dont 2 mortes | assets manquants, version 2 |
+| `cycle` | 1 et 1 | le graphe boucle sur lui-meme |
+
+`Tools/make_pack_assets.py` construit ces copies. Regle a ne pas assouplir :
+la copie reflete **exactement** la liste de fichiers de la fixture. Seul le
+contenu des `.png` est remplace par une vraie image — les assets de fixture
+font 0 octet, ce qui suffit au moteur mais fait renvoyer `nil` a `UIImage` ;
+tout le reste est copie tel quel et **aucun fichier n'est ajoute**. `degraded`
+reference par exemple `absent.mp3` et `sans-extension` qui n'existent pas, et
+cette absence est precisement ce que le pack teste. Les fixtures du moteur ne
+sont jamais modifiees.
 
 ### Portee de cette iteration
 
-Bouton OK uniquement. Pas d'audio, pas de molette, pas de pause, pas de
-decompression ZIP. Les quatre tuiles de la bibliotheque ouvrent toutes le meme
-pack de test : `LunyLibraryItem` reste une donnee factice sans lien avec les
-packs.
+Commandes molette gauche / OK / molette droite. Pas d'audio, pas de pause, pas
+de decompression ZIP. Chaque tuile ouvre son propre pack.
 
-**Consequence a connaitre :** sans molette, la sequence de
-`tests/expected/nominal_deux_branches` n'est pas reproductible depuis l'ecran,
-car son etape 2 est un evenement `right`. Avec OK seul, le parcours est
-`Couverture -> Option A -> Histoire A`, et le bouton se grise sur ce dernier
-noeud (`controlSettings.ok` y vaut faux).
+**A savoir pour exercer la molette :** `random` est le seul pack embarque ou
+elle tourne reellement — ses trois options sont valides et tous ses noeuds ont
+`controlSettings.wheel`. `degraded` a quatre options mais deux sont mortes par
+construction, donc la rotation s'y arrete sur `IGNORED_DANGLING_OPTION`.
 
 Une seule implémentation de l'écran. Un jeu de fichiers `XX*` concurrent
 (`XXRootViewController`, `XXCoverCell`, `XXStoryDetailViewController`) a

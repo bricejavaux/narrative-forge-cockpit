@@ -1,4 +1,5 @@
 #import "DetailViewController.h"
+#import "LunyLibraryItem.h"
 #import "LunyTheme.h"
 #import "luny_engine.h"
 
@@ -9,9 +10,8 @@ static const CGFloat kLunyDetailSideMargin = 20.0f;
 static const CGFloat kLunyDetailGap = 10.0f;
 static const CGFloat kLunyDetailImageMax = 176.0f;
 static const CGFloat kLunyDetailButtonHeight = 44.0f;
-
-/* Nom du pack embarque dans Resources/packs/. */
-static NSString * const kLunyPackName = @"two-branches";
+static const CGFloat kLunyDetailArrowWidth = 56.0f;
+static const CGFloat kLunyDetailDisabledAlpha = 0.35f;
 
 @interface DetailViewController ()
 {
@@ -21,22 +21,26 @@ static NSString * const kLunyPackName = @"two-branches";
      */
     luny_engine *_engine;
 }
-@property (nonatomic, copy) NSString *storyTitle;
+@property (nonatomic, copy) NSString *packPath;
+@property (nonatomic, copy) NSString *packTitle;
 @property (nonatomic, strong) UIImageView *imageView;
 @property (nonatomic, strong) UILabel *imagePlaceholder;
 @property (nonatomic, strong) UILabel *nodeNameLabel;
 @property (nonatomic, strong) UILabel *stateLabel;
 @property (nonatomic, strong) UILabel *statusLabel;
+@property (nonatomic, strong) UIButton *leftButton;
 @property (nonatomic, strong) UIButton *okButton;
+@property (nonatomic, strong) UIButton *rightButton;
 @end
 
 @implementation DetailViewController
 
-- (instancetype)initWithStoryTitle:(NSString *)storyTitle
+- (instancetype)initWithLibraryItem:(LunyLibraryItem *)item
 {
     self = [super initWithNibName:nil bundle:nil];
     if (self) {
-        _storyTitle = storyTitle.length ? [storyTitle copy] : @"Histoire";
+        _packPath = [item.packPath copy];
+        _packTitle = item.title.length ? [item.title copy] : @"Histoire";
     }
     return self;
 }
@@ -53,7 +57,7 @@ static NSString * const kLunyPackName = @"two-branches";
 {
     [super viewDidLoad];
 
-    self.title = self.storyTitle;
+    self.title = self.packTitle;
     self.view.backgroundColor = [LunyTheme backgroundDeep];
 
     [self buildSubviews];
@@ -71,10 +75,11 @@ static NSString * const kLunyPackName = @"two-branches";
     [self.view addSubview:_imageView];
 
     // Affiche pourquoi le cadre est vide quand le noeud n'a pas d'image :
-    // c'est le cas des noeuds "Histoire A"/"Histoire B" du pack de test.
+    // c'est le cas des noeuds "Histoire A"/"Histoire B" du pack two-branches.
     _imagePlaceholder = [self labelWithFont:[UIFont systemFontOfSize:12.0f]
                                       color:[LunyTheme textMuted]];
     _imagePlaceholder.textAlignment = NSTextAlignmentCenter;
+    _imagePlaceholder.numberOfLines = 2;
     [self.view addSubview:_imagePlaceholder];
 
     _nodeNameLabel = [self labelWithFont:[UIFont boldSystemFontOfSize:19.0f]
@@ -94,15 +99,23 @@ static NSString * const kLunyPackName = @"two-branches";
     _statusLabel.numberOfLines = 2;
     [self.view addSubview:_statusLabel];
 
-    _okButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    _okButton.backgroundColor = [LunyTheme accentAmber];
-    _okButton.titleLabel.font = [UIFont boldSystemFontOfSize:17.0f];
-    _okButton.layer.cornerRadius = 8.0f;
-    [_okButton setTitle:@"OK" forState:UIControlStateNormal];
-    [_okButton setTitleColor:[LunyTheme artBase] forState:UIControlStateNormal];
-    [_okButton setTitleColor:[LunyTheme textMuted] forState:UIControlStateDisabled];
-    [_okButton addTarget:self action:@selector(okTapped:) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:_okButton];
+    _leftButton = [self buttonWithTitle:@"‹" action:@selector(wheelLeftTapped:)];
+    _okButton = [self buttonWithTitle:@"OK" action:@selector(okTapped:)];
+    _rightButton = [self buttonWithTitle:@"›" action:@selector(wheelRightTapped:)];
+}
+
+- (UIButton *)buttonWithTitle:(NSString *)title action:(SEL)action
+{
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+    button.backgroundColor = [LunyTheme accentAmber];
+    button.titleLabel.font = [UIFont boldSystemFontOfSize:20.0f];
+    button.layer.cornerRadius = 8.0f;
+    [button setTitle:title forState:UIControlStateNormal];
+    [button setTitleColor:[LunyTheme artBase] forState:UIControlStateNormal];
+    [button setTitleColor:[LunyTheme textMuted] forState:UIControlStateDisabled];
+    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:button];
+    return button;
 }
 
 - (UILabel *)labelWithFont:(UIFont *)font color:(UIColor *)color
@@ -146,26 +159,32 @@ static NSString * const kLunyPackName = @"two-branches";
 
     self.statusLabel.frame = CGRectMake(kLunyDetailSideMargin, y, contentWidth, 28.0f);
 
-    self.okButton.frame = CGRectMake(kLunyDetailSideMargin,
-                                     bounds.size.height - kLunyDetailButtonHeight - kLunyDetailGap * 1.6f,
-                                     contentWidth,
-                                     kLunyDetailButtonHeight);
+    // Rangee de commandes : [ < ] [   OK   ] [ > ]
+    CGFloat rowY = bounds.size.height - kLunyDetailButtonHeight - (kLunyDetailGap * 1.6f);
+    CGFloat okWidth = contentWidth - (2.0f * kLunyDetailArrowWidth) - (2.0f * kLunyDetailGap);
+
+    if (okWidth < kLunyDetailArrowWidth) {
+        okWidth = kLunyDetailArrowWidth;
+    }
+
+    self.leftButton.frame = CGRectMake(kLunyDetailSideMargin, rowY,
+                                       kLunyDetailArrowWidth, kLunyDetailButtonHeight);
+    self.okButton.frame = CGRectMake(kLunyDetailSideMargin + kLunyDetailArrowWidth + kLunyDetailGap,
+                                     rowY, okWidth, kLunyDetailButtonHeight);
+    self.rightButton.frame = CGRectMake(CGRectGetMaxX(self.okButton.frame) + kLunyDetailGap,
+                                        rowY, kLunyDetailArrowWidth, kLunyDetailButtonHeight);
 }
 
 #pragma mark - Moteur
 
 - (void)openPack
 {
-    NSString *packDir = [[NSBundle mainBundle] pathForResource:kLunyPackName
-                                                        ofType:nil
-                                                   inDirectory:@"packs"];
-
-    if (!packDir) {
+    if (!self.packPath) {
         self.statusLabel.text = @"pack introuvable dans le bundle";
         return;
     }
 
-    luny_status status = luny_open([packDir fileSystemRepresentation], NULL, &_engine);
+    luny_status status = luny_open([self.packPath fileSystemRepresentation], NULL, &_engine);
 
     if (status != LUNY_OK) {
         _engine = NULL;
@@ -176,16 +195,35 @@ static NSString * const kLunyPackName = @"two-branches";
 
 - (void)okTapped:(id)sender
 {
+    [self applyEvent:luny_ok label:@"ok"];
+}
+
+- (void)wheelLeftTapped:(id)sender
+{
+    [self applyEvent:luny_wheel_left label:@"wheel_left"];
+}
+
+- (void)wheelRightTapped:(id)sender
+{
+    [self applyEvent:luny_wheel_right label:@"wheel_right"];
+}
+
+/*
+ * Chemin unique pour les trois commandes : emettre, reafficher, rapporter le
+ * statut. Un evenement ignore laisse l'etat du moteur strictement inchange,
+ * et le libelle permet de le constater a l'ecran plutot que de croire a un
+ * bouton mort.
+ */
+- (void)applyEvent:(luny_event_status (*)(luny_engine *))event label:(NSString *)label
+{
     if (!_engine) {
         return;
     }
 
-    luny_event_status status = luny_ok(_engine);
+    luny_event_status status = event(_engine);
     [self renderCurrentStage];
 
-    // Le statut est affiche apres le rendu : un evenement ignore laisse
-    // l'etat inchange, et c'est precisement ce qu'on veut pouvoir constater.
-    self.statusLabel.text = [NSString stringWithFormat:@"ok -> %s",
+    self.statusLabel.text = [NSString stringWithFormat:@"%@ -> %s", label,
                              luny_event_status_str(status)];
 }
 
@@ -199,24 +237,40 @@ static NSString * const kLunyPackName = @"two-branches";
         self.stateLabel.text = nil;
         self.imageView.image = nil;
         self.imagePlaceholder.text = nil;
-        self.okButton.enabled = NO;
-        self.okButton.alpha = 0.4f;
+        [self setButton:self.okButton enabled:NO];
+        [self setButton:self.leftButton enabled:NO];
+        [self setButton:self.rightButton enabled:NO];
         return;
     }
 
     self.nodeNameLabel.text = stage.name ? @(stage.name) : @"(sans nom)";
     [self loadImageNamed:stage.image];
 
+    luny_action_view action;
+    BOOL hasAction = luny_current_action(_engine, &action) && action.index >= 0;
+
     self.stateLabel.text = [NSString stringWithFormat:@"%@\n%@",
                             [self shortUUID:stage.uuid],
-                            [self actionDescription]];
+                            hasAction
+                                ? [NSString stringWithFormat:@"option %d/%d",
+                                   action.index + 1, action.option_count]
+                                : @"hors contexte ActionNode"];
 
-    // Le bouton reflete controlSettings.ok du noeud : sur un noeud terminal
-    // du pack de test (ok=0), il se grise au lieu d'emettre un evenement
-    // que le moteur ignorerait.
-    BOOL okEnabled = (stage.controls.ok != 0);
-    self.okButton.enabled = okEnabled;
-    self.okButton.alpha = okEnabled ? 1.0f : 0.4f;
+    // Meme regle de gating que le moteur : OK depend de controlSettings.ok ;
+    // la molette exige controlSettings.wheel ET un contexte ActionNode
+    // (luny_engine.h, commentaire de luny_wheel_left/right). Griser plutot
+    // qu'emettre un evenement que le moteur ignorerait.
+    [self setButton:self.okButton enabled:(stage.controls.ok != 0)];
+
+    BOOL wheelUsable = (stage.controls.wheel != 0) && hasAction && (action.option_count > 0);
+    [self setButton:self.leftButton enabled:wheelUsable];
+    [self setButton:self.rightButton enabled:wheelUsable];
+}
+
+- (void)setButton:(UIButton *)button enabled:(BOOL)enabled
+{
+    button.enabled = enabled;
+    button.alpha = enabled ? 1.0f : kLunyDetailDisabledAlpha;
 }
 
 - (void)loadImageNamed:(const char *)imageName
@@ -251,17 +305,6 @@ static NSString * const kLunyPackName = @"two-branches";
 
     NSString *full = @(uuid);
     return full.length > 12 ? [full substringFromIndex:full.length - 12] : full;
-}
-
-- (NSString *)actionDescription
-{
-    luny_action_view action;
-
-    if (!luny_current_action(_engine, &action) || action.index < 0) {
-        return @"hors contexte ActionNode";
-    }
-
-    return [NSString stringWithFormat:@"option %d/%d", action.index + 1, action.option_count];
 }
 
 @end

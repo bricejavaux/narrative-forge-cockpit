@@ -3,7 +3,7 @@
 #import "LunyTheme.h"
 #import <QuartzCore/QuartzCore.h>
 
-/* Hauteur reservee au bloc titre + duree, sous le rectangle de couverture. */
+/* Hauteur reservee au bloc titre + sous-titre, sous le rectangle de couverture. */
 static const CGFloat kLunyCellTextBlockHeight = 44.0f;
 static const CGFloat kLunyCellPadding = 8.0f;
 static const CGFloat kLunyCellCornerRadius = 10.0f;
@@ -12,7 +12,7 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
 @property (nonatomic, strong) UIView  *coverView;
 @property (nonatomic, strong) UILabel *initialLabel;
 @property (nonatomic, strong) UILabel *titleLabel;
-@property (nonatomic, strong) UILabel *durationLabel;
+@property (nonatomic, strong) UILabel *subtitleLabel;
 @end
 
 @implementation LunyLibraryCell
@@ -115,11 +115,11 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
         _titleLabel.backgroundColor = [UIColor clearColor];
         [self.contentView addSubview:_titleLabel];
 
-        _durationLabel = [[UILabel alloc] initWithFrame:CGRectZero];
-        _durationLabel.font = [UIFont systemFontOfSize:10.0f];
-        _durationLabel.textColor = [LunyTheme textMuted];
-        _durationLabel.backgroundColor = [UIColor clearColor];
-        [self.contentView addSubview:_durationLabel];
+        _subtitleLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+        _subtitleLabel.font = [UIFont systemFontOfSize:10.0f];
+        _subtitleLabel.textColor = [LunyTheme textMuted];
+        _subtitleLabel.backgroundColor = [UIColor clearColor];
+        [self.contentView addSubview:_subtitleLabel];
     }
     return self;
 }
@@ -143,13 +143,18 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
     CGFloat textWidth = bounds.size.width - (kLunyCellPadding * 2.0f);
 
     self.titleLabel.frame = CGRectMake(kLunyCellPadding, textY, textWidth, 28.0f);
-    self.durationLabel.frame = CGRectMake(kLunyCellPadding, textY + 26.0f, textWidth, 12.0f);
+    self.subtitleLabel.frame = CGRectMake(kLunyCellPadding, textY + 26.0f, textWidth, 12.0f);
 }
 
 - (void)configureWithItem:(LunyLibraryItem *)item accent:(UIColor *)accent
 {
     self.titleLabel.text = item.title;
-    self.durationLabel.text = [NSString stringWithFormat:@"%ld min", (long)item.durationMinutes];
+
+    // Deuxieme ligne : donnee reelle du moteur, pas une duree inventee — le
+    // format de pack n'expose aucune duree (cf. luny_pack_view).
+    self.subtitleLabel.text = item.loaded
+        ? [NSString stringWithFormat:@"%ld noeuds", (long)item.stageCount]
+        : @"pack illisible";
 
     self.coverView.backgroundColor = [LunyTheme coverTintForAccent:accent];
     self.initialLabel.textColor = accent;
@@ -161,7 +166,7 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
     [super prepareForReuse];
 
     self.titleLabel.text = nil;
-    self.durationLabel.text = nil;
+    self.subtitleLabel.text = nil;
     self.initialLabel.text = nil;
     self.coverView.backgroundColor = [LunyTheme artBase];
 }

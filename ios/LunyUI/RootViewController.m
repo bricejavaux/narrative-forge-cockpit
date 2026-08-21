@@ -80,7 +80,7 @@ static const CGFloat   kLunyCellHeight        = 150.0f;
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath
 {
     LunyLibraryItem *item = self.items[(NSUInteger)indexPath.item];
-    DetailViewController *detail = [[DetailViewController alloc] initWithStoryTitle:item.title];
+    DetailViewController *detail = [[DetailViewController alloc] initWithLibraryItem:item];
     [self.navigationController pushViewController:detail animated:YES];
 }
 

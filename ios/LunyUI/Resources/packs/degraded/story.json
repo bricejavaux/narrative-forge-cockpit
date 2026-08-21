@@ -1,0 +1,25 @@
+{
+    "format": "v1", "title": "Degrade", "version": 2,
+    "stageNodes": [
+        { "uuid": "d-entry", "name": "Entree", "squareOne": true,
+          "image": "sans-extension", "audio": "absent.mp3",
+          "okTransition": { "actionNode": "act-trous", "optionIndex": 0 },
+          "homeTransition": null,
+          "controlSettings": { "wheel": true, "ok": true, "home": true, "pause": false, "autoplay": false } },
+        { "uuid": "d-ok", "name": "Cible valide", "squareOne": true,
+          "image": "present.png", "audio": null,
+          "okTransition": { "actionNode": "act-inconnu", "optionIndex": 0 },
+          "homeTransition": { "actionNode": "act-trous", "optionIndex": 99 },
+          "controlSettings": { "wheel": true, "ok": true, "home": true, "pause": false, "autoplay": false } },
+        { "uuid": "d-neg", "name": "Index negatif",
+          "okTransition": { "actionNode": "act-trous", "optionIndex": -3 },
+          "homeTransition": null,
+          "controlSettings": { "wheel": false, "ok": true, "home": false, "pause": false, "autoplay": false } },
+        { "uuid": "d-nocontrols", "name": "Sans controlSettings",
+          "okTransition": null, "homeTransition": null }
+    ],
+    "actionNodes": [
+        { "id": "act-trous", "name": "Liste trouee",
+          "options": [ "d-ok", null, "uuid-inconnu", "d-neg" ] }
+    ]
+}

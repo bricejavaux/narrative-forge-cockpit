@@ -55,6 +55,24 @@ capture de l'appareil.
    320×480 sont la bonne référence dans les deux cas), mais ça détermine
    quel fichier d'icône est réellement chargé — voir `Resources/README.md`.
 
+5. **`UIButtonTypeCustom` n'a pas d'état désactivé visuel.**
+   Rencontré en ajoutant les boutons molette. Un bouton système se grise seul
+   quand `enabled = NO` ; un bouton *custom* portant une couleur de fond ne
+   change que la couleur de son titre, et seulement si l'on a explicitement
+   fourni un `titleColorForState:UIControlStateDisabled`. Le fond, lui, reste
+   identique — le conditionnement des commandes serait donc invisible à
+   l'écran. `DetailViewController` pose donc aussi un `alpha` explicite, en
+   plus de `enabled`. Ce n'est pas de la cosmétique : sans ça, un bouton
+   inactif ressemble à un bouton mort.
+
+6. **Une rangée de trois commandes se calcule par soustraction.**
+   Sans Auto Layout (point 2), la largeur du bouton OK est ce qui reste après
+   les deux flèches et les gouttières. Cette soustraction peut devenir
+   négative sur une largeur étroite, ce qu'un `UIView` accepte sans broncher
+   en produisant un rectangle inversé. La largeur est donc bornée avant
+   usage. Corollaire général du calcul manuel : toute dimension dérivée d'une
+   soustraction a besoin d'un plancher.
+
 ---
 
 ## 2. Choix de code — décidés faute de visibilité sur le projet réel
@@ -63,7 +81,7 @@ Ces points ne sont pas imposés par iOS 6 : ce sont des décisions prises
 parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
 `AppDelegate`, `RootViewController` généré par le gabarit).
 
-5. **`RootViewController` reste un `UIViewController`, pas un
+7. **`RootViewController` reste un `UIViewController`, pas un
    `UICollectionViewController`.**
    `UICollectionViewController` impose `-initWithCollectionViewLayout:`
    comme initialiseur désigné. Cette session ne voit pas comment
@@ -82,7 +100,7 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    l'enregistrement de la cellule) qui avaient fait planter au lancement
    l'implémentation concurrente.
 
-6. **Emplacement des fichiers sources : racine du projet, pas de dossier
+8. **Emplacement des fichiers sources : racine du projet, pas de dossier
    `Classes/`.**
    Hypothèse tirée de la convention généralement documentée pour le
    gabarit Theos `application_modern`, **non vérifiée par une lecture
@@ -94,7 +112,7 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    **Tranché :** hypothèse correcte. Les sources sont à la racine et la
    liste est intégrée au `Makefile`.
 
-7. **Downcast explicite au lieu de generics légers.**
+9. **Downcast explicite au lieu de generics légers.**
    `dequeueReusableCellWithReuseIdentifier:forIndexPath:` renvoie un
    `UICollectionViewCell *` générique ; le code caste explicitement vers
    `LunyLibraryCell *` plutôt que de s'appuyer sur des generics Objective-C
@@ -102,6 +120,32 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    dans le contexte de la tâche (base 10.3 + `libobjc.A.tbd` du 9.3). Pas
    une exigence : une convention plus simple à auditer sans compilateur
    sous la main pour vérifier une syntaxe plus récente.
+
+10. **Les métadonnées de la bibliothèque sont lues dans les packs, plus codées
+   en dur.**
+   `LunyLibraryItem` ouvre chaque pack au démarrage, lit `luny_pack_info()`,
+   puis referme. Le titre affiché est donc celui du pack. La deuxième ligne de
+   la tuile montre le **nombre de nœuds** et non plus une durée : le format de
+   pack n'expose aucune durée (`luny_pack_view` n'a pas ce champ), et la durée
+   précédente était inventée. Afficher une donnée réelle plutôt qu'un nombre
+   plausible est un choix, pas une contrainte.
+
+11. **Choix des quatre packs embarqués.**
+   `two-branches` (2 options), `random` (3), `degraded` (4), `cycle` (1), pour
+   couvrir des formes de graphe différentes plutôt que le même pack copié.
+
+   À savoir avant d'exercer la molette : `degraded` a bien quatre options,
+   mais deux sont mortes par construction (`null` et un uuid inconnu), donc la
+   rotation s'y arrête sur `IGNORED_DANGLING_OPTION`. C'est ce que ce pack
+   teste, pas un défaut. **`random` est le seul pack embarqué où la molette
+   tourne réellement** : ses trois options sont valides et tous ses nœuds ont
+   `controlSettings.wheel`.
+
+12. **Répartition des événements par pointeur de fonction.**
+   Les trois commandes passent par un `-applyEvent:label:` prenant un
+   `luny_event_status (*)(luny_engine *)`. Les trois fonctions du moteur ont
+   la même signature ; une méthode par bouton aurait triplé le même
+   enchaînement émettre / réafficher / rapporter le statut.
 
 ---
 
