@@ -20,9 +20,11 @@ Usage :  python3 Tools/make_icons.py
 
 import math
 import os
-import struct
-import zlib
+import sys
 from array import array
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lunypng import write_png  # noqa: E402
 
 # --- Palette (mockup/luny_maquette_v3.html) --------------------------------
 NIGHT_TOP = (0x13, 0x1A, 0x38)   # haut du degrade, proche de #0B1024 eclairci
@@ -156,26 +158,6 @@ def downsample(sats, master, target):
     return rows
 
 
-def write_png(path, size, rows):
-    def chunk(tag, data):
-        return (
-            struct.pack(">I", len(data))
-            + tag
-            + data
-            + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-        )
-
-    raw = b"".join(b"\x00" + row for row in rows)
-    ihdr = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)  # RGB 8 bits
-    png = (
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", ihdr)
-        + chunk(b"IDAT", zlib.compress(raw, 9))
-        + chunk(b"IEND", b"")
-    )
-    with open(path, "wb") as handle:
-        handle.write(png)
-
 
 def main():
     out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Resources")
@@ -195,7 +177,7 @@ def main():
         size = TARGETS[name]
         if size not in cache:
             cache[size] = downsample(sats, MASTER, size)
-        write_png(os.path.join(out_dir, name), size, cache[size])
+        write_png(os.path.join(out_dir, name), size, size, cache[size])
         print("  %-24s %dx%d" % (name, size, size))
 
 

@@ -1,0 +1,57 @@
+{
+    "format": "v1",
+    "title": "Deux chemins",
+    "description": "Exemple minimal a deux embranchements",
+    "version": 1,
+    "nightModeAvailable": false,
+    "stageNodes": [
+        {
+            "uuid": "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1001",
+            "name": "Couverture", "type": "cover", "squareOne": true,
+            "image": "cover.png", "audio": "cover.ogg",
+            "okTransition": { "actionNode": "7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001", "optionIndex": 0 },
+            "homeTransition": null,
+            "controlSettings": { "wheel": false, "ok": true, "home": false, "pause": false, "autoplay": false }
+        },
+        {
+            "uuid": "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1002",
+            "name": "Option A", "type": "menu.optionstage",
+            "image": "option-a.png", "audio": "option-a.ogg",
+            "okTransition": { "actionNode": "7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2002", "optionIndex": 0 },
+            "homeTransition": null,
+            "controlSettings": { "wheel": true, "ok": true, "home": true, "pause": false, "autoplay": false }
+        },
+        {
+            "uuid": "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1003",
+            "name": "Option B", "type": "menu.optionstage",
+            "image": "option-b.png", "audio": "option-b.ogg",
+            "okTransition": { "actionNode": "7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2002", "optionIndex": 1 },
+            "homeTransition": null,
+            "controlSettings": { "wheel": true, "ok": true, "home": true, "pause": false, "autoplay": false }
+        },
+        {
+            "uuid": "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1004",
+            "name": "Histoire A", "type": "story",
+            "image": null, "audio": "story-a.ogg",
+            "okTransition": null, "homeTransition": null,
+            "controlSettings": { "wheel": false, "ok": false, "home": true, "pause": true, "autoplay": true }
+        },
+        {
+            "uuid": "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1005",
+            "name": "Histoire B", "type": "story",
+            "image": null, "audio": "story-b.ogg",
+            "okTransition": null, "homeTransition": null,
+            "controlSettings": { "wheel": false, "ok": false, "home": true, "pause": true, "autoplay": true }
+        }
+    ],
+    "actionNodes": [
+        {
+            "id": "7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2001", "name": "Menu principal", "type": "menu.optionsaction",
+            "options": [ "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1002", "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1003" ]
+        },
+        {
+            "id": "7b1e2d90-5c44-4f0a-9d21-0e5b6a7c2002", "name": "Histoires", "type": "story.storyaction",
+            "options": [ "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1004", "3f2b6c68-1c6b-4a41-9a3e-6ac47a5c1005" ]
+        }
+    ]
+}

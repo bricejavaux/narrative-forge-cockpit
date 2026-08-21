@@ -1,9 +1,12 @@
 /*
- * DetailViewController.h — ecran de detail volontairement vide.
+ * DetailViewController.h — lecteur de pack, branche sur luny-engine.
  *
- * Cette session ne branche pas le moteur narratif (hors perimetre, cf.
- * README.md). Ce controleur sert uniquement a valider que la navigation
- * pousse/depile correctement depuis la bibliotheque.
+ * Charge un pack deja extrait depuis un repertoire, affiche le noeud courant
+ * (nom, image si presente) et expose un bouton OK qui emet l'evenement
+ * correspondant dans le moteur. L'ecran ne fait que refleter l'etat renvoye
+ * par le C : aucune logique de graphe cote UI.
+ *
+ * Hors perimetre de cette iteration : audio, molette, pause, decompression ZIP.
  */
 #import <UIKit/UIKit.h>
 
