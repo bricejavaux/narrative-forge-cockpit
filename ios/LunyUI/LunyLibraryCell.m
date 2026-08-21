@@ -22,6 +22,69 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
     return @"LunyLibraryCell";
 }
 
+/*
+ * Initiale affichee sur la couverture.
+ *
+ * Prendre betement title[0] donne la meme lettre sur toutes les tuiles des
+ * que les titres sont francais : "La nuit du renard", "Le phare endormi",
+ * "L'etoile qui baille", "Le chemin perdu" commencent tous par L. On saute
+ * donc l'article initial, elide ("L'") ou non ("La "), pour retomber sur une
+ * lettre discriminante. Un titre sans article est traite tel quel.
+ */
++ (NSString *)coverInitialForTitle:(NSString *)title
+{
+    NSString *trimmed = [title stringByTrimmingCharactersInSet:
+                         [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+
+    if (!trimmed.length) {
+        return @"";
+    }
+
+    NSString *candidate = trimmed;
+
+    // Article elide : une lettre suivie d'une apostrophe. Les deux formes sont
+    // acceptees, un vrai pack pouvant porter l'apostrophe typographique.
+    if (trimmed.length >= 2) {
+        unichar second = [trimmed characterAtIndex:1];
+
+        if (second == '\'' || second == 0x2019) {
+            candidate = [trimmed substringFromIndex:2];
+        }
+    }
+
+    // Article detache : on passe au mot suivant s'il en existe un.
+    if (candidate == trimmed) {
+        static NSSet *articles = nil;
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            articles = [NSSet setWithObjects:@"la", @"le", @"les", @"un", @"une",
+                        @"des", @"du", @"de", nil];
+        });
+
+        NSRange space = [trimmed rangeOfCharacterFromSet:
+                         [NSCharacterSet whitespaceCharacterSet]];
+
+        if (space.location != NSNotFound) {
+            NSString *firstWord = [[trimmed substringToIndex:space.location] lowercaseString];
+
+            if ([articles containsObject:firstWord]) {
+                candidate = [trimmed substringFromIndex:space.location + space.length];
+            }
+        }
+    }
+
+    candidate = [candidate stringByTrimmingCharactersInSet:
+                 [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+
+    // Un titre reduit a son seul article ("Le") retombe sur le titre complet
+    // plutot que sur une tuile muette.
+    if (!candidate.length) {
+        candidate = trimmed;
+    }
+
+    return [[candidate substringToIndex:1] uppercaseString];
+}
+
 - (instancetype)initWithFrame:(CGRect)frame
 {
     self = [super initWithFrame:frame];
@@ -90,7 +153,7 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
 
     self.coverView.backgroundColor = [LunyTheme coverTintForAccent:accent];
     self.initialLabel.textColor = accent;
-    self.initialLabel.text = item.title.length ? [[item.title substringToIndex:1] uppercaseString] : @"";
+    self.initialLabel.text = [[self class] coverInitialForTitle:item.title];
 }
 
 - (void)prepareForReuse
