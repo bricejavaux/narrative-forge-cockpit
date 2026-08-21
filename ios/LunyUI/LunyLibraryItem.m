@@ -1,4 +1,5 @@
 #import "LunyLibraryItem.h"
+#import "LunySimulatedAudio.h"
 #import "luny_engine.h"
 
 /*
@@ -30,6 +31,7 @@ static const NSUInteger kLunyPackCount = sizeof(kLunyPackNames) / sizeof(kLunyPa
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, assign) NSInteger stageCount;
 @property (nonatomic, assign) BOOL loaded;
+@property (nonatomic, assign) NSTimeInterval simulatedDuration;
 @end
 
 @implementation LunyLibraryItem
@@ -46,6 +48,7 @@ static const NSUInteger kLunyPackCount = sizeof(kLunyPackNames) / sizeof(kLunyPa
     _title = [packName copy];
     _stageCount = 0;
     _loaded = NO;
+    _simulatedDuration = [LunySimulatedAudio durationForPackNamed:packName];
 
     [self readMetadata];
     return self;

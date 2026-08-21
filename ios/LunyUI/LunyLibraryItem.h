@@ -32,6 +32,13 @@
 @property (nonatomic, assign, readonly) BOOL loaded;
 
 /*
+ * Duree SIMULEE du pack, en secondes — voir LunySimulatedAudio.h. Le format
+ * n'expose aucune duree ; cette valeur est inventee et seulement stable d'un
+ * lancement a l'autre. A remplacer quand le decodage audio sera branche.
+ */
+@property (nonatomic, assign, readonly) NSTimeInterval simulatedDuration;
+
+/*
  * Les packs embarques, dans l'ordre d'affichage. Chaque entree est ouverte une
  * fois pour lire ses metadonnees, puis refermee.
  */

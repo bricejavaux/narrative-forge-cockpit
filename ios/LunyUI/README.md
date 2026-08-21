@@ -41,6 +41,8 @@ ios/LunyUI/
 ├── LunyLibraryItem.h/.m        4 packs embarques, metadonnees lues du moteur
 ├── DetailViewController.h/.m   lecteur de pack, branche sur luny-engine
 ├── LunyTheme.h/.m              tokens de couleur, source unique de la palette
+├── LunyDebug.h                 interrupteur de la telemetrie (0 par defaut)
+├── LunySimulatedAudio.h/.m     SIMULATEUR de duree, temporaire
 ├── LunyARMSupport.c            helpers de division entiere armv7 (voir plus bas)
 ├── Tools/lunypng.py            ecriture de PNG en Python pur
 ├── Tools/make_icons.py         generateur d'icones
@@ -52,9 +54,33 @@ ios/LunyUI/
 ## Moteur narratif
 
 `DetailViewController` charge un pack via `luny-engine` (C99) et n'affiche que
-ce que le moteur renvoie : nom du noeud, image si presente, contexte
-ActionNode, et un bouton OK qui emet `luny_ok()`. Aucune logique de graphe
-cote UI — l'ecran est un miroir de `luny_current_stage()`.
+ce que le moteur renvoie. Aucune logique de graphe cote UI — l'ecran est un
+miroir de `luny_current_stage()`.
+
+Disposition reprise de la maquette : zone d'art 320x240 en haut, panneau de
+commandes compact dessous (barre de progression, molette gauche / bouton
+central / molette droite, points de pagination).
+
+Le bouton central change de metier selon `controlSettings.ok` du noeud, sans
+aucun reglage :
+
+| etat du pack | bouton | role |
+|---|---|---|
+| `ok` actif | ambre, « Choisir » | valide un choix dans un menu |
+| `ok` inactif | vert sauge, « Lire » / « Pause » | pilote la piste |
+
+**Le minuteur de lecture est un simulateur.** Rien n'est decode : voir
+`LunySimulatedAudio.h` et `NOTES.md` §2.14. En fin de piste simulee,
+`luny_audio_ended()` est emis ; si le moteur repond
+`IGNORED_NO_TRANSITION`, l'histoire est finie et l'app revient a la
+bibliotheque (reserve documentee en `NOTES.md` §2.15).
+
+La telemetrie technique (uuid, nom d'evenement, statut brut) est compilee
+hors du binaire par defaut :
+
+```sh
+make LUNY_DEBUG=1 package install   # la retablit, ne pas livrer ainsi
+```
 
 Les sources C sont compilees directement depuis `../../luny-engine`, sans
 copie. Deux details de build :

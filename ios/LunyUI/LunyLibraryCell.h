@@ -16,6 +16,13 @@
 + (NSString *)reuseIdentifier;
 
 /*
+ * Hauteur du bloc titre + duree sous la couverture. Expose pour que le
+ * controleur calcule la taille de tuile sans dupliquer la constante :
+ * couverture carree + ce bloc.
+ */
++ (CGFloat)textBlockHeight;
+
+/*
  * accent provient de +[LunyTheme accentAtIndex:] : la couleur depend de la
  * position dans la grille, pas du modele, qui reste purement de la donnee.
  */

@@ -1,12 +1,24 @@
 #import "LunyLibraryCell.h"
 #import "LunyLibraryItem.h"
 #import "LunyTheme.h"
+#import "LunySimulatedAudio.h"
 #import <QuartzCore/QuartzCore.h>
 
-/* Hauteur reservee au bloc titre + sous-titre, sous le rectangle de couverture. */
-static const CGFloat kLunyCellTextBlockHeight = 44.0f;
-static const CGFloat kLunyCellPadding = 8.0f;
-static const CGFloat kLunyCellCornerRadius = 10.0f;
+/*
+ * Hauteur reservee au bloc titre + duree, sous la couverture. Corps plus
+ * genereux qu'avant : la tuile respire au lieu de remplir.
+ */
+static const CGFloat kLunyCellTextBlockHeight = 52.0f;
+static const CGFloat kLunyCellPadding = 10.0f;
+
+/*
+ * Rayon de la tuile. layer.cornerRadius seul reste peu couteux ; c'est
+ * l'association a masksToBounds qui force un rendu hors ecran, deja le cas
+ * ici pour rogner la couverture. 14pt est le maximum qui garde un carre
+ * lisible a 140pt de cote — au-dela la vignette tourne au galet.
+ */
+static const CGFloat kLunyCellCornerRadius = 14.0f;
+static const CGFloat kLunyCoverCornerRadius = 10.0f;
 
 @interface LunyLibraryCell ()
 @property (nonatomic, strong) UIView  *coverView;
@@ -20,6 +32,11 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
 + (NSString *)reuseIdentifier
 {
     return @"LunyLibraryCell";
+}
+
++ (CGFloat)textBlockHeight
+{
+    return kLunyCellTextBlockHeight;
 }
 
 /*
@@ -95,7 +112,7 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
 
         _coverView = [[UIView alloc] initWithFrame:CGRectZero];
         _coverView.backgroundColor = [LunyTheme artBase];
-        _coverView.layer.cornerRadius = 6.0f;
+        _coverView.layer.cornerRadius = kLunyCoverCornerRadius;
         _coverView.layer.masksToBounds = YES;
         _coverView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
         [self.contentView addSubview:_coverView];
@@ -109,14 +126,14 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
         [_coverView addSubview:_initialLabel];
 
         _titleLabel = [[UILabel alloc] initWithFrame:CGRectZero];
-        _titleLabel.font = [UIFont boldSystemFontOfSize:13.0f];
+        _titleLabel.font = [UIFont boldSystemFontOfSize:14.0f];
         _titleLabel.textColor = [LunyTheme textBright];
         _titleLabel.numberOfLines = 2;
         _titleLabel.backgroundColor = [UIColor clearColor];
         [self.contentView addSubview:_titleLabel];
 
         _subtitleLabel = [[UILabel alloc] initWithFrame:CGRectZero];
-        _subtitleLabel.font = [UIFont systemFontOfSize:10.0f];
+        _subtitleLabel.font = [UIFont systemFontOfSize:11.0f];
         _subtitleLabel.textColor = [LunyTheme textMuted];
         _subtitleLabel.backgroundColor = [UIColor clearColor];
         [self.contentView addSubview:_subtitleLabel];
@@ -137,23 +154,24 @@ static const CGFloat kLunyCellCornerRadius = 10.0f;
 
     self.coverView.frame = CGRectMake(0.0f, 0.0f, bounds.size.width, coverHeight);
     self.initialLabel.frame = self.coverView.bounds;
-    self.initialLabel.font = [UIFont boldSystemFontOfSize:floorf(coverHeight / 2.2f)];
+    // Initiale en grand caractere centre : c'est le motif de la couverture.
+    self.initialLabel.font = [UIFont boldSystemFontOfSize:floorf(coverHeight / 1.9f)];
 
-    CGFloat textY = coverHeight + 4.0f;
+    CGFloat textY = coverHeight + 6.0f;
     CGFloat textWidth = bounds.size.width - (kLunyCellPadding * 2.0f);
 
-    self.titleLabel.frame = CGRectMake(kLunyCellPadding, textY, textWidth, 28.0f);
-    self.subtitleLabel.frame = CGRectMake(kLunyCellPadding, textY + 26.0f, textWidth, 12.0f);
+    self.titleLabel.frame = CGRectMake(kLunyCellPadding, textY, textWidth, 30.0f);
+    self.subtitleLabel.frame = CGRectMake(kLunyCellPadding, textY + 29.0f, textWidth, 13.0f);
 }
 
 - (void)configureWithItem:(LunyLibraryItem *)item accent:(UIColor *)accent
 {
     self.titleLabel.text = item.title;
 
-    // Deuxieme ligne : donnee reelle du moteur, pas une duree inventee — le
-    // format de pack n'expose aucune duree (cf. luny_pack_view).
+    // Duree SIMULEE : le format n'en expose aucune (cf. LunySimulatedAudio.h).
+    // Un pack illisible le dit plutot que d'afficher une duree rassurante.
     self.subtitleLabel.text = item.loaded
-        ? [NSString stringWithFormat:@"%ld noeuds", (long)item.stageCount]
+        ? [LunySimulatedAudio formattedSeconds:item.simulatedDuration]
         : @"pack illisible";
 
     self.coverView.backgroundColor = [LunyTheme coverTintForAccent:accent];

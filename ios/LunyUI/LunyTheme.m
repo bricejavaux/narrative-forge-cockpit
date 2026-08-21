@@ -23,13 +23,19 @@ static UIColor *LunyColorFromHex(uint32_t hex)
 
 @implementation LunyTheme
 
-+ (UIColor *)backgroundDeep { return LunyColorFromHex(0x0B1024); }
-+ (UIColor *)surface        { return LunyColorFromHex(0x141A32); }
-+ (UIColor *)artBase        { return LunyColorFromHex(0x060812); }
++ (UIColor *)backgroundDeep  { return LunyColorFromHex(0x0B1024); }
++ (UIColor *)surface         { return LunyColorFromHex(0x141A32); }
++ (UIColor *)artBase         { return LunyColorFromHex(0x060812); }
++ (UIColor *)controlsSurface { return LunyColorFromHex(0x101426); }
++ (UIColor *)raisedSurface   { return LunyColorFromHex(0x1C2440); }
++ (UIColor *)trackRail       { return LunyColorFromHex(0x232B47); }
++ (UIColor *)dotIdle         { return LunyColorFromHex(0x2C3554); }
 
 + (UIColor *)textPrimary    { return LunyColorFromHex(0xC8D3F2); }
 + (UIColor *)textBright     { return LunyColorFromHex(0xE7ECFA); }
 + (UIColor *)textMuted      { return LunyColorFromHex(0x94A0C6); }
++ (UIColor *)textDisabled   { return LunyColorFromHex(0x5F6B93); }
++ (UIColor *)textOnAccent   { return LunyColorFromHex(0x2A1B03); }
 
 + (UIColor *)accentAmber    { return LunyColorFromHex(0xF0B357); }
 + (UIColor *)accentSage     { return LunyColorFromHex(0x8FC7A8); }
