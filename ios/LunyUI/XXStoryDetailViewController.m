@@ -9,7 +9,7 @@
 		return nil;
 	}
 
-	self.title = title;
+	self.title = title.length ? title : @"Détail";
 	return self;
 }
 

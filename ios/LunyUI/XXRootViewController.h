@@ -2,4 +2,6 @@
 
 @interface XXRootViewController : UICollectionViewController
 
++ (UICollectionViewFlowLayout *)defaultLayout;
+
 @end

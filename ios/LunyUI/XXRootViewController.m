@@ -8,23 +8,28 @@ static const CGFloat XXGridMargin = 12.0f;
 static const CGFloat XXGridSpacing = 12.0f;
 static const NSInteger XXGridColumns = 2;
 
-@interface XXRootViewController ()
+@interface XXRootViewController () <UICollectionViewDelegateFlowLayout>
 @property (nonatomic, strong) NSArray *stories;
 @end
 
 @implementation XXRootViewController
 
-- (id)init {
++ (UICollectionViewFlowLayout *)defaultLayout {
 	UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
 	layout.sectionInset = UIEdgeInsetsMake(XXGridMargin, XXGridMargin, XXGridMargin, XXGridMargin);
 	layout.minimumInteritemSpacing = XXGridSpacing;
 	layout.minimumLineSpacing = XXGridSpacing;
+	return layout;
+}
 
-	return [self initWithCollectionViewLayout:layout];
+- (id)init {
+	// Garantit qu'un layout existe toujours : UICollectionView lève une exception
+	// si elle est initialisée avec un layout nil.
+	return [self initWithCollectionViewLayout:[[self class] defaultLayout]];
 }
 
 - (id)initWithCollectionViewLayout:(UICollectionViewLayout *)layout {
-	self = [super initWithCollectionViewLayout:layout];
+	self = [super initWithCollectionViewLayout:(layout ?: [[self class] defaultLayout])];
 
 	if (!self) {
 		return nil;
@@ -41,33 +46,49 @@ static const NSInteger XXGridColumns = 2;
 	return self;
 }
 
+- (void)loadView {
+	[super loadView];
+
+	// Enregistrement au plus tôt, dès que la collection view existe : sous iOS 6
+	// UICollectionViewController déclenche un premier reloadData avant même
+	// viewDidLoad, et tout dequeue précédant l'enregistrement lève
+	// NSInternalInconsistencyException ("could not dequeue a view of kind").
+	[self.collectionView registerClass:[XXCoverCell class] forCellWithReuseIdentifier:XXCoverCellIdentifier];
+}
+
 - (void)viewDidLoad {
 	[super viewDidLoad];
 
 	self.collectionView.backgroundColor = [UIColor colorWithWhite:0.96f alpha:1.0f];
 	self.collectionView.alwaysBounceVertical = YES;
 	self.collectionView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-	[self.collectionView registerClass:[XXCoverCell class] forCellWithReuseIdentifier:XXCoverCellIdentifier];
 }
 
-- (void)viewWillLayoutSubviews {
-	[super viewWillLayoutSubviews];
+#pragma mark - Collection View Flow Layout Delegate
 
+- (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
 	CGFloat gutters = (2 * XXGridMargin) + ((XXGridColumns - 1) * XXGridSpacing);
-	CGFloat available = CGRectGetWidth(self.collectionView.bounds) - gutters;
+	CGFloat available = CGRectGetWidth(collectionView.bounds) - gutters;
 
-	if (available <= 0.0f) {
-		return;
+	// Le flow layout lève une exception sur une taille nulle ou négative :
+	// pendant les passes de layout transitoires les bounds peuvent être vides.
+	if (available < (CGFloat)XXGridColumns) {
+		return CGSizeMake(1.0f, 1.0f);
 	}
 
 	CGFloat itemWidth = floorf(available / XXGridColumns);
-	CGSize itemSize = CGSizeMake(itemWidth, [XXCoverCell heightForWidth:itemWidth]);
-	UICollectionViewFlowLayout *layout = (UICollectionViewFlowLayout *)self.collectionViewLayout;
+	CGFloat itemHeight = [XXCoverCell heightForWidth:itemWidth];
 
-	if (!CGSizeEqualToSize(layout.itemSize, itemSize)) {
-		layout.itemSize = itemSize;
-		[layout invalidateLayout];
+	// Le flow layout exige aussi que la hauteur d'item tienne dans la vue
+	// moins les insets de section et de contenu, sous peine d'exception.
+	UIEdgeInsets contentInset = collectionView.contentInset;
+	CGFloat usableHeight = CGRectGetHeight(collectionView.bounds) - contentInset.top - contentInset.bottom - (2 * XXGridMargin);
+
+	if (usableHeight > 1.0f && itemHeight > usableHeight) {
+		itemHeight = usableHeight;
 	}
+
+	return CGSizeMake(itemWidth, itemHeight);
 }
 
 #pragma mark - Collection View Data Source
@@ -82,9 +103,12 @@ static const NSInteger XXGridColumns = 2;
 
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
 	XXCoverCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:XXCoverCellIdentifier forIndexPath:indexPath];
-	NSDictionary *story = _stories[indexPath.item];
 
-	[cell configureWithTitle:story[@"title"] duration:story[@"duration"] tint:story[@"tint"]];
+	if (indexPath.item < (NSInteger)_stories.count) {
+		NSDictionary *story = _stories[indexPath.item];
+		[cell configureWithTitle:story[@"title"] duration:story[@"duration"] tint:story[@"tint"]];
+	}
+
 	return cell;
 }
 
@@ -92,6 +116,10 @@ static const NSInteger XXGridColumns = 2;
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
 	[collectionView deselectItemAtIndexPath:indexPath animated:YES];
+
+	if (indexPath.item >= (NSInteger)_stories.count) {
+		return;
+	}
 
 	NSDictionary *story = _stories[indexPath.item];
 	XXStoryDetailViewController *detail = [[XXStoryDetailViewController alloc] initWithTitle:story[@"title"]];
