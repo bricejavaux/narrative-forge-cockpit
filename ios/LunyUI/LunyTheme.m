@@ -1,8 +1,7 @@
 #import "LunyTheme.h"
 
-/* Proportion d'accent conservee dans la teinte de couverture, et dans la
- * variante desactivee d'un bouton. Meme formule pour les deux palettes. */
-static const CGFloat kLunyCoverAccentMix = 0.18f;
+/* Proportion d'accent conservee dans la variante desactivee d'un bouton.
+ * Celle des couvertures est propre a chaque palette (champ coverMix). */
 static const CGFloat kLunyDisabledAccentMix = 0.18f;
 
 /*
@@ -33,6 +32,14 @@ typedef struct {
     uint32_t accentSage;
     uint32_t accentRose;
     uint32_t accentBlue;
+
+    /* Accents decoratifs des couvertures, distincts des accents de bouton. */
+    uint32_t coverAccent[4];
+    /* Proportion d'accent dans l'aplat, et base dans laquelle il est fondu. */
+    float    coverMix;
+    int      coverMixesIntoSurface;  /* 0 = artBase, 1 = surface */
+    /* 1 = l'initiale est encree avec l'accent ; 0 = avec textBright. */
+    int      coverInkIsAccent;
 } LunyPalette;
 
 /* Nuit et ambre — mockup/luny_maquette_v3.html. */
@@ -40,7 +47,8 @@ static const LunyPalette kLunyDarkPalette = {
     "sombre",
     0x0B1024, 0x141A32, 0x060812, 0x101426, 0x1C2440, 0x232B47, 0x2C3554,
     0xC8D3F2, 0xE7ECFA, 0x94A0C6, 0x5F6B93, 0x2A1B03,
-    0xF0B357, 0x8FC7A8, 0xD98FA6, 0x7FA6E0
+    0xF0B357, 0x8FC7A8, 0xD98FA6, 0x7FA6E0,
+    { 0xF0B357, 0x8FC7A8, 0xD98FA6, 0x7FA6E0 }, 0.18f, 0, 1
 };
 
 /*
@@ -56,7 +64,31 @@ static const LunyPalette kLunyLightPalette = {
     "claire",
     0xF3E7D3, 0xE7D6BA, 0xD8C3A0, 0xEADCC2, 0xDCC8A6, 0xC6AE8A, 0xC0A784,
     0x43301F, 0x2B1D12, 0x5E4730, 0x7C6446, 0xF7EFE1,
-    0x7C4910, 0x445C33, 0x8A4136, 0x3A5563
+    0x7C4910, 0x445C33, 0x8A4136, 0x3A5563,
+    { 0x7C4910, 0x445C33, 0x8A4136, 0x3A5563 }, 0.18f, 0, 1
+};
+
+/*
+ * Turquoise tres clair et jaune chaud, encre ardoise.
+ *
+ * Deux valeurs de depart ont du etre approfondies pour tenir le contraste,
+ * et c'est documente dans NOTES.md :
+ *
+ *   teal   #2A8C82 -> #1F6F67 : le point de depart ne donnait que 4,06:1
+ *          avec du texte blanc, sous le seuil de 4,5:1 exige.
+ *   jaune  #E8A93C reste tel quel, mais UNIQUEMENT en aplat de couverture :
+ *          en fond de bouton il ne tient que 2,06:1 avec du blanc. Le bouton
+ *          lecture/pause utilise donc un or profond #9C6B12 (4,64:1).
+ *
+ * L'initiale d'une couverture y est encree en ardoise et non avec l'accent :
+ * sur un aplat clair, un accent pastel n'a pas 3:1 avec son propre fond.
+ */
+static const LunyPalette kLunyPastelPalette = {
+    "pastel",
+    0xE3F4F1, 0xFFFBF0, 0xCFE8E3, 0xF2FAF8, 0xD6EAE6, 0xBBD9D3, 0xA9CCC5,
+    0x2B3A3A, 0x1C2A2A, 0x4A6260, 0x5E7A77, 0xFFFFFF,
+    0x1F6F67, 0x9C6B12, 0xC96A6A, 0x4A7FA8,
+    { 0xE8A93C, 0x2A8C82, 0xC96A6A, 0x4A7FA8 }, 0.45f, 1, 0
 };
 
 /*
@@ -66,6 +98,9 @@ static const LunyPalette kLunyLightPalette = {
  */
 static const LunyPalette *LunyActivePalette(void)
 {
+    if (LUNY_THEME_PASTEL) {
+        return &kLunyPastelPalette;
+    }
     return LUNY_THEME_LIGHT ? &kLunyLightPalette : &kLunyDarkPalette;
 }
 
@@ -124,14 +159,20 @@ static UIColor *LunyMix(UIColor *top, UIColor *bottom, CGFloat weight)
 
 + (UIColor *)accentAtIndex:(NSUInteger)index
 {
-    NSArray *accents = @[ [self accentAmber], [self accentSage], [self accentRose], [self accentBlue] ];
-    NSAssert(accents.count == kLunyAccentCount, @"kLunyAccentMask suppose exactement kLunyAccentCount accents");
-    return accents[index & kLunyAccentMask];
+    return LunyColorFromHex(LunyActivePalette()->coverAccent[index & kLunyAccentMask]);
 }
 
 + (UIColor *)coverTintForAccent:(UIColor *)accent
 {
-    return LunyMix(accent, [self artBase], kLunyCoverAccentMix);
+    const LunyPalette *palette = LunyActivePalette();
+    UIColor *base = palette->coverMixesIntoSurface ? [self surface] : [self artBase];
+
+    return LunyMix(accent, base, (CGFloat)palette->coverMix);
+}
+
++ (UIColor *)coverInkForAccent:(UIColor *)accent
+{
+    return LunyActivePalette()->coverInkIsAccent ? accent : [self textBright];
 }
 
 + (UIColor *)pressedVariantOf:(UIColor *)color

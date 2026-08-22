@@ -4,16 +4,18 @@
  * Tokens de couleur de l'app. Source unique : aucune valeur hex ne doit etre
  * ecrite ailleurs.
  *
- * DEUX PALETTES coexistent, pour comparaison avant decision :
+ * TROIS PALETTES coexistent, pour comparaison avant decision :
  *
  *   sombre  (defaut) — nuit et ambre, reprise de mockup/luny_maquette_v3.html
- *   claire            — bois et creme, texte brun sur fond chaud
+ *   claire            — bois et creme, encre brune sur fond chaud
+ *   pastel            — turquoise tres clair et jaune chaud, encre ardoise
  *
- * Bascule a la compilation, les deux compilent :
+ * Bascule a la compilation, les trois compilent :
  *
  *     make LUNY_THEME_LIGHT=1 package install
+ *     make LUNY_THEME_PASTEL=1 package install
  *
- * Les deux jeux ont ete verifies au contraste WCAG sur tous les couples
+ * Les trois jeux ont ete verifies au contraste WCAG sur tous les couples
  * texte/fond de l'app — voir NOTES.md. Toute retouche de valeur doit refaire
  * cette verification : un token n'est pas une preference isolee, il vit dans
  * une paire.
@@ -22,6 +24,10 @@
 
 #ifndef LUNY_THEME_LIGHT
 #define LUNY_THEME_LIGHT 0
+#endif
+
+#ifndef LUNY_THEME_PASTEL
+#define LUNY_THEME_PASTEL 0
 #endif
 
 @interface LunyTheme : NSObject
@@ -55,11 +61,26 @@
 + (UIColor *)accentRose;
 + (UIColor *)accentBlue;
 
-/* Accent attribue a une tuile selon sa position. Cycle sur les quatre. */
+/*
+ * Accent DECORATIF d'une couverture, selon la position dans la grille.
+ *
+ * Volontairement distinct de accentAmber / accentSage, qui remplissent des
+ * boutons : les deux roles n'ont pas les memes obligations de contraste. Un
+ * aplat de couverture n'a qu'a porter son initiale ; un bouton doit porter un
+ * libelle. La palette pastel s'en sert : son jaune est un aplat superbe et un
+ * fond de bouton illisible.
+ */
 + (UIColor *)accentAtIndex:(NSUInteger)index;
 
-/* Teinte de couverture : l'accent fondu dans artBase. */
+/* Aplat de couverture, derive de l'accent decoratif. */
 + (UIColor *)coverTintForAccent:(UIColor *)accent;
+
+/*
+ * Encre de l'initiale posee sur cet aplat. Sur les palettes sombres c'est
+ * l'accent lui-meme ; sur les palettes claires une encre foncee, l'accent
+ * n'ayant plus assez d'ecart avec son propre aplat.
+ */
++ (UIColor *)coverInkForAccent:(UIColor *)accent;
 
 /*
  * Variante assombrie, pour l'etat highlighted d'un bouton. UIKit ne fournit

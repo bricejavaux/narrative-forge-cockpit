@@ -175,7 +175,7 @@ static const CGFloat kLunyCoverCornerRadius = 10.0f;
         : @"pack illisible";
 
     self.coverView.backgroundColor = [LunyTheme coverTintForAccent:accent];
-    self.initialLabel.textColor = accent;
+    self.initialLabel.textColor = [LunyTheme coverInkForAccent:accent];
     self.initialLabel.text = [[self class] coverInitialForTitle:item.title];
 }
 

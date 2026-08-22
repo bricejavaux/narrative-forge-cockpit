@@ -42,11 +42,13 @@ ios/LunyUI/
 ├── DetailViewController.h/.m   lecteur de pack, branche sur luny-engine
 ├── LunyTheme.h/.m              tokens de couleur, source unique de la palette
 ├── LunyDebug.h                 interrupteur de la telemetrie (0 par defaut)
-├── LunySimulatedAudio.h/.m     SIMULATEUR de duree, temporaire
+├── LunyAudioTrack.h/.m         piste du noeud : AVAudioPlayer ou repli simule
+├── LunySimulatedAudio.h/.m     durees fabriquees, utilisees par le repli
 ├── LunyARMSupport.c            helpers de division entiere armv7 (voir plus bas)
 ├── Tools/lunypng.py            ecriture de PNG en Python pur
 ├── Tools/make_icons.py         generateur d'icones
-├── Tools/make_pack_assets.py   construit les 4 packs embarques
+├── Tools/make_pack_assets.py   construit les packs embarques
+├── Tools/make_demo_audio.py    WAV reels du pack audio-demo
 ├── NOTES.md                    contraintes iOS 6 vs choix de code
 └── Resources/                  icones, Info.plist, packs/ (4 packs)
 ```
@@ -76,9 +78,19 @@ aucun reglage :
 | `ok` actif | ambre, « Choisir » | valide un choix dans un menu |
 | `ok` inactif | vert sauge, « Lire » / « Pause » | pilote la piste |
 
-**Le minuteur de lecture est un simulateur.** Rien n'est decode : voir
-`LunySimulatedAudio.h` et `NOTES.md` §2.16. En fin de piste simulee,
-`luny_audio_ended()` est emis ; si le moteur repond
+**Audio.** `LunyAudioTrack` choisit au chargement entre lecture reelle
+(`AVAudioPlayer`, si l'extension est decodable par iOS et le fichier
+ouvrable) et repli sur minuteur a duree fabriquee. Le repli est affiche
+« (simulé) », jamais silencieux.
+
+**iOS ne decode pas l'Ogg Vorbis** — aucune version. Le format STUdio
+l'autorise pourtant, et le moteur l'accepte : un pack converti en `.ogg`
+restera muet tant qu'une conversion cote PC n'aura pas eu lieu (`NOTES.md`
+§1.10). Seul `audio-demo` a de vraies pistes, en WAV.
+
+En fin de piste,
+`luny_audio_ended()` est emis — depuis le decodeur en lecture reelle, depuis
+le minuteur sinon. Si le moteur repond
 `IGNORED_NO_TRANSITION`, l'histoire est finie et l'app revient a la
 bibliotheque (reserve documentee en `NOTES.md` §2.17).
 
@@ -94,8 +106,9 @@ make LUNY_DEBUG=1 package install   # la retablit, ne pas livrer ainsi
 Deux jeux de couleurs coexistent, bascule a la compilation :
 
 ```sh
-make package install                     # sombre (defaut) : nuit et ambre
-make LUNY_THEME_LIGHT=1 package install  # claire : bois et creme
+make package install                      # sombre (defaut) : nuit et ambre
+make LUNY_THEME_LIGHT=1 package install   # claire : bois et creme
+make LUNY_THEME_PASTEL=1 package install  # pastel : turquoise et jaune
 ```
 
 `LunyTheme` reste la source unique — aucun appelant ne change entre les deux,

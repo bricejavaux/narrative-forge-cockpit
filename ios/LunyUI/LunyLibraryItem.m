@@ -11,12 +11,18 @@
  *   degraded      1 ActionNode a 4 options    options mortes, assets manquants, version 2
  *   cycle         2 ActionNodes a 1 option    le graphe boucle sur lui-meme
  *
+ * audio-demo n'est pas une fixture du moteur : il est ecrit pour cette app,
+ * et c'est le SEUL pack embarque dont la lecture audio est reelle. Ses pistes
+ * sont de vrais WAV PCM generes par Tools/make_demo_audio.py. Les quatre
+ * autres referencent des .ogg de 0 octet et exercent donc le repli simule.
+ *
  * random est celui qui exerce reellement la molette : ses trois options sont
  * valides et tous ses noeuds ont controlSettings.wheel. degraded a bien quatre
  * options mais deux sont mortes par construction, donc la rotation s'y arrete
  * — c'est ce que ce pack teste, pas un defaut.
  */
 static NSString * const kLunyPackNames[] = {
+    @"audio-demo",
     @"two-branches",
     @"random",
     @"degraded",

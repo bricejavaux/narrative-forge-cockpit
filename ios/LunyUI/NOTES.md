@@ -102,6 +102,17 @@ capture de l'appareil.
    `setBackgroundImage:forState:` avec un aplat 1×1 par état — mécanisme
    standard d'UIKit — au lieu de `backgroundColor`.
 
+10. **iOS ne decode pas l'Ogg Vorbis.**
+   Contrainte de plateforme, pas d'iOS 6 en particulier : aucune version d'iOS
+   n'a de decodeur Vorbis. Or le format STUdio autorise `.ogg` et `.oga`, et
+   le moteur les accepte (`ext_matches_kind`). Un pack converti en Ogg
+   n'aura donc **aucun son** sur l'appareil tant qu'une conversion n'aura pas
+   eu lieu en amont.
+
+   C'est structurant pour la suite du projet, pas un detail d'implementation :
+   la chaine de conversion des vrais packs devra produire du WAV, du MP3 ou de
+   l'AAC. Formats verifies comme decodables : wav, mp3, m4a, aac, caf, aif.
+
 ---
 
 ## 2. Choix de code — décidés faute de visibilité sur le projet réel
@@ -366,6 +377,97 @@ parce que cette session n'a pas accès au projet `LunyUI` local (Makefile,
    vérification : un token n'est pas une préférence isolée, il vit dans une
    paire.
 
+27. **Nature exacte des assets de test — information structurante.**
+
+   Inventaire etabli en inspectant les octets, pas en supposant :
+
+   | pack | images | audio |
+   |---|---|---|
+   | two-branches | 3 fichiers, **0 octet** | 5 fichiers `.ogg`, **0 octet** |
+   | random | 1 fichier, **0 octet** | aucun (`audio` nul partout) |
+   | degraded | 1 fichier, 0 octet ; 2 references absentes | reference `absent.mp3`, inexistant |
+   | cycle | aucun | aucun |
+   | **audio-demo** | 2 PNG generes | **2 WAV PCM reels** |
+
+   **Toutes les fixtures du moteur sont des place-tenus vides.** Elles
+   suffisent au moteur, qui ne verifie que presence et extension sans jamais
+   ouvrir le contenu — mais rien ne s'affiche ni ne s'entend a partir d'elles.
+   Les images ont ete remplacees par des couvertures generees ; l'audio ne
+   pouvait pas l'etre de la meme facon, l'Ogg n'etant ni encodable ici ni
+   decodable par iOS.
+
+   D'ou `audio-demo` : un cinquieme pack, **ecrit pour cette app et non repris
+   d'une fixture**, avec deux vraies pistes WAV PCM 16 bits mono 22050 Hz
+   generees par `Tools/make_demo_audio.py` (module `wave` de la bibliotheque
+   standard, aucune dependance). C'est le seul pack embarque dont la lecture
+   est reelle ; les quatre autres exercent le repli.
+
+28. **`LunyAudioTrack` : une interface, deux mecanismes.**
+   L'ecran ne sait pas si la piste est reelle ou simulee. La classe tranche au
+   chargement — extension decodable **et** fichier ouvrable par AVAudioPlayer,
+   sinon repli — et expose la meme interface dans les deux cas : `duration`,
+   `position`, `play`, `pause`, `seekToPosition:`, plus deux rappels de
+   delegue.
+
+   La fin de piste vient du decodeur en reel
+   (`audioPlayerDidFinishPlaying:successfully:`) et du minuteur en simule ;
+   les deux aboutissent au meme rappel, et c'est lui qui emet
+   `luny_audio_ended()`. La barre saisissable pilote la position reelle quand
+   un vrai fichier joue, `AVAudioPlayer.currentTime` acceptant l'ecriture a
+   l'arret comme en lecture.
+
+   **Le repli est affiche, jamais silencieux :** le bloc temps porte la
+   mention « (simulé) ». Une duree fabriquee ne doit pas se faire passer pour
+   une lecture.
+
+   Verifie sur le 3GS : `intro.wav` donne `isSimulated=NON` et une duree de
+   3,55 s lue par le decodeur, la position avance en temps reel, et la fin
+   declenche bien le rappel. `cover.ogg` (0 octet) bascule en simule avec une
+   duree hachee, sans plantage.
+
+29. **Troisieme palette : pastel turquoise et jaune.**
+
+   Deux valeurs de depart ont du etre approfondies, mesures a l'appui :
+
+   | token | depart | retenu | raison |
+   |---|---|---|---|
+   | teal primaire | `#2A8C82` | `#1F6F67` | 4,06:1 avec du blanc, sous le seuil ; 5,95:1 apres |
+   | bouton lecture | `#E8A93C` | `#9C6B12` | le jaune ne tient que 2,06:1 avec du blanc |
+
+   Le jaune `#E8A93C` est conserve **tel quel**, mais uniquement en aplat de
+   couverture — ce que la consigne prevoyait deja (« pas necessairement en
+   texte »).
+
+   **Ce constat a impose une separation architecturale** : `accentAtIndex:`
+   ne renvoie plus les accents de bouton mais un jeu **decoratif** propre aux
+   couvertures. Les deux roles n'ont pas les memes obligations : un aplat
+   porte une initiale, un bouton porte un libelle. Sans cette separation, le
+   jaune se serait retrouve en fond du bouton lecture/pause.
+
+   Deuxieme consequence : sur une palette claire, un accent pastel n'a pas 3:1
+   avec son propre aplat. L'initiale y est donc encree en `textBright`
+   (ardoise) et non avec l'accent, via le nouveau `coverInkForAccent:`. Les
+   palettes sombres gardent l'accent comme encre.
+
+### Ratios mesures, les trois palettes
+
+Tous les couples texte/fond reellement utilises a l'ecran. Seuils : 4,5:1
+texte courant, 3:1 grand texte.
+
+| couple | sombre | claire | pastel |
+|---|---|---|---|
+| titre de tuile | 14,53 | 11,44 | 14,36 |
+| duree de tuile | 6,62 | 6,09 | 6,33 |
+| en-tete | 15,96 | 13,35 | 13,07 |
+| sous-titre (3:1) | 4,56 | 4,56 | 4,08 |
+| temps | 6,41 | 6,41 | 6,18 |
+| bouton principal actif | 8,99 | 4,57 | 5,95 |
+| bouton lecture actif | 8,99 | 6,51 | 4,64 |
+| bouton desactive | 4,93 | 5,21 | 5,01 |
+| fleche active | 10,22 | 7,65 | 9,48 |
+| fleche desactivee | 5,89 | 5,31 | 5,23 |
+| initiales sur couverture (3:1) | 6,19 – 7,88 | 3,38 – 3,65 | 8,15 – 10,61 |
+
 ---
 
 ## 3. Ce qui reste à vérifier localement
@@ -464,6 +566,24 @@ cette passe, à regarder un par un :
 - Les mêmes vérifications que ci-dessus s'appliquent : aucun libellé ne doit
   perdre en lisibilité par rapport à la palette sombre.
 
+**Lecture audio réelle (pack « Berceuse »)**
+- À l'ouverture, une mélodie doit **réellement se faire entendre** (~3,5 s),
+  et la barre avancer en même temps que le son.
+- Le bloc temps affiche `0:00 / 0:03` **sans** la mention « (simulé) ».
+- Sur les quatre autres packs, la mention « (simulé) » doit être visible —
+  leurs `.ogg` font 0 octet et iOS ne décode pas l'Ogg de toute façon.
+- Appuyer « Choisir » puis laisser « Comptine » aller au bout (~5 s) : le son
+  s'arrête de lui-même et l'app **revient à la bibliothèque**.
+- Régler l'interrupteur silencieux de l'appareil : le son doit continuer
+  (catégorie `playback`).
+
+**Palette pastel (si compilée avec `LUNY_THEME_PASTEL=1`)**
+- Fond turquoise très clair, tuiles crème, encre ardoise.
+- Les couvertures sont des aplats pastel avec l'initiale **en ardoise foncée**,
+  pas dans la couleur de l'accent — c'est voulu, voir §2.29.
+- Le bouton principal est teal profond, le bouton lecture or profond : aucun
+  des deux ne doit être jaune vif, le jaune est réservé aux couvertures.
+
 **Absence de télémétrie**
 - Aucun uuid, aucun `wheel_left -> ACCEPTED`, aucun `option 2/3` nulle part.
   S'il en reste un, le paquet a été construit avec `LUNY_DEBUG=1`.
@@ -474,12 +594,16 @@ cette passe, à regarder un par un :
 
 Volontairement non commencés, pour ne pas laisser de moitiés en place :
 
-- **Décodage audio réel** (`AVAudioPlayer`), qui remplacera entièrement
-  `LunySimulatedAudio` et rendra les durées vraies.
+- **Conversion des vrais packs** OGG→MP3/WAV et BMP→PNG, côté PC. C'est le
+  verrou qui reste : iOS ne décodera jamais l'Ogg (§1.10), donc tant que la
+  conversion n'existe pas, un pack STUdio réel restera muet dans l'app.
+  `LunySimulatedAudio` ne disparaîtra qu'une fois cette chaîne en place.
 - **Import ZIP de packs externes** : le moteur ne lit qu'un répertoire déjà
   extrait (`luny_engine.h`).
 - **Événement HOME du graphe narratif** (`luny_home()`), distinct du retour de
   navigation actuel, qui est une simple dépile de `UINavigationController`.
+- **Sélecteur de thème à l'exécution** : les trois palettes ne se choisissent
+  aujourd'hui qu'à la compilation, ce qui suffit pour comparer.
 - **Volume et réglages parentaux** — la maquette prévoit « Enchaîner les
   histoires » et « Autoplay dans les séquences » ; leur absence est la raison
   pour laquelle la règle de fin d'histoire reste partielle (§2.17).

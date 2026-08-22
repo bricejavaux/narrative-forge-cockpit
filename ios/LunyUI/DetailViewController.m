@@ -1,6 +1,7 @@
 #import "DetailViewController.h"
 #import "LunyDebug.h"
 #import "LunyLibraryItem.h"
+#import "LunyAudioTrack.h"
 #import "LunySimulatedAudio.h"
 #import "LunyTheme.h"
 #import "luny_engine.h"
@@ -45,22 +46,10 @@ static const CGFloat kLunyDotSize = 7.0f;
 static const CGFloat kLunyDotGap = 6.0f;
 static const NSInteger kLunyDotMax = 10;
 
-/* Cadence du minuteur simule. Voir LunySimulatedAudio.h : rien n'est decode. */
-static const NSTimeInterval kLunyTickInterval = 0.25;
-
-@interface DetailViewController ()
+@interface DetailViewController () <LunyAudioTrackDelegate>
 {
     /* Poignee C : ARC ne gere pas ce pointeur, ferme dans -dealloc. */
     luny_engine *_engine;
-
-    /* Etat de lecture SIMULE. */
-    NSTimeInterval _position;
-    NSTimeInterval _duration;
-    BOOL _playing;
-
-    /* Vrai si le noeud courant reference une piste. Distinct de
-     * _duration > 0 : un pack peut n'avoir aucun audio du tout. */
-    BOOL _hasTrack;
 
     /* Etat du glissement sur la barre. */
     BOOL _scrubbing;
@@ -92,7 +81,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 @property (nonatomic, strong) UIView *dotsView;
 @property (nonatomic, strong) NSMutableArray *dots;
 
-@property (nonatomic, strong) NSTimer *tickTimer;
+@property (nonatomic, strong) LunyAudioTrack *track;
 
 #if LUNY_DEBUG
 @property (nonatomic, strong) UILabel *debugLabel;
@@ -113,10 +102,9 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
 - (void)dealloc
 {
-    // NSTimer retient sa cible : sans invalidation le controleur ne serait
-    // jamais libere et le minuteur continuerait a battre apres le retour.
-    [_tickTimer invalidate];
-    _tickTimer = nil;
+    // La piste possede un NSTimer qui retient sa cible : la decharger coupe
+    // aussi ce minuteur, sans quoi il battrait apres le retour.
+    [_track unload];
 
     luny_close(_engine);
     _engine = NULL;
@@ -131,6 +119,9 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     self.title = self.packTitle;
     self.view.backgroundColor = [LunyTheme backgroundDeep];
 
+    _track = [[LunyAudioTrack alloc] init];
+    _track.delegate = self;
+
     [self buildSubviews];
     [self openPack];
     [self renderCurrentStage];
@@ -141,8 +132,8 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 {
     [super viewWillDisappear:animated];
 
-    // L'ecran quitte la pile : le minuteur n'a plus rien a animer.
-    [self stopTicking];
+    // L'ecran quitte la pile : la piste n'a plus d'auditeur.
+    [self.track unload];
 }
 
 - (void)buildSubviews
@@ -227,6 +218,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     _timeLabel = [self labelWithFont:[UIFont systemFontOfSize:11.0f]
                                color:[LunyTheme textDisabled]];
     _timeLabel.textAlignment = NSTextAlignmentRight;
+    _timeLabel.numberOfLines = 2;
     [_controlsPanel addSubview:_timeLabel];
 
     _leftButton = [self arrowButtonWithTitle:@"‹" action:@selector(wheelLeftTapped:)];
@@ -395,8 +387,8 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     CGRect rail = self.trackRail.frame;
     CGFloat ratio = 0.0f;
 
-    if (_duration > 0.0) {
-        ratio = (CGFloat)(_position / _duration);
+    if (self.track.duration > 0.0) {
+        ratio = (CGFloat)(self.track.position / self.track.duration);
     }
     if (ratio < 0.0f) {
         ratio = 0.0f;
@@ -479,13 +471,13 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
 - (void)seekToRatio:(CGFloat)ratio
 {
-    _position = _duration * (NSTimeInterval)ratio;
+    [self.track seekToPosition:self.track.duration * (NSTimeInterval)ratio];
     [self refreshTransportLabels];
 }
 
 - (void)trackTapped:(UITapGestureRecognizer *)tap
 {
-    if (!self.trackTouchZone.userInteractionEnabled || _duration <= 0.0) {
+    if (!self.trackTouchZone.userInteractionEnabled || self.track.duration <= 0.0) {
         return;
     }
 
@@ -494,7 +486,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
 - (void)trackPanned:(UIPanGestureRecognizer *)pan
 {
-    if (!self.trackTouchZone.userInteractionEnabled || _duration <= 0.0) {
+    if (!self.trackTouchZone.userInteractionEnabled || self.track.duration <= 0.0) {
         return;
     }
 
@@ -505,8 +497,8 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
             // Le minuteur est suspendu pendant la saisie, sinon il continuerait
             // d'avancer sous le doigt.
             _scrubbing = YES;
-            _wasPlayingBeforeScrub = _playing;
-            [self stopTicking];
+            _wasPlayingBeforeScrub = self.track.isPlaying;
+            [self.track pause];
             [self seekToRatio:ratio];
             break;
 
@@ -522,11 +514,8 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
             // On ne reprend que si la piste avancait avant la saisie, et
             // seulement si elle n'est pas deja au bout.
-            if (_wasPlayingBeforeScrub && _position < _duration) {
-                _playing = YES;
-                [self startTicking];
-            } else {
-                _playing = NO;
+            if (_wasPlayingBeforeScrub && self.track.position < self.track.duration) {
+                [self.track play];
             }
             [self refreshMainButtonForCurrentStage];
             break;
@@ -648,7 +637,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
     // La barre se saisit si le pack autorise la pause et qu'il y a une piste.
     // Grisee, pas silencieusement inerte : on doit voir qu'elle ne repond pas.
-    [self setTrackEnabled:((stage.controls.pause != 0) && _hasTrack)];
+    [self setTrackEnabled:((stage.controls.pause != 0) && self.track.hasTrack)];
 
     [self refreshMainButtonForStage:&stage];
     [self refreshTransportLabels];
@@ -674,11 +663,11 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
     // ok inactif : le bouton devient lecture/pause, en vert.
     [self applyBackgroundColor:[LunyTheme accentSage] toButton:self.mainButton];
-    [self.mainButton setTitle:(_playing ? @"Pause" : @"Lire") forState:UIControlStateNormal];
+    [self.mainButton setTitle:(self.track.isPlaying ? @"Pause" : @"Lire") forState:UIControlStateNormal];
 
     // Inactif si le pack n'autorise pas la pause ou si aucune piste n'est
     // chargee — meme condition que la maquette.
-    BOOL usable = (stage->controls.pause != 0) && (_duration > 0.0);
+    BOOL usable = (stage->controls.pause != 0) && (self.track.duration > 0.0);
     [self setButton:self.mainButton enabled:usable];
 }
 
@@ -764,117 +753,81 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     [self layoutDots];
 }
 
-#pragma mark - Lecture simulee
+#pragma mark - Lecture
 
 /*
- * ATTENTION : rien n'est decode ici. Le minuteur ci-dessous imite une lecture
- * audio pour faire vivre la barre de progression et declencher
- * luny_audio_ended() en fin de piste. Voir LunySimulatedAudio.h — tout ce
- * bloc disparait quand AVAudioPlayer sera branche.
+ * La piste est reelle quand l'asset est decodable par iOS, simulee sinon —
+ * LunyAudioTrack tranche et expose une seule interface. Cet ecran ne connait
+ * que celle-ci.
  */
 - (void)startTrackForCurrentStage
 {
     luny_stage_view stage;
 
-    [self stopTicking];
-    _position = 0.0;
-    _duration = 0.0;
-    _playing = NO;
-    _hasTrack = NO;
+    [self.track unload];
     _scrubbing = NO;
 
-    /*
-     * Un noeud peut n'avoir aucune piste : le moteur rend alors audio = NULL.
-     * C'est le cas de TOUS les noeuds du pack "random", verifie au CLI sur
-     * l'appareil — d'ou la duree 0:00 qui y a ete rapportee comme un defaut.
-     * Ce n'est pas le hachage qui echoue, il n'y a rien a hacher. On le dit
-     * a l'ecran au lieu d'afficher un compteur a zero, qui se lit comme une
-     * panne.
-     */
-    if (_engine && luny_current_stage(_engine, &stage) && stage.audio) {
-        _hasTrack = YES;
-        _duration = [LunySimulatedAudio durationForTrackNamed:@(stage.audio)];
-        _playing = (_duration > 0.0);
+    if (!_engine || !luny_current_stage(_engine, &stage) || !stage.audio) {
+        // Le noeud ne reference aucune piste : le moteur rend audio = NULL.
+        // C'est le cas de tous les noeuds du pack "random".
+        [self refreshMainButtonForCurrentStage];
+        [self refreshTransportLabels];
+        return;
     }
 
-    if (_playing) {
-        [self startTicking];
-    }
+    char path[PATH_MAX];
+    int needed = luny_asset_path(_engine, stage.audio, path, sizeof(path));
+    NSString *fullPath = (needed >= 0 && needed < (int)sizeof(path)) ? @(path) : nil;
 
-    // Le libelle du bouton central depend de _playing et de _duration, tous
-    // deux fixes a l'instant : il faut donc le recalculer apres.
+    [self.track loadPath:fullPath assetName:@(stage.audio)];
+    [self.track play];
+
+    // Le libelle du bouton central depend de l'etat de la piste, fixe a
+    // l'instant : il faut donc le recalculer apres.
     [self refreshMainButtonForCurrentStage];
     [self refreshTransportLabels];
 }
 
 - (void)togglePlayback
 {
-    if (_duration <= 0.0) {
-        return;
-    }
-
-    _playing = !_playing;
-
-    if (_playing) {
-        if (_position >= _duration) {
-            _position = 0.0;
-        }
-        [self startTicking];
+    if (self.track.isPlaying) {
+        [self.track pause];
     } else {
-        [self stopTicking];
+        [self.track play];
     }
 
     [self refreshMainButtonForCurrentStage];
     [self refreshTransportLabels];
 }
 
-- (void)startTicking
-{
-    [self stopTicking];
-    self.tickTimer = [NSTimer scheduledTimerWithTimeInterval:kLunyTickInterval
-                                                      target:self
-                                                    selector:@selector(tick:)
-                                                    userInfo:nil
-                                                     repeats:YES];
-}
-
-- (void)stopTicking
-{
-    [self.tickTimer invalidate];
-    self.tickTimer = nil;
-}
-
-- (void)tick:(NSTimer *)timer
-{
-    _position += kLunyTickInterval;
-
-    if (_position >= _duration) {
-        _position = _duration;
-        [self stopTicking];
-        _playing = NO;
-        [self refreshTransportLabels];
-        [self simulatedTrackEnded];
-        return;
-    }
-
-    [self refreshTransportLabels];
-}
-
 - (void)refreshTransportLabels
 {
-    // Sans piste, un "0:00 / 0:00" laisserait croire a un minuteur bloque.
-    self.timeLabel.text = _hasTrack
-        ? [NSString stringWithFormat:@"%@ / %@",
-           [LunySimulatedAudio formattedSeconds:_position],
-           [LunySimulatedAudio formattedSeconds:_duration]]
-        : @"pas de piste";
+    if (!self.track.hasTrack) {
+        // Sans piste, un "0:00 / 0:00" laisserait croire a un minuteur bloque.
+        self.timeLabel.text = @"pas de piste";
+    } else {
+        NSString *temps = [NSString stringWithFormat:@"%@ / %@",
+                           [LunySimulatedAudio formattedSeconds:self.track.position],
+                           [LunySimulatedAudio formattedSeconds:self.track.duration]];
+
+        // Le repli sur minuteur est signale, jamais silencieux : une duree
+        // fabriquee ne doit pas se faire passer pour une lecture reelle.
+        self.timeLabel.text = self.track.isSimulated
+            ? [temps stringByAppendingString:@"\n(simulé)"]
+            : temps;
+    }
 
     [self layoutTrackFill];
 }
 
 /*
- * Fin de piste simulee. On transmet l'evenement au moteur et on se contente
- * de lire son verdict.
+ * Fin de piste. On transmet l'evenement au moteur et on se contente de lire
+ * son verdict.
+ *
+ * La provenance de la fin depend du mode : en lecture reelle c'est le
+ * decodeur qui previent (audioPlayerDidFinishPlaying:), en repli c'est le
+ * minuteur. LunyAudioTrack ramene les deux au meme rappel, et cet ecran n'a
+ * pas a savoir lequel a parle.
  *
  * Regle de fin d'histoire (doc d'interface, "Pas d'enchainement
  * automatique") : une histoire terminee ne reste pas figee, elle ramene a la
@@ -885,7 +838,7 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
  * "fin d'histoire" faute d'un champ "type" fiable dans le format. Voir
  * NOTES.md pour la portee exacte de cette approximation.
  */
-- (void)simulatedTrackEnded
+- (void)audioTrackDidFinish:(LunyAudioTrack *)track
 {
     if (!_engine) {
         return;
@@ -905,6 +858,16 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
     }
 
     [self showDebugEvent:@"audio_ended" status:status];
+}
+
+/* Battement de la piste : seul l'affichage bouge, jamais l'etat du moteur. */
+- (void)audioTrackDidAdvance:(LunyAudioTrack *)track
+{
+    if (_scrubbing) {
+        return;   // le doigt fait autorite pendant la saisie
+    }
+
+    [self refreshTransportLabels];
 }
 
 #pragma mark - Telemetrie de mise au point

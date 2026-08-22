@@ -130,6 +130,28 @@ def build_pack(name, fixtures_dir, out_root):
             print("  %s/assets/%-16s copie tel quel (%d o)" % (name, filename, os.path.getsize(dst_file)))
 
 
+# Le pack de demonstration audio n'est pas une fixture : il est ecrit pour
+# cette app. Seules ses images sont (re)generees ici — ses pistes viennent de
+# make_demo_audio.py, et son dossier ne doit donc jamais etre efface.
+AUDIO_DEMO_IMAGES = {
+    "cover.png": ((0x7F, 0xA6, 0xE0), "B"),
+    "story.png": ((0x8F, 0xC7, 0xA8), "C"),
+}
+
+
+def build_audio_demo_images(out_root):
+    out_dir = os.path.join(out_root, "audio-demo", "assets")
+
+    if not os.path.isdir(out_dir):
+        print("  audio-demo : dossier absent, lancer make_demo_audio.py d'abord")
+        return
+
+    for name in sorted(AUDIO_DEMO_IMAGES):
+        accent, letter = AUDIO_DEMO_IMAGES[name]
+        write_png(os.path.join(out_dir, name), WIDTH, HEIGHT, render(accent, letter))
+        print("  audio-demo/assets/%-14s image %dx%d, lettre %s" % (name, WIDTH, HEIGHT, letter))
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     fixtures = os.path.normpath(os.path.join(here, "..", "..", "..", "luny-engine", "tests", "packs"))
@@ -138,6 +160,8 @@ def main():
 
     for name in sorted(PACK_ACCENTS):
         build_pack(name, fixtures, out_root)
+
+    build_audio_demo_images(out_root)
 
 
 if __name__ == "__main__":

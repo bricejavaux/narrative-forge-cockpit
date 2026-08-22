@@ -1,10 +1,15 @@
 #import "XXAppDelegate.h"
 #import "RootViewController.h"
+#import "LunyAudioTrack.h"
 #import "LunyTheme.h"
 
 @implementation XXAppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+	// Categorie lecture, une fois pour toute l'app : sans elle le son reste
+	// muet quand l'interrupteur silencieux est actif.
+	[LunyAudioTrack prepareAudioSession];
+
 	_window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
 	// Evite un flash blanc entre le lancement et le premier rendu.
 	_window.backgroundColor = [LunyTheme backgroundDeep];
