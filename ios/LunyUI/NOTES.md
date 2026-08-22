@@ -468,6 +468,51 @@ texte courant, 3:1 grand texte.
 | fleche desactivee | 5,89 | 5,31 | 5,23 |
 | initiales sur couverture (3:1) | 6,19 – 7,88 | 3,38 – 3,65 | 8,15 – 10,61 |
 
+30. **Piste longue de test, et un bug d'`AVAudioPlayer` qu'elle a revele.**
+
+   `audio-demo` porte une troisieme piste, `longue.wav`, **3 min 13 s**
+   (193,19 s), destinee a eprouver la barre sur une vraie plage. Elle est
+   generee a **11025 Hz** et non 22050 : trois minutes a 22050 pesent 7,6 Mo,
+   le plus gros fichier du depot de loin. Pour une sequence de tons purs la
+   bande passante n'apporte rien.
+
+   Le nouveau noeud a impose **une modification d'un noeud existant**, ce qui
+   ne pouvait pas etre evite : ajouter un StageNode ne le rend pas
+   atteignable. Il est devenu la seconde option de l'ActionNode existant, et
+   `controlSettings.wheel` est passe a vrai sur « Comptine » pour pouvoir y
+   tourner. Aucun autre champ n'a bouge, et les deux pistes courtes sont
+   inchangees bit a bit.
+
+   **Bug trouve en testant le glissement sur toute la plage** : ecrire
+   `currentTime = duration` sur un `AVAudioPlayer` ne place pas la tete en fin
+   de piste, il la remet **a zero**. Mesure sur l'appareil, la pastille
+   glissee a fond renvoyait 0,00 s au lieu de 193,19 s — la piste serait
+   repartie du debut. `seekToPosition:` retire donc 50 ms au bout droit en
+   lecture reelle. Apres correction, mesure : 0 %, 25 %, 50 %, 75 % exacts, et
+   100 % a 193,14 s.
+
+   La branche simulee n'a pas ce defaut et n'est pas concernee.
+
+### Ce que le moteur ne peut pas verifier
+
+`luny_pack_info()` **n'expose aucune duree** — le mot n'apparait nulle part
+dans `luny_engine.h`. Le moteur ne lit jamais le contenu d'un asset, il en
+verifie la presence et l'extension. Une duree ne peut donc pas etre confrontee
+au moteur.
+
+Ce qui a ete verifie a la place, et qui couvre la meme intention :
+
+| verification | resultat |
+|---|---|
+| le moteur resout `longue.wav` | oui, noeud `ad-long` a l'index 1/2 |
+| duree dans l'en-tete WAV | 193,19 s, 11025 Hz, 16 bits mono |
+| duree rendue par `AVAudioPlayer` sur le 3GS | **193,19 s**, identique |
+| categorie de session sur le 3GS | `AVAudioSessionCategoryPlayback` |
+
+La categorie `playback` est le mecanisme qui fait sortir le son malgre
+l'interrupteur silencieux ; elle est confirmee active sur l'appareil. Le
+comportement audible, lui, reste a confirmer a l'oreille.
+
 ---
 
 ## 3. Ce qui reste à vérifier localement
@@ -576,6 +621,15 @@ cette passe, à regarder un par un :
   s'arrête de lui-même et l'app **revient à la bibliothèque**.
 - Régler l'interrupteur silencieux de l'appareil : le son doit continuer
   (catégorie `playback`).
+
+**Piste longue (« Berceuse » → Choisir → chevron droit → « Longue »)**
+- Durée affichée **3:13**, sans mention « (simulé) ».
+- Glisser la pastille d'un bout à l'autre : le temps suit sur toute la plage,
+  et **relâcher tout à droite ne doit pas faire repartir du début** — c'était
+  le bug corrigé, il vaut la peine d'être revérifié à l'usage.
+- **Basculer l'interrupteur silencieux pendant la lecture : le son doit
+  continuer.** C'est le seul point que je ne peux pas vérifier autrement que
+  par la catégorie de session, confirmée `playback` sur l'appareil.
 
 **Palette pastel (si compilée avec `LUNY_THEME_PASTEL=1`)**
 - Fond turquoise très clair, tuiles crème, encre ardoise.

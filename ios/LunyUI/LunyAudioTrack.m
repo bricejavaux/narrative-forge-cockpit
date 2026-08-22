@@ -6,6 +6,17 @@
 /* Cadence de rafraichissement de l'affichage, et pas du minuteur simule. */
 static const NSTimeInterval kLunyTickInterval = 0.25;
 
+/*
+ * Retrait applique au bout droit d'un seek reel.
+ *
+ * Ecrire currentTime = duration sur un AVAudioPlayer ne le place pas en fin de
+ * piste : il repart a zero. Mesure sur l'appareil, une pastille glissee a fond
+ * renvoyait 0,00 s au lieu de 193,19 s. On s'arrete donc juste avant la fin,
+ * ce qui affiche bien une barre pleine et laisse la lecture se terminer
+ * normalement si elle reprend.
+ */
+static const NSTimeInterval kLunyRealSeekEpsilon = 0.05;
+
 @interface LunyAudioTrack () <AVAudioPlayerDelegate>
 @property (nonatomic, strong) AVAudioPlayer *player;
 @property (nonatomic, strong) NSTimer *tickTimer;
@@ -179,11 +190,21 @@ static const NSTimeInterval kLunyTickInterval = 0.25;
 
     if (_isSimulated) {
         _simulatedPosition = clamped;
-    } else {
-        // AVAudioPlayer accepte currentTime a l'arret comme en lecture : c'est
-        // le seul "seek" dont on a besoin ici.
-        _player.currentTime = clamped;
+        return;
     }
+
+    // AVAudioPlayer accepte currentTime a l'arret comme en lecture, mais
+    // remet a zero si on atteint exactement la duree : d'ou le retrait.
+    NSTimeInterval limit = self.duration - kLunyRealSeekEpsilon;
+
+    if (limit < 0.0) {
+        limit = 0.0;
+    }
+    if (clamped > limit) {
+        clamped = limit;
+    }
+
+    _player.currentTime = clamped;
 }
 
 #pragma mark - Battement

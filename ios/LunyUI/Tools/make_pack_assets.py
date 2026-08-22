@@ -136,6 +136,7 @@ def build_pack(name, fixtures_dir, out_root):
 AUDIO_DEMO_IMAGES = {
     "cover.png": ((0x7F, 0xA6, 0xE0), "B"),
     "story.png": ((0x8F, 0xC7, 0xA8), "C"),
+    "long.png": ((0xD9, 0x8F, 0xA6), "?"),
 }
 
 

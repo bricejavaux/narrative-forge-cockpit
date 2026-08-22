@@ -86,7 +86,8 @@ ouvrable) et repli sur minuteur a duree fabriquee. Le repli est affiche
 **iOS ne decode pas l'Ogg Vorbis** — aucune version. Le format STUdio
 l'autorise pourtant, et le moteur l'accepte : un pack converti en `.ogg`
 restera muet tant qu'une conversion cote PC n'aura pas eu lieu (`NOTES.md`
-§1.10). Seul `audio-demo` a de vraies pistes, en WAV.
+§1.10). Seul `audio-demo` a de vraies pistes, en WAV : deux courtes et une de
+3 min 13 s pour eprouver la barre sur une vraie plage.
 
 En fin de piste,
 `luny_audio_ended()` est emis — depuis le decodeur en lecture reelle, depuis

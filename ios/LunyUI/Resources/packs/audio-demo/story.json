@@ -1,30 +1,72 @@
 {
     "format": "v1",
     "title": "Berceuse",
-    "description": "Pack de demonstration a lecture audio reelle (WAV PCM)",
+    "description": "Pack de demonstration a lecture audio reelle (WAV PCM), dont une piste longue",
     "version": 1,
     "nightModeAvailable": false,
     "stageNodes": [
         {
             "uuid": "ad-cover",
-            "name": "Berceuse", "type": "cover", "squareOne": true,
-            "image": "cover.png", "audio": "intro.wav",
-            "okTransition": { "actionNode": "ad-suite", "optionIndex": 0 },
+            "name": "Berceuse",
+            "type": "cover",
+            "squareOne": true,
+            "image": "cover.png",
+            "audio": "intro.wav",
+            "okTransition": {
+                "actionNode": "ad-suite",
+                "optionIndex": 0
+            },
             "homeTransition": null,
-            "controlSettings": { "wheel": false, "ok": true, "home": false, "pause": true, "autoplay": false }
+            "controlSettings": {
+                "wheel": false,
+                "ok": true,
+                "home": false,
+                "pause": true,
+                "autoplay": false
+            }
         },
         {
             "uuid": "ad-story",
-            "name": "Comptine", "type": "story",
-            "image": "story.png", "audio": "comptine.wav",
-            "okTransition": null, "homeTransition": null,
-            "controlSettings": { "wheel": false, "ok": false, "home": true, "pause": true, "autoplay": true }
+            "name": "Comptine",
+            "type": "story",
+            "image": "story.png",
+            "audio": "comptine.wav",
+            "okTransition": null,
+            "homeTransition": null,
+            "controlSettings": {
+                "wheel": true,
+                "ok": false,
+                "home": true,
+                "pause": true,
+                "autoplay": true
+            }
+        },
+        {
+            "uuid": "ad-long",
+            "name": "Longue",
+            "type": "story",
+            "image": "long.png",
+            "audio": "longue.wav",
+            "okTransition": null,
+            "homeTransition": null,
+            "controlSettings": {
+                "wheel": true,
+                "ok": false,
+                "home": true,
+                "pause": true,
+                "autoplay": true
+            }
         }
     ],
     "actionNodes": [
         {
-            "id": "ad-suite", "name": "Suite", "type": "story.storyaction",
-            "options": [ "ad-story" ]
+            "id": "ad-suite",
+            "name": "Suite",
+            "type": "story.storyaction",
+            "options": [
+                "ad-story",
+                "ad-long"
+            ]
         }
     ]
 }
