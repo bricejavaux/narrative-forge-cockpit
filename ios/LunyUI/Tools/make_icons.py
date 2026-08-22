@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """
-Generateur d'icones LunyUI.
+Generateur d'icones LunyUI — SOLUTION DE SECOURS.
+
+Ce script n'est plus la source des AppIcon*. Les icones livrees sont
+desormais produites par make_icons_from_source.py, par reduction Lanczos de
+Resources/luny_icon_source_clean.png.
+
+Celui-ci reste disponible pour le cas ou cette source viendrait a manquer :
+il dessine une icone au code, sans aucun asset. L'executer ECRASE les icones
+issues de la vraie source.
 
 Aucun outil d'edition d'image n'est disponible dans cet environnement (ni
 ImageMagick, ni PIL, ni cairosvg) : ce script encode les PNG a la main avec

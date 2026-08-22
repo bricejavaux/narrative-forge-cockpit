@@ -176,14 +176,24 @@ est remplacée par `#94A0C6` (6,62:1).
 
 ## Icônes
 
-`Tools/make_icons.py` régénère tout `Resources/AppIcon*.png` (plus les noms
-historiques `Icon*.png`) depuis un seul rendu 720×720, réduit par moyenne de
-surface. Aucune dépendance : ni ImageMagick, ni PIL. Motif volontairement
-grossier — croissant ambre sur fond nuit — pour rester lisible à 29×29.
+Les icônes sont produites par réduction Lanczos d'une source unique,
+`Resources/luny_icon_source_clean.png`, vers toutes les tailles du Makefile
+plus les noms historiques `Icon*.png` :
 
 ```sh
-python3 Tools/make_icons.py
+python3 Tools/make_icons_from_source.py
 ```
+
+Aucune dépendance : le décodage PNG et le Lanczos sont en Python pur
+(`lunypng.py`, `lunyresize.py`). Aucun coin arrondi ni masque n'est appliqué —
+iOS pose le sien, une icône pré-arrondie donnerait un double contour.
+
+La source est rognée de 115 px par côté avant réduction : elle porte une
+silhouette arrondie cuite, coins blancs compris (`NOTES.md` §2.34). Elle reste
+versionnée dans `Resources/` mais est retirée du bundle à l'empaquetage.
+
+`Tools/make_icons.py`, l'ancien générateur programmatique, reste disponible en
+secours ; l'exécuter écrase les icônes issues de la vraie source.
 
 Note sur cet appareil : l'iPhone 3GS n'est **pas** Retina (320×480 à
 l'échelle 1×). C'est donc `AppIcon57x57.png` / `Icon.png` en 57×57 qui est

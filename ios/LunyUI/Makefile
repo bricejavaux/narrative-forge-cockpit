@@ -41,5 +41,12 @@ include $(THEOS_MAKE_PATH)/application.mk
 # uicache echoue en root ("cannot open cache file. incorrect user?") : il
 # doit tourner en mobile. Automatise ici plutot que redecouvert a chaque
 # deploiement.
+# La source de reference reste dans Resources/ pour etre versionnee a cote des
+# icones qu'elle produit, mais elle n'a rien a faire dans le bundle : 1,5 Mo
+# d'image morte embarquee sur l'appareil. On la retire au moment de la mise en
+# scene, apres que les icones ont ete generees a partir d'elle.
+before-package::
+	find "$(THEOS_STAGING_DIR)" -name 'luny_icon_source_clean.png' -delete
+
 after-install::
 	install.exec "su mobile -c 'uicache -a'"

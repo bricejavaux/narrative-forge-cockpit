@@ -608,6 +608,75 @@ comportement audible, lui, reste a confirmer a l'oreille.
    **Non verifie** : le geste d'appui long et l'apparition de l'alerte
    demandent un doigt.
 
+34. **Icone : la source fournie n'etait pas un carre plein.**
+
+   La consigne annoncait « aucune vraie bordure decorative a gerer, juste un
+   carre plein ». Le fichier dit autre chose, mesure avant tout traitement :
+
+   | mesure | valeur |
+   |---|---|
+   | dimensions | 1159 x 1159, RVB 8 bits, non entrelace |
+   | couleur des quatre coins | **(251,251,251) — blanc** |
+   | rayon d'arrondi cuit | ~209 px, soit **18 % du cote** |
+   | contenu a y=0 | seulement x=210..951, pleine largeur a partir de y~300 |
+   | bord | biseau quasi noir sur ~8 px |
+
+   La silhouette arrondie de l'icone est donc **cuite dans l'image**, coins
+   blancs compris. Redimensionnee telle quelle, elle aurait produit
+   exactement ce que le point 3 de la consigne interdisait : du blanc dans
+   les coins a l'interieur du masque iOS, et le biseau lu comme un second
+   contour.
+
+   **Traitement retenu, apres arbitrage** : rognage de 115 px par cote, soit
+   le plus grand carre central exempt de blanc (929 x 929, recherche par
+   dichotomie). Purement soustractif — aucun pixel n'est invente — et cela
+   retire d'un meme geste les coins blancs et le biseau. Cout : 36 % de la
+   surface, cadrage plus serre.
+
+   Verification apres generation, sur trois tailles : l'anneau exterieur a
+   une luminance qui varie de 14 a 243 (ecart-type ~60) et les quatre coins
+   sont tous de couleurs differentes. Un lisere dessine donnerait au
+   contraire un anneau quasi uniforme. **Aucun double contour dans l'asset.**
+
+35. **Chaine de reduction, en Python pur.**
+
+   Ni ImageMagick ni PIL sur cette machine, et les generateurs du projet
+   tiennent sans dependance : `lunypng.py` gagne un decodeur PNG (8/16 bits,
+   gris, palette, RVB, alpha, les cinq filtres ; l'entrelacement Adam7 est
+   refuse explicitement plutot que mal decode) et `lunyresize.py` apporte un
+   Lanczos-3 separable, avec dilatation du support en reduction.
+
+   Reduction en deux temps, pour une raison de cout : un Lanczos direct
+   depuis 1159 px demande une centaine de coefficients par pixel de sortie,
+   impraticable en Python pur sur 17 tailles. On prefiltre donc par moyenne
+   de surface exacte (table de sommes cumulees) jusqu'a deux fois la cible,
+   puis on termine au Lanczos — le prefiltrage est precisement ce qu'il faut
+   avant une reduction. Total : **7,5 s pour 22 fichiers**.
+
+   Validation du reechantillonneur avant usage :
+
+   | propriete | resultat |
+   |---|---|
+   | aller-retour encodeur/decodeur | bit-exact |
+   | aplat uni reduit en 29/40/57/128 | couleur preservee exactement |
+   | somme des poids du noyau | ecart max 1,1e-16 |
+   | damier 1 px reduit de moitie | moyenne 127,1 / ecart-type 0,31 |
+
+   Le dernier point est le plus parlant : un sous-echantillonnage naif
+   donnerait un damier residuel, pas un gris uniforme.
+
+   `make_icons.py`, l'ancien generateur programmatique, reste dans `Tools/`
+   comme solution de secours et porte desormais un avertissement : l'executer
+   ecrase les icones issues de la vraie source.
+
+36. **La source de reference ne part pas dans le bundle.**
+
+   Elle vit dans `Resources/` pour rester versionnee a cote des icones
+   qu'elle produit, mais `Resources/` est copie tel quel dans le `.app` par
+   Theos : 1,5 Mo d'image morte embarquee sur un 3GS. Un `before-package::`
+   la retire de la mise en scene, apres generation. Verifie sur l'appareil :
+   absente du bundle installe, presente dans le depot.
+
 ---
 
 ## 3. Ce qui reste à vérifier localement
@@ -747,6 +816,18 @@ cette passe, à regarder un par un :
 - Aucune tuile ne doit disparaître par erreur : les cinq packs livrés sont
   indeletables par permission système, pas seulement par convention.
 - Un appui long ne doit pas ouvrir l'histoire au relâchement.
+
+**Nouvelle icône**
+- Sur SpringBoard, la fusée doit apparaître **sans liseré ni double contour**
+  au bord : l'asset en est exempt (mesuré), reste à confirmer le rendu.
+- Le cadrage est plus serré qu'à l'origine — 36 % de surface retirée pour
+  supprimer les coins blancs. La lune et les nuages restent présents mais
+  frôlent les bords : à valider comme acceptable ou non.
+- Cohérence avec les icônes voisines du SpringBoard : même impression de
+  taille et de marge, pas d'icône qui « déborde » par rapport aux autres.
+- Si l'ancienne icône persiste malgré le respring déjà effectué, c'est le
+  cache de SpringBoard : un second `killall -9 SpringBoard` ou un
+  redémarrage complet la remplacera.
 
 **Absence de télémétrie**
 - Aucun uuid, aucun `wheel_left -> ACCEPTED`, aucun `option 2/3` nulle part.
