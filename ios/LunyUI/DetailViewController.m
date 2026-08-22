@@ -136,6 +136,39 @@ static const NSInteger kLunyDotMax = 10;
     [self.track unload];
 }
 
+/*
+ * Bouton retour a vue personnalisee, aux memes codes que « Choisir » et
+ * « Debut » : aplat d'accent, coins arrondis, libelle court. Le bouton
+ * systeme d'UINavigationController jurait avec le reste.
+ *
+ * Le chevron U+2039 est employe plutot qu'une fleche : la police de cet
+ * appareil rend .notdef pour U+2190 et U+21A9, verifie par
+ * CTFontGetGlyphsForCharacters, alors que U+2039 y a un vrai glyphe (190).
+ *
+ * Le comportement ne change pas : depile la pile de navigation.
+ */
+- (void)buildBackButton
+{
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+    button.titleLabel.font = [UIFont boldSystemFontOfSize:14.0f];
+    button.layer.cornerRadius = 8.0f;
+    button.clipsToBounds = YES;
+    button.frame = CGRectMake(0.0f, 0.0f, 78.0f, 30.0f);
+    [button setTitle:@"‹ Retour" forState:UIControlStateNormal];
+    [button setTitleColor:[LunyTheme textOnAccent] forState:UIControlStateNormal];
+    [self applyBackgroundColor:[LunyTheme accentAmber] toButton:button];
+    [button addTarget:self action:@selector(backTapped:)
+     forControlEvents:UIControlEventTouchUpInside];
+
+    self.navigationItem.leftBarButtonItem =
+        [[UIBarButtonItem alloc] initWithCustomView:button];
+}
+
+- (void)backTapped:(id)sender
+{
+    [self.navigationController popViewControllerAnimated:YES];
+}
+
 - (void)buildSubviews
 {
     // L'illustration et son texte de remplacement vivent dans un conteneur :

@@ -61,10 +61,14 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
 {
     [super viewDidLoad];
 
-    // Le titre reste porte par l'en-tete dans la vue, pas par la barre de
-    // navigation : la barre n'est la que pour le bouton retour depuis le
-    // lecteur. self.title l'alimente quand meme.
+    /*
+     * Le titre est porte par l'en-tete dans la vue, pas par la barre de
+     * navigation : les afficher tous les deux le repetait a l'ecran. On garde
+     * self.title pour l'identite du controleur, et on vide celui de la barre.
+     * L'ecran de detail garde le sien, qui nomme l'histoire en cours.
+     */
     self.title = @"Mes histoires";
+    self.navigationItem.title = @"";
     self.view.backgroundColor = [LunyTheme backgroundDeep];
 
     self.items = [LunyLibraryItem sampleLibrary];

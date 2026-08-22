@@ -103,3 +103,49 @@ def resize_rgb(src_width, src_height, rows, dst_width, dst_height):
         out.append(bytes(row))
 
     return out
+
+
+def rounded_mask(size, radius_ratio, inset=1.0, samples=4):
+    """
+    Canal alpha d'un rectangle a coins arrondis, antialiase par
+    sur-echantillonnage.
+
+    radius_ratio : rayon en fraction du cote. Mesure sur les icones systeme
+                   de cet appareil : 13,0 px sur 59, soit 0,2203.
+    inset        : marge transparente sur les bords droits, en pixels. Les
+                   icones d'Apple en ont une d'environ 1 px.
+    """
+    radius = radius_ratio * size
+    left = inset
+    right = size - inset
+    rows = []
+
+    for y in range(size):
+        row = bytearray()
+        for x in range(size):
+            couverts = 0
+            for sy in range(samples):
+                py = y + (sy + 0.5) / samples
+                for sx in range(samples):
+                    px = x + (sx + 0.5) / samples
+
+                    if px < left or px > right or py < left or py > right:
+                        continue
+
+                    cx = cy = None
+                    if px < left + radius and py < left + radius:
+                        cx, cy = left + radius, left + radius
+                    elif px > right - radius and py < left + radius:
+                        cx, cy = right - radius, left + radius
+                    elif px < left + radius and py > right - radius:
+                        cx, cy = left + radius, right - radius
+                    elif px > right - radius and py > right - radius:
+                        cx, cy = right - radius, right - radius
+
+                    if cx is None or math.hypot(px - cx, py - cy) <= radius:
+                        couverts += 1
+
+            row.append((couverts * 255) // (samples * samples))
+        rows.append(bytes(row))
+
+    return rows

@@ -10,10 +10,15 @@ import struct
 import zlib
 
 
-def write_png(path, width, height, rows):
+def write_png(path, width, height, rows, alpha_rows=None):
     """
     rows : sequence de `height` objets bytes, chacun de longueur width*3
            (RGB 8 bits, sans octet de filtre — il est ajoute ici).
+
+    alpha_rows : facultatif, `height` objets bytes de longueur width. Fournis,
+           le fichier est ecrit en RVBA. C'est indispensable pour les icones :
+           ce SpringBoard n'applique aucun masque, l'arrondi doit donc etre
+           porte par le canal alpha du fichier (voir NOTES.md).
     """
     for index, row in enumerate(rows):
         if len(row) != width * 3:
@@ -31,8 +36,26 @@ def write_png(path, width, height, rows):
             + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
         )
 
-    raw = b"".join(b"\x00" + row for row in rows)
-    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)  # RGB 8 bits
+    if alpha_rows is None:
+        raw = b"".join(b"\x00" + row for row in rows)
+        colour_type = 2                                    # RVB
+    else:
+        if len(alpha_rows) != height:
+            raise ValueError("%d lignes d'alpha, attendu %d" % (len(alpha_rows), height))
+        melange = []
+        for row, alpha in zip(rows, alpha_rows):
+            if len(alpha) != width:
+                raise ValueError("ligne d'alpha de %d octets, attendu %d"
+                                 % (len(alpha), width))
+            out = bytearray()
+            for x in range(width):
+                out += row[x * 3:x * 3 + 3]
+                out.append(alpha[x])
+            melange.append(bytes(out))
+        raw = b"".join(b"\x00" + row for row in melange)
+        colour_type = 6                                    # RVBA
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, colour_type, 0, 0, 0)
     png = (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", ihdr)

@@ -746,6 +746,70 @@ comportement audible, lui, reste a confirmer a l'oreille.
    et un cache maison n'apporterait rien. La mesure est notee ici pour
    qu'elle n'ait pas a etre refaite au prochain doute.
 
+40. **Icone carree : ce SpringBoard n'applique AUCUN masque. Correction d'une
+    erreur de ma part.**
+
+   J'avais affirme en §2.37 qu'iOS arrondissait lui-meme les coins et qu'un
+   arrondi dessine en aurait superpose deux. **C'etait faux**, et la mesure
+   l'a etabli.
+
+   Chaine de preuve, tout sur l'appareil :
+
+   | mesure | resultat |
+   |---|---|
+   | rendu en cache de LunyUI | 97 % opaque, rectangle plein |
+   | rendu en cache de Musique | 85 % opaque, rectangle arrondi |
+   | `UIPrerenderedIcon` passe a `false`, respring | **inchange**, toujours 97 % |
+   | fichier `icon.png` de Musique lui-meme | **88 % opaque, coins deja transparents** |
+
+   Le dernier point tranche : les icones systeme paraissent arrondies parce
+   qu'Apple les livre **deja masquees**. SpringBoard se contente de composer
+   le fichier tel quel. `UIPrerenderedIcon` n'y est pour rien — la preuve, le
+   basculer n'a rien change, et les apps systeme portent de toute facon la
+   cle mal orthographiee `UIPrenderedIcon`, que le chargeur public ignore.
+
+   L'arrondi est donc desormais **ecrit dans le canal alpha** des fichiers
+   produits, avec un rayon repris d'Apple : un cercle ajuste sur l'alpha de
+   `Music~iphone.app/icon.png` donne 13,0 px pour 59 de large, soit **0,2203
+   du cote**, plus une marge transparente d'environ 1 px sur les bords
+   droits. Le decodage de ce PNG a demande de traiter le format CgBI d'Apple
+   — deflate brut sans en-tete zlib.
+
+   Verifie apres correction : notre rendu en cache passe a **85 % opaque avec
+   coins arrondis**, exactement la valeur de Musique.
+
+   La marge de securite de 5 % de §2.37 est conservee : elle garde la lune
+   hors de l'arc, qui mord plus profond qu'estime (0,046 du cote par axe pour
+   R=0,2203, contre 0,036 pour le R=0,175 suppose alors).
+
+   `UIPrerenderedIcon` est remis a `true` : c'est maintenant litteralement
+   exact, l'icone etant entierement pre-rendue, et sa valeur est sans effet
+   sur le masquage.
+
+41. **Titre en double sur la bibliotheque.**
+
+   `self.title` alimentait a la fois la barre de navigation et l'en-tete dans
+   la vue, d'ou la repetition. `navigationItem.title` est vide sur le seul
+   ecran racine ; `self.title` reste renseigne pour l'identite du controleur.
+   L'ecran de detail garde son titre de barre, qui nomme l'histoire.
+
+42. **Bouton retour a vue personnalisee.**
+
+   Le bouton systeme d'`UINavigationController` jurait avec le reste. Il est
+   remplace par un `UIBarButtonItem` a vue personnalisee, aux memes codes que
+   « Choisir » et « Debut » : aplat d'accent, coins arrondis, aplat par etat
+   pour le retour au contact.
+
+   Libelle « ‹ Retour » : le chevron U+2039 a un vrai glyphe sur cet appareil
+   (mesure precedemment, glyphe 190), alors que U+2190 et U+21A9 y rendent
+   `.notdef`. Le comportement est inchange, il depile la pile.
+
+   **Verification partielle** : le harnais UIKit n'a pas pu s'executer, le
+   3GS se rendormant sans cesse pendant les essais. Ce qui est etabli : les
+   trois themes compilent, et le binaire installe contient bien le selecteur
+   `backTapped`. Le rendu du bouton et l'absence de titre en double restent a
+   confirmer a l'oeil.
+
 ---
 
 ## 3. Ce qui reste à vérifier localement
@@ -897,11 +961,19 @@ cette passe, à regarder un par un :
   voir §2.38.
 
 **Nouvelle icône**
-- Sur SpringBoard, la fusée doit apparaître **sans liseré ni double contour**
-  au bord : l'asset en est exempt (mesuré), reste à confirmer le rendu.
-- La **lune doit être entièrement visible**, non rognée par l'arrondi que
-  SpringBoard applique lui-même : l'illustration a été rentrée de 5 % pour
-  cela (§2.37). L'icône paraîtra un peu plus petite dans sa tuile qu'avant.
+- Les coins doivent maintenant être **arrondis comme ceux des apps voisines**.
+  L'arrondi est écrit dans le fichier, avec le rayon exact d'Apple (§2.40) ;
+  le rendu mis en cache par SpringBoard a été mesuré à 85 % opaque, la même
+  valeur que Musique.
+- La **lune doit être entièrement visible**, l'illustration ayant été rentrée
+  de 5 % pour dégager l'arc (§2.37).
+
+**Titre et bouton retour**
+- Sur la bibliothèque, « Mes histoires » ne doit apparaître **qu'une fois**,
+  dans le corps de l'écran, plus dans la barre.
+- Sur le lecteur, le bouton retour doit être un **aplat ambre arrondi
+  « ‹ Retour »**, assorti à « Choisir » et « Début », et non le chevron
+  système. Il doit s'assombrir au contact et ramener à la bibliothèque.
 - Le cadrage est plus serré qu'à l'origine — 36 % de surface retirée pour
   supprimer les coins blancs. La lune et les nuages restent présents mais
   frôlent les bords : à valider comme acceptable ou non.

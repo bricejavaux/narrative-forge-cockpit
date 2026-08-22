@@ -16,7 +16,7 @@ packgui.py    fenêtre Tkinter — même logique, même journal
 
 | paquet | rôle | sans lui |
 |---|---|---|
-| `python3-tk` | fenêtre Tkinter | la fenêtre ne démarre pas ; la ligne de commande fonctionne |
+| `python3-tk` | fenêtre Tkinter | la fenêtre ne démarre pas ; la ligne de commande fonctionne. **Pas livré avec Python sur Debian/Ubuntu** malgré son statut de bibliothèque standard |
 | `ffmpeg` | `.ogg` → `.mp3`, `.bmp` → `.png` | les fichiers sont copiés tels quels et signalés dans le journal |
 | `python3-pil` | `.bmp` → `.png` (préféré à ffmpeg) | ffmpeg prend le relais |
 
@@ -24,9 +24,10 @@ packgui.py    fenêtre Tkinter — même logique, même journal
 sudo apt install python3-tk ffmpeg python3-pil
 ```
 
-**Aucun des trois n'était installé sur la machine de développement au moment
-d'écrire cet outil, et `sudo` y demande un mot de passe.** Les conséquences
-sont détaillées plus bas, section « Ce qui a été testé ».
+État sur la machine de développement : `python3-tk` est installé depuis, la
+fenêtre a donc pu être vérifiée. **`ffmpeg` et `python3-pil` manquent
+toujours**, et `sudo` y demande un mot de passe — les conversions réelles
+n'ont donc jamais tourné. Détail plus bas, section « Ce qui a été testé ».
 
 Côté SSH, rien à faire : `~/.ssh/config` contient déjà l'entrée pour
 `192.168.1.98` avec `id_rsa_3gs`. Aucun mot de passe n'est demandé.
@@ -45,10 +46,11 @@ python3 packcli.py envoyer <pack.zip>
 python3 packcli.py supprimer <nom>
 ```
 
-WSLg est présent sur cette machine (`DISPLAY=:0`, `/mnt/wslg` existe), donc la
-fenêtre devrait s'afficher une fois `python3-tk` installé. **Cela n'a pas pu
-être vérifié** : le paquet manque et ne peut pas être installé sans mot de
-passe. Si rien ne s'ouvre, `packcli.py` fait strictement la même chose.
+WSLg est présent (`DISPLAY=:0`, `/mnt/wslg`) et la fenêtre s'affiche : sondée
+en instrumentant `mainloop`, elle est mappée et visible en 720×640. Si rien ne
+s'ouvre chez vous, lancer avec `LUNY_GUI_TRACE=1` pour situer le blocage
+(`NOTES.md`), ou se rabattre sur `packcli.py`, qui fait strictement la même
+chose.
 
 ---
 
@@ -117,15 +119,19 @@ une vraie lecture.
   nommé dans le journal, transfert mené à son terme, pack toujours accepté
   par le moteur ensuite.
 
-**Non testé, faute de pouvoir installer les paquets :**
+**Depuis, `python3-tk` a été installé** et la fenêtre a pu être sondée : elle
+s'affiche bien, en 720×640, avant comme après correction. La panne signalée
+n'a pas été reproduite — l'explication la plus probable étant que la tentative
+précédait l'installation du paquet. Un vrai défaut de sûreté vis-à-vis des
+fils a néanmoins été trouvé et corrigé au passage : voir `NOTES.md`.
 
-- la **fenêtre Tkinter** ne s'est jamais ouverte ici. Son code est écrit et
-  sa syntaxe validée, mais aucun de ses comportements n'a été exercé ;
+**Non testé, faute de pouvoir installer le paquet :**
+
 - la **conversion réelle** `.ogg` → `.mp3` et `.bmp` → `.png` : seul le
   chemin d'échec a pu être vérifié, c'est-à-dire ffmpeg absent et fichiers
   vides. La commande ffmpeg elle-même n'a jamais tourné.
 
-Ces deux points sont à reprendre après `sudo apt install python3-tk ffmpeg`.
+Ce point est à reprendre après `sudo apt install ffmpeg`.
 
 ---
 

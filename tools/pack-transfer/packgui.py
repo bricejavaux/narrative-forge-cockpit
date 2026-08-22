@@ -10,9 +10,14 @@ son statut de bibliotheque standard :
 Si la fenetre ne s'ouvre pas, packcli.py fait exactement la meme chose en
 ligne de commande — les deux appellent le meme packcore.
 
-Les operations longues (conversion, scp) tournent dans un fil separe et
-poussent leurs messages dans une file que la boucle Tk vide periodiquement :
-sans cela la fenetre se figerait pendant tout un transfert.
+Regle a ne pas enfreindre : **aucun appel a un widget depuis un fil autre que
+le principal**. Tkinter n'est pas sur de ce point de vue, et une premiere
+version le violait — voir NOTES.md. Les fils de travail ne font que deposer
+des ordres dans une file ; la boucle Tk la vide et agit.
+
+Pour tracer un demarrage qui n'affiche rien :
+
+    LUNY_GUI_TRACE=1 python3 -u packgui.py 2>&1 | tee /tmp/packgui-debug.log
 """
 
 import os
@@ -20,6 +25,18 @@ import queue
 import sys
 import tempfile
 import threading
+import traceback
+
+TRACE = os.environ.get("LUNY_GUI_TRACE") == "1"
+
+
+def trace(etape):
+    if TRACE:
+        sys.stderr.write("[trace] %s\n" % etape)
+        sys.stderr.flush()
+
+
+trace("import de tkinter")
 
 try:
     import tkinter as tk
@@ -43,13 +60,22 @@ class Application(tk.Frame):
         self.pack(fill="both", expand=True)
 
         self.source = None
-        self.messages = queue.Queue()
+        self.ordres = queue.Queue()
         self.busy = False
 
+        trace("construction des widgets")
         self._build()
+
+        trace("demarrage de la vidange de file")
         self.after(120, self._drain)
+
         self.log("Pret. Choisir un pack, puis « Convertir et envoyer ».")
-        self.refresh_inventory()
+
+        # L'inventaire n'est PAS lance ici : il ouvre une connexion SSH, et
+        # rien de long ne doit s'executer avant que la boucle Tk tourne et que
+        # la fenetre soit affichee. On le programme, la boucle s'en chargera.
+        self.after(400, self.refresh_inventory)
+        trace("interface prete")
 
     # -------------------------------------------------- interface --
     def _build(self):
@@ -101,30 +127,50 @@ class Application(tk.Frame):
 
         tk.Label(self, text="Journal", anchor="w",
                  font=("TkDefaultFont", 10, "bold")).pack(fill="x", pady=(10, 0))
-        self.text = tk.Text(self, height=16, wrap="word")
-        self.text.pack(fill="both", expand=True)
-        scroll = tk.Scrollbar(self.text, command=self.text.yview)
-        scroll.pack(side="right", fill="y")
-        self.text.configure(yscrollcommand=scroll.set, state="disabled")
 
-    # ------------------------------------------------------ outils --
+        cadre = tk.Frame(self)
+        cadre.pack(fill="both", expand=True)
+        scroll = tk.Scrollbar(cadre)
+        scroll.pack(side="right", fill="y")
+        self.text = tk.Text(cadre, height=16, wrap="word",
+                            yscrollcommand=scroll.set, state="disabled")
+        self.text.pack(side="left", fill="both", expand=True)
+        scroll.configure(command=self.text.yview)
+
+    # ------------------------------------------------------ file --
+    #
+    # Un fil de travail ne touche jamais un widget. Il depose ici soit une
+    # chaine a journaliser, soit un appelable que la boucle Tk executera.
+
     def log(self, message):
-        self.messages.put(message)
+        self.ordres.put(("log", message))
+
+    def _plus_tard(self, fonction):
+        self.ordres.put(("appel", fonction))
 
     def _drain(self):
         while True:
             try:
-                message = self.messages.get_nowait()
+                genre, charge = self.ordres.get_nowait()
             except queue.Empty:
                 break
-            self.text.configure(state="normal")
-            self.text.insert("end", message + "\n")
-            self.text.see("end")
-            self.text.configure(state="disabled")
+
+            if genre == "log":
+                self.text.configure(state="normal")
+                self.text.insert("end", charge + "\n")
+                self.text.see("end")
+                self.text.configure(state="disabled")
+            else:
+                try:
+                    charge()
+                except Exception:                            # noqa: BLE001
+                    self.text.configure(state="normal")
+                    self.text.insert("end", traceback.format_exc())
+                    self.text.configure(state="disabled")
+
         self.after(120, self._drain)
 
     def _run(self, work):
-        """Execute dans un fil et rend les boutons pendant ce temps."""
         if self.busy:
             self.log("une operation est deja en cours")
             return
@@ -135,11 +181,11 @@ class Application(tk.Frame):
         def wrapper():
             try:
                 work()
-            except Exception as error:                      # noqa: BLE001
+            except Exception as error:                       # noqa: BLE001
                 self.log("ERREUR inattendue : %s" % error)
             finally:
                 self.busy = False
-                self.after(0, self._refresh_button)
+                self._plus_tard(self._refresh_button)
 
         threading.Thread(target=wrapper, daemon=True).start()
 
@@ -170,7 +216,7 @@ class Application(tk.Frame):
             if not packcore.device_reachable(self.log):
                 return
             rows = packcore.remote_inventory(self.log)
-            self.after(0, lambda: self._fill_tree(rows))
+            self._plus_tard(lambda: self._fill_tree(rows))
         self._run(work)
 
     def _fill_tree(self, rows):
@@ -207,7 +253,7 @@ class Application(tk.Frame):
             if packcore.remote_delete(name, where, self.log):
                 packcore.remote_uicache(self.log)
                 rows = packcore.remote_inventory()
-                self.after(0, lambda: self._fill_tree(rows))
+                self._plus_tard(lambda: self._fill_tree(rows))
         self._run(work)
 
     def send(self):
@@ -246,18 +292,32 @@ class Application(tk.Frame):
                 if packcore.remote_send(built, target, self.log):
                     packcore.remote_uicache(self.log)
                     rows = packcore.remote_inventory()
-                    self.after(0, lambda: self._fill_tree(rows))
+                    self._plus_tard(lambda: self._fill_tree(rows))
 
         self._run(work)
 
 
 def main():
-    root = tk.Tk()
-    root.title("Luny — transfert de packs vers le 3GS")
-    root.geometry("720x640")
-    Application(root)
-    root.mainloop()
+    try:
+        trace("creation de la fenetre racine")
+        root = tk.Tk()
+        root.title("Luny — transfert de packs vers le 3GS")
+        root.geometry("720x640")
+
+        trace("creation de l'application")
+        Application(root)
+
+        trace("entree dans mainloop")
+        root.mainloop()
+        trace("sortie de mainloop")
+    except Exception:                                        # noqa: BLE001
+        # Une exception pendant la construction laisserait autrement un
+        # processus vivant et muet : on la montre.
+        traceback.print_exc()
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
