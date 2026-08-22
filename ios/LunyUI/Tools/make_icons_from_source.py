@@ -54,6 +54,26 @@ DEFAULT_SOURCE = "luny_icon_source_clean.png"
 # NOTES.md. A recalculer si la source change.
 CROP_MARGIN = 115
 
+# Marge de securite laissee autour de l'illustration, en fraction du cote.
+#
+# iOS arrondit lui-meme les coins des icones — c'est natif, aucun tweak de
+# theme n'est installe sur cet appareil et UIPrerenderedIcon ne desactive que
+# le vernis brillant, pas le masque. Dessiner un arrondi dans le fichier
+# donnerait donc DEUX arrondis superposes.
+#
+# Le probleme reel etait ailleurs : apres recadrage l'illustration touchait
+# les bords, et le masque mordait dans du contenu clair (luminance moyenne
+# 126 au coin haut-gauche), la lune commencant a une paire de pixels de la
+# zone rognee. On rentre donc l'illustration.
+#
+# L'arc du masque mord au plus profond sur la diagonale, a R(1-1/racine(2))
+# du coin, soit ~0,051 du cote pour R=0,175 — environ 0,036 par axe. Une
+# marge de 5 % place donc toute la morsure dans la marge.
+#
+# La marge est remplie par prolongement du bord, et non par un aplat : le
+# ciel et les nuages sont degrades, un aplat se verrait comme un cadre.
+ICON_SAFE_MARGIN = 0.05
+
 
 def summed_area(rows, width, height, channel):
     """Table (width+1)x(height+1) des sommes cumulees d'un canal."""
@@ -98,6 +118,28 @@ def area_reduce(rows, width, height, target):
     return out
 
 
+def inset_with_edge_padding(rows, width, height, margin):
+    """
+    Reduit l'illustration puis la recentre, la marge etant remplie en
+    prolongeant les pixels de bord vers l'exterieur.
+    """
+    inner = int(round(width * (1.0 - 2.0 * margin)))
+    offset = (width - inner) // 2
+    shrunk = resize_rgb(width, height, rows, inner, inner)
+
+    out = []
+    for y in range(height):
+        src_y = min(max(y - offset, 0), inner - 1)
+        line = shrunk[src_y]
+        row = bytearray()
+        row += line[0:3] * offset                       # bord gauche prolonge
+        row += line
+        row += line[(inner - 1) * 3:inner * 3] * (width - offset - inner)
+        out.append(bytes(row))
+
+    return out
+
+
 def make_size(rows, width, height, target):
     prefilter = min(width, target * 2)
 
@@ -137,6 +179,11 @@ def main():
         height -= 2 * CROP_MARGIN
         print("  rognee de %d px par cote -> %d x %d (coins blancs et biseau retires)"
               % (CROP_MARGIN, width, height))
+
+    if ICON_SAFE_MARGIN > 0:
+        rows = inset_with_edge_padding(rows, width, height, ICON_SAFE_MARGIN)
+        print("  illustration rentree de %.0f %% par cote, marge prolongee depuis le bord"
+              % (ICON_SAFE_MARGIN * 100))
 
     cache = {}
 

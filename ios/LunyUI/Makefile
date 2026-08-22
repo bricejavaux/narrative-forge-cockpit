@@ -46,7 +46,7 @@ include $(THEOS_MAKE_PATH)/application.mk
 # d'image morte embarquee sur l'appareil. On la retire au moment de la mise en
 # scene, apres que les icones ont ete generees a partir d'elle.
 before-package::
-	find "$(THEOS_STAGING_DIR)" -name 'luny_icon_source_clean.png' -delete
+	find "$(THEOS_STAGING_DIR)" -name 'luny_*_source*.png' -delete
 
 after-install::
 	install.exec "su mobile -c 'uicache -a'"

@@ -35,6 +35,17 @@
 /* Nom de la palette active, pour le diagnostic. */
 + (NSString *)paletteName;
 
+/*
+ * La bibliotheque pose-t-elle le fond decoratif nocturne ?
+ *
+ * Vrai pour la seule palette sombre. Mesure a l'appui : a 15 % d'opacite,
+ * l'image de nuit releve le fond sombre (#0B1024 -> #1B2232), ce qui lui
+ * donne de la profondeur ; mais elle grise les palettes claires
+ * (#F3E7D3 -> #E0D8C6), leur otant la chaleur qui fait leur identite. Elle
+ * n'y decore pas, elle salit.
+ */
++ (BOOL)usesNightBackdrop;
+
 /* Fonds */
 + (UIColor *)backgroundDeep;    /* fond de la bibliotheque et du lecteur */
 + (UIColor *)surface;           /* fond de tuile */

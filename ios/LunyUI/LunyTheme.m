@@ -136,6 +136,11 @@ static UIColor *LunyMix(UIColor *top, UIColor *bottom, CGFloat weight)
 
 + (NSString *)paletteName { return @(LunyActivePalette()->name); }
 
++ (BOOL)usesNightBackdrop
+{
+    return LunyActivePalette() == &kLunyDarkPalette;
+}
+
 + (UIColor *)backgroundDeep  { return LunyColorFromHex(LunyActivePalette()->backgroundDeep); }
 + (UIColor *)surface         { return LunyColorFromHex(LunyActivePalette()->surface); }
 + (UIColor *)artBase         { return LunyColorFromHex(LunyActivePalette()->artBase); }

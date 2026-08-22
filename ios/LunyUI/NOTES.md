@@ -677,6 +677,75 @@ comportement audible, lui, reste a confirmer a l'oreille.
    la retire de la mise en scene, apres generation. Verifie sur l'appareil :
    absente du bundle installe, presente dans le depot.
 
+37. **Icone : pas d'arrondi dessine, mais une marge de securite.**
+
+   La demande etait d'arrondir les bords « comme les applications des
+   iPhone 3GS ». Verifie sur l'appareil avant d'agir : **aucun tweak de theme
+   n'est installe**, donc SpringBoard applique son propre masque nativement —
+   `UIPrerenderedIcon` ne desactive que le vernis brillant, pas le masque.
+   Dessiner un arrondi dans le fichier en aurait donc superpose deux.
+
+   Le defaut reel etait autre : apres le recadrage de §2.34 l'illustration
+   touchait les bords, et l'arc du masque mordait dans du contenu clair —
+   luminance moyenne 126 au coin haut-gauche, la lune commencant a une paire
+   de pixels de la zone rognee.
+
+   L'illustration est donc **rentree de 5 % par cote**, la marge etant
+   remplie par prolongement des pixels de bord et non par un aplat : le ciel
+   et les nuages sont degrades, un aplat se serait vu comme un cadre. La
+   valeur vient d'un calcul, pas d'un essai : l'arc mord au plus profond sur
+   la diagonale, a R(1-1/racine(2)) du coin, soit ~0,036 du cote par axe pour
+   R=0,175. Apres correction, la lune degage nettement le masque.
+
+38. **Fond decoratif de la bibliotheque, et pourquoi il est reserve au
+    theme sombre.**
+
+   `backdrop-library.png`, 320x480 — la taille exacte de l'ecran, le 3GS
+   n'etant pas Retina. Pose derriere l'en-tete et la grille, jamais dans les
+   tuiles, dont le fond reste opaque (`LunyTheme surface`). La grille est en
+   `clearColor`, le fond transparait donc entre les tuiles.
+
+   L'image est livree **sans teinte** : le melange se fait a l'execution par
+   l'alpha de la vue. Une seule image sert alors toutes les palettes qui la
+   veulent, et l'opacite se regle sans rien regenerer.
+
+   **Contraste a 15 %, mesure sur l'image reelle** et non sur une simulation,
+   pire cas sur la bande de l'en-tete :
+
+   | palette | titre | sous-titre |
+   |---|---|---|
+   | sombre | 10,55:1 | 11,12:1 |
+   | claire | 10,87:1 | 10,53:1 |
+   | pastel | 10,59:1 | 10,28:1 |
+
+   Tres au-dessus du seuil de 4,5:1. A 10 % le pire cas remonte a 12,44:1.
+   **Le texte de duree des tuiles n'est pas concerne** : les tuiles sont
+   opaques, le fond ne passe pas derriere.
+
+   **Reserve au theme sombre**, et c'est une decision mesuree. A 15 %,
+   l'image de nuit releve le fond sombre (#0B1024 -> #1B2232), ce qui lui
+   donne de la profondeur. Sur les palettes claires elle les grise
+   (#F3E7D3 -> #E0D8C6 ; #E3F4F1 -> #D2E4E0) : la chaleur du creme et la
+   fraicheur du pastel, qui font toute leur identite, s'effacent. Une scene
+   nocturne n'y decore pas, elle salit. `+[LunyTheme usesNightBackdrop]`
+   porte cette regle.
+
+39. **Cout du fond : aucun cache supplementaire necessaire.**
+
+   Mesure sur l'appareil, pas estimation :
+
+   | operation | duree |
+   |---|---|
+   | `imageNamed:` premier appel | 16,7 ms |
+   | `imageNamed:` appels suivants | 0,047 ms |
+   | premier dessin (decodage reel) | ~54 ms |
+
+   UIKit met deja l'image en cache, et la `UIImageView` la retient pour la
+   duree de vie de l'ecran — que le controleur racine ne quitte jamais,
+   etant la base de la pile de navigation. Le cout est donc paye une fois,
+   et un cache maison n'apporterait rien. La mesure est notee ici pour
+   qu'elle n'ait pas a etre refaite au prochain doute.
+
 ---
 
 ## 3. Ce qui reste à vérifier localement
@@ -817,9 +886,22 @@ cette passe, à regarder un par un :
   indeletables par permission système, pas seulement par convention.
 - Un appui long ne doit pas ouvrir l'histoire au relâchement.
 
+**Fond de la bibliothèque**
+- Sur le thème sombre, l'image de nuit doit se deviner **derrière** le titre
+  et entre les tuiles, sans jamais gêner la lecture du titre ni du sous-titre.
+- Les tuiles doivent rester franchement opaques : aucun motif ne doit
+  transparaître à l'intérieur d'une couverture.
+- Si le titre paraît moins net à l'usage, **baisser** `kLunyBackdropAlpha`
+  (0,10 laisse 12,44:1) plutôt que de l'augmenter.
+- Sur les thèmes clair et pastel, le fond doit être **absent** — c'est voulu,
+  voir §2.38.
+
 **Nouvelle icône**
 - Sur SpringBoard, la fusée doit apparaître **sans liseré ni double contour**
   au bord : l'asset en est exempt (mesuré), reste à confirmer le rendu.
+- La **lune doit être entièrement visible**, non rognée par l'arrondi que
+  SpringBoard applique lui-même : l'illustration a été rentrée de 5 % pour
+  cela (§2.37). L'icône paraîtra un peu plus petite dans sa tuile qu'avant.
 - Le cadrage est plus serré qu'à l'origine — 36 % de surface retirée pour
   supprimer les coins blancs. La lune et les nuages restent présents mais
   frôlent les bords : à valider comme acceptable ou non.

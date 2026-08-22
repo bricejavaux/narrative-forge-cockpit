@@ -188,6 +188,10 @@ Aucune dépendance : le décodage PNG et le Lanczos sont en Python pur
 (`lunypng.py`, `lunyresize.py`). Aucun coin arrondi ni masque n'est appliqué —
 iOS pose le sien, une icône pré-arrondie donnerait un double contour.
 
+L'illustration est ensuite rentrée de 5 % par côté, marge remplie par
+prolongement du bord : SpringBoard arrondit lui-même les coins, et sans cette
+marge le masque mordait dans la lune (`NOTES.md` §2.37).
+
 La source est rognée de 115 px par côté avant réduction : elle porte une
 silhouette arrondie cuite, coins blancs compris (`NOTES.md` §2.34). Elle reste
 versionnée dans `Resources/` mais est retirée du bundle à l'empaquetage.
@@ -203,6 +207,21 @@ réellement chargé ; les variantes `@2x`/`@3x` sont fournies par complétude.
 et SpringBoard ignore alors l'app silencieusement — pas d'erreur, juste une
 absence sur l'écran d'accueil. Vérifiez une taille non nulle après toute
 régénération.
+
+## Fond de la bibliothèque
+
+```sh
+python3 Tools/make_backdrop.py
+```
+
+Produit `Resources/backdrop-library.png` en 320×480 depuis
+`luny_background_source_portrait.png`. L'image est livrée sans teinte ; le
+mélange se fait à l'exécution par l'alpha de la vue (`kLunyBackdropAlpha`,
+0,15). Elle n'est posée que sur le **thème sombre** — sur les palettes claires
+une scène nocturne ternit au lieu de décorer (`NOTES.md` §2.38).
+
+Comme la source d'icône, l'image de départ reste versionnée mais est retirée
+du bundle à l'empaquetage.
 
 ## Déploiement
 

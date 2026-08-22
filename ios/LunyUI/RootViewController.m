@@ -18,6 +18,19 @@ static const NSInteger kLunyGridColumns       = 2;
 static const CGFloat   kLunyGridSpacing       = 14.0f;
 static const CGFloat   kLunyGridSectionInset  = 16.0f;
 
+/*
+ * Opacite du fond decoratif.
+ *
+ * Point de depart 0,15, verifie au contraste et non suppose : sur la palette
+ * sombre le pire cas mesure est 10,55:1 pour le titre et 11,12:1 pour le
+ * sous-titre, tres au-dessus du seuil de 4,5:1. Les tuiles ne sont pas
+ * concernees, leur fond est opaque.
+ *
+ * Si le rendu reel demande a alleger, BAISSER cette valeur : a 0,10 le pire
+ * cas remonte a 12,44:1. Ne pas l'augmenter sans refaire la mesure.
+ */
+static const CGFloat kLunyBackdropAlpha = 0.15f;
+
 /* En-tete "Mes histoires" : titre affirme + compte discret. */
 static const CGFloat   kLunyHeaderHeight      = 74.0f;
 static const CGFloat   kLunyHeaderTitleHeight = 32.0f;
@@ -33,6 +46,7 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 @interface RootViewController () <UIAlertViewDelegate>
+@property (nonatomic, strong) UIImageView *backdrop;
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, strong) LunyLibraryItem *pendingDeletion;
 @property (nonatomic, strong) UIView *header;
@@ -55,6 +69,7 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
 
     self.items = [LunyLibraryItem sampleLibrary];
 
+    [self buildBackdrop];
     [self buildHeader];
 
     UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
@@ -176,6 +191,34 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
                                 (unsigned long)self.items.count];
 }
 
+/*
+ * Fond decoratif, pose avant tout le reste pour rester DERRIERE l'en-tete et
+ * la grille. Les tuiles gardent leur fond opaque : il ne transparait qu'entre
+ * elles et derriere le titre.
+ *
+ * -imageNamed: garde l'image en cache cote UIKit, donc un seul decodage pour
+ * la duree de vie de l'ecran. Inutile d'ajouter un cache par-dessus.
+ */
+- (void)buildBackdrop
+{
+    if (![LunyTheme usesNightBackdrop]) {
+        return;
+    }
+
+    UIImage *image = [UIImage imageNamed:@"backdrop-library.png"];
+
+    if (!image) {
+        return;   // fond absent du bundle : l'ecran reste utilisable sans lui
+    }
+
+    _backdrop = [[UIImageView alloc] initWithImage:image];
+    _backdrop.contentMode = UIViewContentModeScaleAspectFill;
+    _backdrop.clipsToBounds = YES;
+    _backdrop.alpha = kLunyBackdropAlpha;
+    _backdrop.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.view addSubview:_backdrop];
+}
+
 - (void)buildHeader
 {
     _header = [[UIView alloc] initWithFrame:CGRectZero];
@@ -212,6 +255,7 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
         return;
     }
 
+    self.backdrop.frame = bounds;
     self.header.frame = CGRectMake(0.0f, 0.0f, bounds.size.width, kLunyHeaderHeight);
     self.headerTitle.frame = CGRectMake(kLunyGridSectionInset, 16.0f,
                                         innerWidth, kLunyHeaderTitleHeight);
