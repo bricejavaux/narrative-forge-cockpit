@@ -23,8 +23,18 @@ static const CGFloat   kLunyHeaderHeight      = 74.0f;
 static const CGFloat   kLunyHeaderTitleHeight = 32.0f;
 static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
 
-@interface RootViewController ()
+/*
+ * UIAlertView est deprecie dans le SDK 10.3 au profit d'UIAlertController —
+ * qui n'existe qu'a partir d'iOS 8. Sur une cible 6.0 c'est donc l'API
+ * correcte, et non un reliquat : on tait l'avertissement ici plutot que de
+ * baisser -Werror pour tout le projet.
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+@interface RootViewController () <UIAlertViewDelegate>
 @property (nonatomic, strong) UICollectionView *collectionView;
+@property (nonatomic, strong) LunyLibraryItem *pendingDeletion;
 @property (nonatomic, strong) UIView *header;
 @property (nonatomic, strong) UILabel *headerTitle;
 @property (nonatomic, strong) UILabel *headerSubtitle;
@@ -71,7 +81,99 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
     [self.collectionView registerClass:[LunyLibraryCell class]
              forCellWithReuseIdentifier:[LunyLibraryCell reuseIdentifier]];
 
+    // Appui long : seule facon de proposer une suppression sans encombrer la
+    // tuile d'un bouton permanent.
+    UILongPressGestureRecognizer *longPress =
+        [[UILongPressGestureRecognizer alloc] initWithTarget:self
+                                                      action:@selector(handleLongPress:)];
+    [self.collectionView addGestureRecognizer:longPress];
+
     [self.view addSubview:self.collectionView];
+}
+
+#pragma mark - Suppression d'un pack
+
+- (void)handleLongPress:(UILongPressGestureRecognizer *)recognizer
+{
+    if (recognizer.state != UIGestureRecognizerStateBegan) {
+        return;   // un seul declenchement par appui
+    }
+
+    CGPoint point = [recognizer locationInView:self.collectionView];
+    NSIndexPath *indexPath = [self.collectionView indexPathForItemAtPoint:point];
+
+    if (!indexPath || (NSUInteger)indexPath.item >= self.items.count) {
+        return;
+    }
+
+    LunyLibraryItem *item = self.items[(NSUInteger)indexPath.item];
+
+    if (!item.deletable) {
+        /*
+         * Pack livre dans le bundle. Le refus n'est pas une politique de
+         * l'app : /Applications appartient a root et l'app tourne en mobile,
+         * la suppression echouerait en "Permission denied". Autant l'expliquer
+         * plutot que de proposer une action vouee a echouer.
+         */
+        UIAlertView *info = [[UIAlertView alloc]
+            initWithTitle:@"Pack intégré"
+                  message:[NSString stringWithFormat:
+                           @"« %@ » est livré avec l'application et ne peut pas être supprimé.",
+                           item.title]
+                 delegate:nil
+        cancelButtonTitle:@"Fermer"
+        otherButtonTitles:nil];
+        [info show];
+        return;
+    }
+
+    self.pendingDeletion = item;
+
+    UIAlertView *confirm = [[UIAlertView alloc]
+        initWithTitle:@"Supprimer cette histoire ?"
+              message:[NSString stringWithFormat:
+                       @"« %@ » sera effacé de l'appareil. Cette action est définitive : "
+                       @"l'histoire devra être réimportée pour revenir.", item.title]
+             delegate:self
+    cancelButtonTitle:@"Annuler"
+    otherButtonTitles:@"Supprimer", nil];
+    [confirm show];
+}
+
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+    LunyLibraryItem *item = self.pendingDeletion;
+    self.pendingDeletion = nil;
+
+    if (!item || buttonIndex == alertView.cancelButtonIndex) {
+        return;
+    }
+
+    NSError *error = nil;
+
+    if (![item deleteFromDisk:&error]) {
+        UIAlertView *failure = [[UIAlertView alloc]
+            initWithTitle:@"Suppression impossible"
+                  message:error.localizedDescription ?: @"Le pack n'a pas pu être effacé."
+                 delegate:nil
+        cancelButtonTitle:@"Fermer"
+        otherButtonTitles:nil];
+        [failure show];
+        return;
+    }
+
+    // Relecture complete plutot que retrait d'une ligne : la bibliotheque est
+    // courte, et repartir du disque garantit que l'ecran reflete ce qui existe
+    // vraiment.
+    self.items = [LunyLibraryItem sampleLibrary];
+    [self refreshHeaderCount];
+    [self.collectionView reloadData];
+}
+
+- (void)refreshHeaderCount
+{
+    self.headerSubtitle.text = [NSString stringWithFormat:@"%lu histoires · hors ligne",
+                                (unsigned long)self.items.count];
 }
 
 - (void)buildHeader
@@ -90,13 +192,13 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
     [_header addSubview:_headerTitle];
 
     _headerSubtitle = [[UILabel alloc] initWithFrame:CGRectZero];
-    _headerSubtitle.text = [NSString stringWithFormat:@"%lu histoires · hors ligne",
-                            (unsigned long)self.items.count];
     _headerSubtitle.font = [UIFont systemFontOfSize:12.0f];
     _headerSubtitle.textColor = [LunyTheme textDisabled];
     _headerSubtitle.backgroundColor = [UIColor clearColor];
     _headerSubtitle.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [_header addSubview:_headerSubtitle];
+
+    [self refreshHeaderCount];
 }
 
 - (void)viewWillLayoutSubviews
@@ -166,3 +268,5 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
 }
 
 @end
+
+#pragma clang diagnostic pop

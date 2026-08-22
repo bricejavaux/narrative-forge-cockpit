@@ -32,6 +32,16 @@
 @property (nonatomic, assign, readonly) BOOL loaded;
 
 /*
+ * NO pour un pack livre dans le bundle de l'app.
+ *
+ * Ce n'est pas une politique choisie ici mais une contrainte du systeme :
+ * /Applications/LunyUI.app appartient a root:wheel en 755, l'app tourne en
+ * mobile, et un rm y echoue en "Permission denied" — verifie sur l'appareil.
+ * Seuls les packs poses dans Documents/packs/ sont supprimables.
+ */
+@property (nonatomic, assign, readonly) BOOL deletable;
+
+/*
  * Duree SIMULEE du pack, en secondes — voir LunySimulatedAudio.h. Le format
  * n'expose aucune duree ; cette valeur est inventee et seulement stable d'un
  * lancement a l'autre. A remplacer quand le decodage audio sera branche.
@@ -43,5 +53,14 @@
  * fois pour lire ses metadonnees, puis refermee.
  */
 + (NSArray *)sampleLibrary;
+
+/*
+ * Repertoire inscriptible des packs ajoutes par l'utilisateur. Cree a la
+ * demande. C'est la que l'import ZIP deposera ses packs le jour venu.
+ */
++ (NSString *)userPacksDirectory;
+
+/* Efface le pack du disque. Refuse un pack du bundle. */
+- (BOOL)deleteFromDisk:(NSError **)error;
 
 @end

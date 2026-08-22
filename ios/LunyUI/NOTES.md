@@ -513,6 +513,101 @@ La categorie `playback` est le mecanisme qui fait sortir le son malgre
 l'interrupteur silencieux ; elle est confirmee active sur l'appareil. Le
 comportement audible, lui, reste a confirmer a l'oreille.
 
+31. **Lecture en arriere-plan : `UIBackgroundModes` manquait.**
+
+   Cause constatee : la cle etait absente de `Info.plist`, verifie sur le
+   bundle installe (`grep UIBackgroundModes` -> 0 occurrence). Sans elle iOS
+   suspend l'app des qu'elle passe en fond, quelle que soit la categorie de
+   session. `audio` a ete ajoute, et la session etait deja passee en
+   `playback` des `didFinishLaunchingWithOptions:` — pas seulement a la
+   premiere lecture — ce qui est le second prerequis.
+
+   **Ce que je n'ai pas pu tester moi-meme, et pourquoi.** Les trois
+   declencheurs — Home, veille automatique, bouton Power — demandent une
+   pression physique. Aucun outil d'automatisation SpringBoard n'est installe
+   sur cet appareil (`activator`, `sbutil`, `notifyutil` : tous absents,
+   verifie), et surtout **le Wi-Fi tombe pendant la veille sur ce 3GS** : le
+   SSH devient injoignable au moment precis ou il faudrait observer. Je ne
+   peux donc ni declencher ni observer ces trois cas.
+
+   Ce qui est verifie : la cle est presente dans le bundle installe, et la
+   categorie de session est `AVAudioSessionCategoryPlayback` sur l'appareil.
+
+   **Pour obtenir la preuve malgre le sommeil**, une trace de lecture
+   horodatee a ete ajoutee sous `LUNY_DEBUG`, ecrite dans
+   `/tmp/LunyUI-playback.txt` a chaque battement. Elle survit a la veille et
+   se relit au reveil :
+
+       make LUNY_DEBUG=1 package install
+       # lancer "Berceuse" -> "Longue" (3 min 13 s), puis :
+       #   cas 1 : appui sur Home, attendre 30 s
+       #   cas 2 : laisser l'ecran s'eteindre seul, attendre 30 s
+       #   cas 3 : appui sur Power, attendre 30 s
+       # rallumer, puis :
+       cat /tmp/LunyUI-playback.txt
+
+   Si les horodatages continuent pendant la periode ecran eteint, la lecture
+   a continue. **Les trois cas sont a traiter separement** : rien ne garantit
+   qu'ils se comportent pareil, un Power explicite pouvant differer d'une
+   veille automatique. Ne pas conclure des trois a partir d'un seul.
+
+32. **`idleTimerDisabled` : ecarte, et pourquoi.**
+
+   Question posee : faut-il rallumer l'ecran en fin d'histoire ou a un choix ?
+
+   La reponse est non, pour une raison qui rend le debat sans objet :
+   **aucune API publique d'iOS ne permet a une app d'allumer l'ecran**.
+   `idleTimerDisabled` ne reveille rien, il *empeche* seulement l'extinction.
+   Le seul moyen d'avoir l'ecran allume a un choix serait donc de ne jamais
+   le laisser s'eteindre de toute l'histoire — precisement l'option couteuse
+   en batterie, et pour un usage en voyage c'est le pire compromis possible.
+
+   Par ailleurs, une fois l'arriere-plan audio correctement configure, l'ecran
+   n'a aucun besoin d'etre allume pour que le son continue. Le besoin reel
+   n'est pas « rallumer l'ecran » mais « signaler qu'une decision attend », et
+   le mecanisme natif pour cela est une notification locale
+   (`UILocalNotification`, iOS 4+), qui sonne et s'affiche sur l'ecran
+   verrouille sans maintenir l'affichage.
+
+   Decision : `idleTimerDisabled` reste a sa valeur par defaut. La
+   notification locale est notee en prochaine etape, hors perimetre ici.
+
+33. **Suppression d'un pack : le bundle est en lecture seule, par le systeme.**
+
+   La consigne visait `/Applications/LunyUI.app/packs/<nom>/`. C'est
+   impossible, et ce n'est pas une politique de l'app : mesure sur
+   l'appareil, `/Applications/LunyUI.app` appartient a `root:wheel` en `755`,
+   l'app tourne en `mobile`, et un `rm` y echoue en **Permission denied**.
+
+   Cela reglait du meme coup la protection du banc d'essai evoquee dans la
+   consigne : les cinq packs livres sont indeletables **par construction**, ce
+   qui est plus solide que n'importe quel drapeau que j'aurais pu ajouter.
+
+   La bibliotheque lit donc desormais **deux sources** : le bundle (lecture
+   seule) et `Documents/packs/` (inscriptible). Seules les entrees de la
+   seconde portent `deletable = YES`. C'est aussi la ou l'import ZIP deposera
+   ses packs le jour venu, donc la fonction n'est pas un decor : elle est
+   prete pour le seul cas ou elle aura un sens.
+
+   Un appui long sur une tuile du bundle ouvre une alerte qui **explique**
+   pourquoi la suppression est refusee, plutot que de proposer une action
+   vouee a echouer.
+
+   API : `UIAlertView`, verifie dans le SDK — `UIAlertController` est
+   `NS_CLASS_AVAILABLE_IOS(8_0)`, donc inexistant sur cible 6.0.
+   `UIAlertView` y est marquee depreciee (depuis iOS 9), ce que `-Werror`
+   transforme en erreur : l'avertissement est tu localement par un
+   `#pragma clang diagnostic`, sans baisser `-Werror` pour tout le projet.
+
+   Verifie sur l'appareil, avec un pack temporaire depose dans Documents :
+   bibliotheque a 6 entrees dont une supprimable ; refus sur un pack du
+   bundle avec message clair et pack toujours present ; suppression reelle du
+   pack Documents ; relecture a 5 entrees. Le pack temporaire a ete efface
+   par le test lui-meme.
+
+   **Non verifie** : le geste d'appui long et l'apparition de l'alerte
+   demandent un doigt.
+
 ---
 
 ## 3. Ce qui reste à vérifier localement
@@ -638,6 +733,21 @@ cette passe, à regarder un par un :
 - Le bouton principal est teal profond, le bouton lecture or profond : aucun
   des deux ne doit être jaune vif, le jaune est réservé aux couvertures.
 
+**Lecture en arrière-plan — les trois cas, séparément**
+- Lancer « Berceuse » → chevron droit → « Longue » (3 min 13 s), puis :
+  1. appui sur **Home** — le son doit continuer ;
+  2. laisser l'écran **s'éteindre seul** — le son doit continuer ;
+  3. appui sur **Power** — le son doit continuer.
+- Ne pas conclure des trois à partir d'un seul : ils peuvent différer.
+- Preuve écrite disponible avec un build `LUNY_DEBUG=1` : voir §2.31.
+
+**Suppression d'un pack**
+- Appui long sur une tuile du bundle : alerte expliquant que le pack est
+  intégré, un seul bouton « Fermer », aucune suppression.
+- Aucune tuile ne doit disparaître par erreur : les cinq packs livrés sont
+  indeletables par permission système, pas seulement par convention.
+- Un appui long ne doit pas ouvrir l'histoire au relâchement.
+
 **Absence de télémétrie**
 - Aucun uuid, aucun `wheel_left -> ACCEPTED`, aucun `option 2/3` nulle part.
   S'il en reste un, le paquet a été construit avec `LUNY_DEBUG=1`.
@@ -656,6 +766,8 @@ Volontairement non commencés, pour ne pas laisser de moitiés en place :
   extrait (`luny_engine.h`).
 - **Événement HOME du graphe narratif** (`luny_home()`), distinct du retour de
   navigation actuel, qui est une simple dépile de `UINavigationController`.
+- **Notification locale** à un point de choix ou en fin d'histoire, seul
+  mécanisme natif pour signaler quelque chose écran éteint (§2.32).
 - **Sélecteur de thème à l'exécution** : les trois palettes ne se choisissent
   aujourd'hui qu'à la compilation, ce qui suffit pour comparer.
 - **Volume et réglages parentaux** — la maquette prévoit « Enchaîner les

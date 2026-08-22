@@ -38,11 +38,24 @@ static const NSUInteger kLunyPackCount = sizeof(kLunyPackNames) / sizeof(kLunyPa
 @property (nonatomic, assign) NSInteger stageCount;
 @property (nonatomic, assign) BOOL loaded;
 @property (nonatomic, assign) NSTimeInterval simulatedDuration;
+@property (nonatomic, assign) BOOL deletable;
 @end
 
 @implementation LunyLibraryItem
 
-- (instancetype)initWithPackName:(NSString *)packName
++ (NSString *)userPacksDirectory
+{
+    NSArray *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+                                                             NSUserDomainMask, YES);
+
+    if (!documents.count) {
+        return nil;
+    }
+
+    return [documents[0] stringByAppendingPathComponent:@"packs"];
+}
+
+- (instancetype)initWithPackName:(NSString *)packName path:(NSString *)path deletable:(BOOL)deletable
 {
     self = [super init];
     if (!self) {
@@ -50,7 +63,8 @@ static const NSUInteger kLunyPackCount = sizeof(kLunyPackNames) / sizeof(kLunyPa
     }
 
     _packName = [packName copy];
-    _packPath = [[NSBundle mainBundle] pathForResource:packName ofType:nil inDirectory:@"packs"];
+    _packPath = [path copy];
+    _deletable = deletable;
     _title = [packName copy];
     _stageCount = 0;
     _loaded = NO;
@@ -89,14 +103,50 @@ static const NSUInteger kLunyPackCount = sizeof(kLunyPackNames) / sizeof(kLunyPa
 
 + (NSArray *)sampleLibrary
 {
-    NSMutableArray *items = [NSMutableArray arrayWithCapacity:kLunyPackCount];
+    NSMutableArray *items = [NSMutableArray array];
     NSUInteger index;
 
+    // Packs livres avec l'app : lisibles, jamais supprimables.
     for (index = 0; index < kLunyPackCount; index++) {
-        [items addObject:[[LunyLibraryItem alloc] initWithPackName:kLunyPackNames[index]]];
+        NSString *name = kLunyPackNames[index];
+        NSString *path = [[NSBundle mainBundle] pathForResource:name ofType:nil inDirectory:@"packs"];
+
+        [items addObject:[[LunyLibraryItem alloc] initWithPackName:name path:path deletable:NO]];
+    }
+
+    // Packs deposes dans Documents : supprimables.
+    NSString *userDir = [self userPacksDirectory];
+    NSArray *entries = userDir
+        ? [[NSFileManager defaultManager] contentsOfDirectoryAtPath:userDir error:NULL]
+        : nil;
+
+    for (NSString *name in [entries sortedArrayUsingSelector:@selector(compare:)]) {
+        NSString *path = [userDir stringByAppendingPathComponent:name];
+        BOOL directory = NO;
+
+        if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&directory] || !directory) {
+            continue;
+        }
+
+        [items addObject:[[LunyLibraryItem alloc] initWithPackName:name path:path deletable:YES]];
     }
 
     return items;
+}
+
+- (BOOL)deleteFromDisk:(NSError **)error
+{
+    if (!self.deletable || !self.packPath) {
+        // Garde-fou : le systeme refuserait de toute facon, mais autant ne pas
+        // presenter la tentative comme possible.
+        if (error) {
+            *error = [NSError errorWithDomain:@"LunyLibraryItem" code:1 userInfo:
+                      @{ NSLocalizedDescriptionKey: @"Ce pack est livré avec l'application." }];
+        }
+        return NO;
+    }
+
+    return [[NSFileManager defaultManager] removeItemAtPath:self.packPath error:error];
 }
 
 @end

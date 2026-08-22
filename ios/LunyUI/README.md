@@ -204,6 +204,31 @@ Le `after-install::` du Makefile lance `su mobile -c 'uicache -a'` :
 `uicache` échoue en root (« cannot open cache file. incorrect user? »),
 piège automatisé ici plutôt que redécouvert à chaque déploiement.
 
+## Bibliotheque : deux sources de packs
+
+| source | inscriptible | supprimable depuis l'app |
+|---|---|---|
+| `LunyUI.app/packs/` (bundle) | non | non |
+| `Documents/packs/` | oui | oui, par appui long |
+
+Le bundle appartient a `root:wheel` et l'app tourne en `mobile` : un `rm` y
+echoue en « Permission denied ». Les packs livres sont donc indeletables par
+le systeme, pas par convention — voir `NOTES.md` §2.33. `Documents/packs/`
+est l'emplacement ou l'import ZIP deposera ses packs.
+
+## Lecture en arriere-plan
+
+`UIBackgroundModes = audio` dans `Info.plist`, plus la session en categorie
+`playback` des le lancement. Les trois declencheurs (Home, veille automatique,
+Power) demandent une pression physique et n'ont pas pu etre testes ici — un
+build `LUNY_DEBUG=1` ecrit une trace horodatee dans
+`/tmp/LunyUI-playback.txt` qui survit a la veille et permet de conclure apres
+coup (`NOTES.md` §2.31).
+
+`idleTimerDisabled` n'est **pas** active : aucune API publique ne permet a une
+app d'allumer l'ecran, donc le maintenir allume serait la seule option, et
+elle coute cher en batterie pour rien (`NOTES.md` §2.32).
+
 ## Diagnostic
 
 Le 3GS n'a ni syslog, ni `head`, ni `tail`. `main.m` installe donc un

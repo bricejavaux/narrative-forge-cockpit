@@ -1,4 +1,5 @@
 #import "LunyAudioTrack.h"
+#import "LunyDebug.h"
 #import "LunySimulatedAudio.h"
 
 #import <AVFoundation/AVFoundation.h>
@@ -230,8 +231,46 @@ static const NSTimeInterval kLunyRealSeekEpsilon = 0.05;
     self.tickTimer = nil;
 }
 
+/*
+ * Trace de lecture, compilee hors du binaire par defaut.
+ *
+ * Elle existe pour une raison precise : verifier que le son continue apres un
+ * appui sur Home ou une mise en veille demande d'observer l'appareil pendant
+ * qu'il dort — or le Wi-Fi tombe en veille sur ce 3GS, donc le SSH avec. Une
+ * trace horodatee sur disque survit au sommeil et se relit au reveil.
+ *
+ *     make LUNY_DEBUG=1 package install
+ *     ... appuyer sur Home, attendre, rallumer ...
+ *     cat /tmp/LunyUI-playback.txt
+ */
+static void LunyTracePlayback(NSTimeInterval position, NSTimeInterval duration, BOOL simulated)
+{
+#if LUNY_DEBUG
+    static NSString * const path = @"/tmp/LunyUI-playback.txt";
+
+    NSString *ligne = [NSString stringWithFormat:@"%.0f  position=%.2f/%.2f  %@\n",
+                       [NSDate timeIntervalSinceReferenceDate], position, duration,
+                       simulated ? @"simule" : @"reel"];
+
+    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
+
+    if (!handle) {
+        [ligne writeToFile:path atomically:NO encoding:NSUTF8StringEncoding error:NULL];
+        return;
+    }
+
+    [handle seekToEndOfFile];
+    [handle writeData:[ligne dataUsingEncoding:NSUTF8StringEncoding]];
+    [handle closeFile];
+#else
+    (void)position; (void)duration; (void)simulated;
+#endif
+}
+
 - (void)tick:(NSTimer *)timer
 {
+    LunyTracePlayback(self.position, self.duration, _isSimulated);
+
     if (_isSimulated) {
         _simulatedPosition += kLunyTickInterval;
 
