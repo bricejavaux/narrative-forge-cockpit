@@ -18,7 +18,8 @@ vaut mieux la connaître avant de faire confiance à quoi que ce soit ici.
 
 | | état |
 |---|---|
-| logique de balayage, correspondance, diff, récapitulatif, filtres | **155 tests automatiques**, tous verts |
+| logique de balayage, correspondance, diff, récapitulatif, filtres | **189 tests automatiques**, tous verts |
+| **noms de packs** (espace, virgule, accent, apostrophe) | **vérifiés contre le vrai 3GS**, et un transfert réel de bout en bout |
 | protocole SCP historique | **vérifié à l'octet près** contre un faux canal |
 | conversion `.ogg → .mp3` et `.bmp → .png` | **réellement exécutée**, résultat vérifié par `ffprobe` |
 | `packcore` inchangé côté WSL | **non-régression vérifiée** contre le vrai 3GS |
@@ -239,8 +240,16 @@ transport : ssh/scp du systeme vers root@192.168.1.98
   ssh -F /dev/null -o ConnectTimeout=10 -o BatchMode=yes
       -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -o PubkeyAcceptedKeyTypes=+ssh-rsa
       -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+      -o LogLevel=ERROR
       -i <clé> -o IdentitiesOnly=yes root@192.168.1.98 '<commande>'
 ```
+
+`LogLevel=ERROR` n'est pas cosmétique : le fichier des hôtes connus étant
+`/dev/null`, ssh écrivait « Permanently added … » sur stderr **à chaque
+commande**. Les deux flux étant fusionnés, une suppression réussie ressortait
+en « ÉCHEC suppression », la bannière tenant lieu de motif. Les refus de
+négociation et d'authentification sont, eux, de niveau erreur et restent
+affichés.
 
 Sur le transport paramiko, le journal donne à la place la version du module,
 celle du serveur, le type de clé d'hôte négocié et la signature retenue. Le
@@ -343,6 +352,60 @@ Ces deux nombres sont vérifiés par les tests, sur les pixels réellement remis
 à Tk — pas sur une constante de réglage. C'est ce qui manquait : l'ancien test
 contrôlait l'opacité, laquelle était juste.
 
+### Noms de packs — espace, virgule, accent, apostrophe
+
+Le pack « Margot, Apprentie véto en Australie » a fait tomber le transfert sur
+`scp: ambiguous target`, et a révélé **quatre défauts** d'un coup. Tous les
+packs essayés jusque-là s'appelaient `two-branches`, `IDRISS_ET_COLETTE`,
+`audio-demo` : que des caractères sans histoire.
+
+| caractère | ce qu'il cassait |
+|---|---|
+| espace | la cible scp — le shell distant en faisait plusieurs mots |
+| espace | l'inventaire — le chemin était lu comme le dernier champ de `ls -l` |
+| apostrophe | les commandes distantes, entourées de guillemets simples écrits à la main |
+| accent | la correspondance local/distant — HFS+ renormalise NFC en NFD |
+
+Les trois premiers sont corrigés là où ils se produisent : quotage POSIX de
+tout chemin distant, et lecture de `ls -l` en champs bornés. Le quatrième ne
+se corrige pas à la source — c'est le système de fichiers de l'appareil qui
+décide.
+
+D'où la règle :
+
+> **Le nom de dossier est translittéré. Le titre n'est jamais touché.**
+
+```
+« Margot, Apprentie véto en Australie »
+  -> dossier   Margot_Apprentie_veto_en_Australie
+  -> titre     Margot, Apprentie véto en Australie   (story.json, intact)
+```
+
+C'est le **titre** que l'app affiche ; elle ne retombe sur le nom de dossier
+que si le titre est vide. La translittération est donc invisible à l'écran de
+l'appareil.
+
+Jeu de caractères conservé : `A-Z a-z 0-9 . _ -`. Le reste devient `_`, les
+groupes se réduisent à un seul `_`, les accents partent par décomposition
+Unicode (`é` → `e`), un `-` ou un `.` en tête est retiré, longueur bornée à 64.
+
+| entrée | dossier envoyé |
+|---|---|
+| `Margot, Apprentie véto en Australie` | `Margot_Apprentie_veto_en_Australie` |
+| `Margot, l'apprentie` | `Margot_l_apprentie` |
+| `7+ Margot, Apprentie véto au Canada` | `7_Margot_Apprentie_veto_au_Canada` |
+| `IDRISS_ET_COLETTE`, `two-branches`, `audio-demo` | **inchangés** |
+
+Les packs déjà sur l'appareil gardent donc leur nom, et leur correspondance.
+
+La ligne du volet gauche affiche **« dossier envoyé : … »** quand le nom
+change, et le journal l'écrit au transfert. Deux entrées locales qui se
+réduisent au même nom ressortent comme **noms ambigus** et ne sont jamais
+pré-cochées.
+
+Le quotage reste en place malgré la translittération : sans lui, un pack
+déposé autrefois sous un nom riche serait impossible à supprimer.
+
 ### La règle de correspondance
 
 Les deux volets se comparent par le **nom de dossier que le pack occupera sur
@@ -355,8 +418,14 @@ l'appareil**, jamais par le titre : l'appareil ne connaît que le premier.
 | ZIP avec `PACK/story.json` | `PACK` |
 
 C'est exactement ce que fait `packcore.extract_zip` lors d'un vrai transfert.
+Ce nom est ensuite **translittéré** (voir ci-dessus) avant d'atteindre
+l'appareil.
+
 Comparaison **insensible à la casse** : le système de fichiers de cet iOS l'est
-aussi, et `MonPack` y écraserait `monpack` sans le dire.
+aussi, et `MonPack` y écraserait `monpack` sans le dire. Elle est aussi
+insensible à la forme de normalisation Unicode et à la translittération —
+la même fonction est appliquée des deux côtés, sinon un pack transféré avec
+succès reviendrait « absent de l'appareil » à chaque inventaire.
 
 Deux entrées locales qui donnent le même nom sont signalées **« nom ambigu »**
 et aucune n'est présélectionnée.

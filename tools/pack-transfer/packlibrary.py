@@ -54,6 +54,8 @@ import os
 import posixpath
 import zipfile
 
+import packnames
+
 AUDIO_TO_CONVERT = (".ogg", ".oga")
 IMAGE_TO_CONVERT = (".bmp",)
 
@@ -64,8 +66,18 @@ PROTECTED_LOCATION = "bundle"
 
 
 def normalise(name):
-    """Cle de comparaison : casse ignoree, espaces de bord retires."""
-    return (name or "").strip().lower()
+    """
+    Cle de comparaison entre les deux bibliotheques.
+
+    Delegue a `packnames.key`, employe des DEUX cotes : la casse est ignoree
+    (HFS+ l'est aussi), et le nom est translittere avant comparaison. Ce
+    dernier point n'est pas cosmetique — il fait correspondre un dossier local
+    « Margot, Apprentie véto en Australie » avec le pack depose sur l'appareil
+    sous ce nom, que le systeme de fichiers l'ait stocke en NFC ou, comme il le
+    fait reellement, en NFD. Sans cela, un pack transfere avec succes
+    reapparaissait « absent de l'appareil » a chaque inventaire.
+    """
+    return packnames.key(name)
 
 
 # ------------------------------------------------------------------ #
@@ -79,8 +91,19 @@ class LocalPack(object):
                  node_count=0, to_convert=None, cover_asset=None, error=None):
         self.source_path = source_path
         self.kind = kind                      # "dossier" ou "zip"
-        self.transfer_name = transfer_name
-        self.title = title or transfer_name
+
+        # Le nom d'origine reste pour l'affichage ; celui qui part sur
+        # l'appareil est translittere. Voir packnames : espace, virgule,
+        # apostrophe et accent ont chacun casse une etape differente de la
+        # chaine, et l'accent en casse une qu'aucun quotage ne peut reparer —
+        # HFS+ renormalise.
+        self.source_name = transfer_name
+        self.transfer_name = packnames.safe_name(transfer_name)
+
+        # `source_name` et non `transfer_name` : sans titre dans story.json,
+        # mieux vaut montrer le nom que l'utilisateur voit dans son
+        # explorateur que sa version translitteree.
+        self.title = title or self.source_name
         self.node_count = node_count
         self.to_convert = to_convert or []
         self.cover_asset = cover_asset
@@ -106,6 +129,11 @@ class LocalPack(object):
             return "conversion necessaire (%d fichier%s)" % (
                 len(self.to_convert), "s" if len(self.to_convert) > 1 else "")
         return "pret tel quel"
+
+    @property
+    def renamed(self):
+        """Vrai si le dossier partira sous un autre nom que le sien."""
+        return self.transfer_name != self.source_name
 
     def __repr__(self):
         return "LocalPack(%r, %s)" % (self.transfer_name, self.state_label)

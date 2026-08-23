@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import zipfile
 
+import packnames
 import packproc
 import packtransport
 
@@ -213,7 +214,18 @@ def convert_pack(pack_dir, build_root, log):
     if story is None:
         return None
 
-    name = os.path.basename(os.path.normpath(pack_dir))
+    # Le nom du dossier construit est celui qu'occupera le pack sur
+    # l'appareil : `remote_send` le reprend par `os.path.basename`. C'est donc
+    # ICI que la translitteration s'applique, une fois, pour la ligne de
+    # commande comme pour la fenetre. Le titre de story.json n'est pas touche,
+    # et c'est lui que l'app affiche.
+    brut = os.path.basename(os.path.normpath(pack_dir))
+    name = packnames.safe_name(brut)
+
+    if name != brut:
+        log("dossier renomme pour l'appareil : « %s » -> « %s » "
+            "(le titre affiche ne change pas)" % (brut, name))
+
     out_dir = os.path.join(build_root, name)
 
     if os.path.isdir(out_dir):
@@ -367,14 +379,21 @@ def remote_inventory(log=None, transport=None):
     packs = {}
 
     for line in proc.stdout.decode("utf-8", "replace").splitlines():
-        parts = line.split()
+        # Decoupage BORNE a neuf champs : droits, liens, proprietaire, groupe,
+        # taille, mois, jour, heure, PUIS le chemin — qui garde ses espaces.
+        #
+        # `split()` sans borne, puis `parts[-1]`, ne rendait que le dernier mot
+        # du chemin. Releve sur l'appareil, pour « Margot, Apprentie veto en
+        # Australie » : `Australie/story.json`. Le pack etait alors compte sous
+        # un nom inexistant, ou pas compte du tout.
+        parts = line.split(None, 8)
         if len(parts) < 9:
             continue
         try:
             size = int(parts[4])
         except ValueError:
             continue
-        path = parts[-1]
+        path = parts[8].strip()
 
         for key, base in TARGETS.items():
             if path.startswith(base + "/"):
@@ -472,8 +491,10 @@ def remote_disk(log=None, transport=None, path=None):
     """
     chemin = path or TARGETS[DEFAULT_TARGET]
 
-    for commande, bloc in (("df -k '%s' 2>/dev/null" % chemin, 1024),
-                           ("df '%s' 2>/dev/null" % chemin, 512)):
+    protege = packtransport.quote_remote(chemin)
+
+    for commande, bloc in (("df -k %s 2>/dev/null" % protege, 1024),
+                           ("df %s 2>/dev/null" % protege, 512)):
         try:
             proc = _ssh([commande], timeout=25, transport=transport)
         except subprocess.TimeoutExpired:
@@ -499,9 +520,14 @@ def remote_send(local_dir, target, log, transport=None):
     tr = transport or default_transport()
     base = TARGETS[target]
     name = os.path.basename(os.path.normpath(local_dir))
-    remote = "%s/%s" % (base, name)
+    remote = packnames.remote_path(base, name)
 
-    proc = _ssh(["mkdir -p '%s' && rm -rf '%s'" % (base, remote)], transport=tr)
+    q = packtransport.quote_remote
+
+    # Chaque chemin est protege pour le shell de l'appareil. Les guillemets
+    # simples ecrits a la main suffisaient jusqu'a l'apostrophe : sur
+    # « Margot, l'apprentie », ce `rm -rf` devenait une commande tronquee.
+    proc = _ssh(["mkdir -p %s && rm -rf %s" % (q(base), q(remote))], transport=tr)
     if proc.returncode != 0:
         log("ECHEC transfert : preparation du dossier distant — %s"
             % proc.stdout.decode("utf-8", "replace").strip())
@@ -521,15 +547,16 @@ def remote_send(local_dir, target, log, transport=None):
     # Sans cela l'app, qui tourne en mobile, ne pourrait pas lire un pack
     # depose par root dans Documents — ni le supprimer.
     if target == "documents":
-        _ssh(["chown -R mobile:mobile '%s' '%s'" % (base, remote)], transport=tr)
+        _ssh(["chown -R mobile:mobile %s %s" % (q(base), q(remote))], transport=tr)
 
     log("TRANSFERT OK : %s -> %s:%s" % (name, tr.host, remote))
     return True
 
 
 def remote_delete(name, target, log, transport=None):
-    remote = "%s/%s" % (TARGETS[target], name)
-    proc = _ssh(["rm -rf '%s'" % remote], transport=transport)
+    remote = packnames.remote_path(TARGETS[target], name)
+    proc = _ssh(["rm -rf %s" % packtransport.quote_remote(remote)],
+                transport=transport)
     output = proc.stdout.decode("utf-8", "replace").strip()
 
     if proc.returncode != 0 or output:

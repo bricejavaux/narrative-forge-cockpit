@@ -9,13 +9,14 @@ packcore.py      logique : validation, conversion, inventaire, envoi, suppressio
 packtransport.py transport : binaires ssh/scp du système, ou paramiko en Python pur
 packlibrary.py   balayage local, inventaire distant, différence entre les deux, filtres
 packconfig.py    réglages mémorisés, localisation des ressources embarquées, version
+packnames.py     noms de dossier acceptés par l'appareil (translittération)
 packproc.py      appels externes sans fenêtre de console sous Windows
 packimage.py     lecture PNG, recadrage et composition, en Python pur (aucune dépendance)
 packcli.py       ligne de commande
 packgui.py       fenêtre Tkinter — même logique, même journal
 packgui_win.py   application Windows autoportante — voir README-windows.md
 luny-transfer.spec  recette PyInstaller, versionnée avec le code
-tests/           155 tests, exécutables sans appareil ni réseau
+tests/           189 tests, exécutables sans appareil ni réseau
 ```
 
 **Application Windows** : `packgui_win.py` est une variante autoportante à

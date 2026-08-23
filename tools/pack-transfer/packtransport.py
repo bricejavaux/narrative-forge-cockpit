@@ -56,6 +56,7 @@ essayer pour de vrai.
 """
 
 import os
+import posixpath
 import re
 import socket
 import subprocess
@@ -314,6 +315,31 @@ def _read_ack(channel):
     raise ScpError(detail or "accuse SCP inattendu %r" % code)
 
 
+def quote_remote(chemin):
+    """
+    Protege un chemin pour le SHELL DE L'APPAREIL — pas pour celui du poste.
+
+    C'est la distinction qui a coute le defaut `scp: ambiguous target` :
+    `subprocess` recevant une liste d'arguments, rien n'est interprete cote
+    Windows, et on en a conclu qu'il n'y avait rien a proteger. Mais scp,
+    ssh et la commande distante font passer le chemin par le `sh` de
+    l'appareil, qui le decoupe sur les espaces comme n'importe quel shell.
+
+    Guillemets SIMPLES, parce qu'ils sont les seuls a tout neutraliser d'un
+    coup — espace, virgule, `$`, `` ` ``, `*`. Le seul caractere qu'ils ne
+    peuvent pas contenir est l'apostrophe elle-meme : la sequence `'\''`
+    ferme la chaine, insere une apostrophe litterale, puis la rouvre. C'est
+    le procede POSIX standard, et il a ete verifie sur l'appareil :
+
+        mkdir -p '/tmp/luny-essai/Margot, l'\''apprentie'   -> cree
+
+    contre, avec le quotage precedent :
+
+        sh: -c: line 0: unexpected EOF while looking for matching `''
+    """
+    return "'" + str(chemin).replace("'", "'\\''") + "'"
+
+
 def _check_name(name):
     """
     Le nom est le reste de la ligne de controle : un saut de ligne le
@@ -472,6 +498,18 @@ class SystemTransport(object):
             # a cet usage — voir NOTES.md.
             "-o", "StrictHostKeyChecking=no",
             "-o", "UserKnownHostsFile=%s" % os.devnull,
+            # Sans cela, ssh ecrit « Warning: Permanently added … to the list
+            # of known hosts. » sur stderr — a chaque commande, puisque le
+            # fichier des hotes connus est /dev/null. Or les deux flux sont
+            # fusionnes, et `remote_delete` tient toute sortie pour un echec :
+            # une suppression reussie etait annoncee « ECHEC suppression »,
+            # suivie de la banniere en guise de motif. Constate contre
+            # l'appareil.
+            #
+            # `ERROR` ne masque que ce bavardage : les refus de negociation et
+            # d'authentification, sur lesquels repose tout le diagnostic de
+            # connexion (voir §5.8), restent de niveau erreur.
+            "-o", "LogLevel=ERROR",
         ]
 
         if self.port and int(self.port) != 22:
@@ -514,9 +552,17 @@ class SystemTransport(object):
         # par SFTP, et le serveur SFTP de cet iOS 6 ne sait pas creer de
         # repertoire : « path canonicalization failed » des qu'on envoie un
         # dossier.
+        #
+        # La partie situee APRES le `:` est remise telle quelle au shell de
+        # l'appareil : elle doit donc etre protegee. Sans quoi un nom de pack
+        # contenant un espace devient plusieurs mots et scp refuse en
+        # « ambiguous target » — defaut constate sur « Margot, Apprentie veto
+        # en Australie ».
+        cible = "%s:%s" % (self.target,
+                           quote_remote(posixpath.join(base, name)))
+
         proc = packproc.run(
-            ["scp", "-O", "-r", "-q"] + self.options()
-            + [local_dir, "%s:%s/%s" % (self.target, base, name)],
+            ["scp", "-O", "-r", "-q"] + self.options() + [local_dir, cible],
             timeout=timeout)
 
         return Result(proc.returncode, proc.stdout)
@@ -794,7 +840,11 @@ class ParamikoTransport(object):
 
         try:
             channel = self._session(timeout)
-            channel.exec_command("scp -rt '%s'" % base)
+            # Meme regle que pour le transport systeme : `exec_command` passe
+            # par le shell de l'appareil. Le NOM du pack, lui, ne transite pas
+            # par ici mais dans l'enregistrement `D` du protocole SCP, ou les
+            # espaces sont parfaitement legaux (voir `_check_name`).
+            channel.exec_command("scp -rt %s" % quote_remote(base))
 
             scp_send_directory(channel, local_dir, name, log)
 

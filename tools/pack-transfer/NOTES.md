@@ -524,3 +524,230 @@ iOS, et **son absence arrête la construction**.
 | `df` sur ce 3GS | présence et format de sortie supposés, repli prévu |
 | l'exécutable empaqueté | PyInstaller doit tourner sur Windows |
 | ffmpeg.exe | toujours pas téléchargé — ni version, ni présence de `libmp3lame` |
+
+
+---
+
+## 7. Itération du 2026-08-23 (soir) — les noms de packs
+
+Le pack « Margot, Apprentie véto en Australie » a fait tomber le transfert sur
+`scp: ambiguous target`. En cherchant pourquoi, **quatre défauts** sont
+apparus, tous dans la même famille et tous invisibles jusque-là : les packs
+d'essai s'appelaient `two-branches`, `IDRISS_ET_COLETTE`, `audio-demo`,
+`test-pack`. Que des caractères sans histoire.
+
+Les quatre sont **mesurés contre le vrai 3GS**, pas déduits.
+
+### 7.1 L'espace casse scp — le défaut signalé
+
+Reproduit à l'identique avec un dossier de test portant le même nom :
+
+```
+CIBLE scp remise au shell distant :
+    root@192.168.1.98:/var/mobile/Documents/packs/Margot, Apprentie véto en Australie
+
+ECHEC transfert : scp: ambiguous target
+```
+
+La cause tient en une distinction : **`subprocess` reçoit une liste
+d'arguments, donc rien n'est interprété côté Windows** — et on en avait
+conclu qu'il n'y avait rien à protéger. Mais la partie située après le `:`
+n'est pas lue par le poste : scp la remet au `sh` de l'appareil, qui la
+découpe sur les espaces comme n'importe quel shell. Quatre mots, donc
+plusieurs cibles, donc refus.
+
+Corrigé par `packtransport.quote_remote`, appliqué à la cible scp et à
+`scp -rt` côté paramiko.
+
+### 7.2 L'apostrophe casse le quotage — et c'était dans un `rm -rf`
+
+Les commandes distantes entouraient déjà les chemins de guillemets **simples**
+écrits à la main : `rm -rf '%s'`. Cela suffit pour l'espace, la virgule et
+l'accent. Pas pour `'`. Sur l'appareil :
+
+```
+$ rm -rf '/tmp/luny-essai/Margot, l'apprentie'
+sh: -c: line 0: unexpected EOF while looking for matching `''
+sh: -c: line 1: syntax error: unexpected end of file
+```
+
+Et le cas **pair** est pire que le cas impair. Avec deux apostrophes, les
+guillemets se referment deux à deux et la commande devient syntaxiquement
+valide — mais elle ne désigne plus le même chemin. Relevé sur l'appareil, en
+remplaçant `rm` par `echo` :
+
+```
+$ for a in '/var/mobile/Documents/packs/Margot, l'apprentie qui n'existe pas'
+    do echo "  [$a]"; done
+  [/var/mobile/Documents/packs/Margot, lapprentie]
+  [qui]
+  [nexiste pas]
+```
+
+Trois arguments, trois chemins, aucun n'étant celui voulu. Un `rm -rf` sur ce
+découpage n'échoue pas : il efface ailleurs, en silence. Avec le quotage
+POSIX, le même nom donne un seul mot, caractère pour caractère.
+
+Une commande de suppression tronquée n'est pas un défaut de confort. Le
+procédé POSIX — `'\''` ferme la chaîne, insère une apostrophe littérale, la
+rouvre — a été vérifié sur l'appareil avant d'être figé dans le code :
+
+```
+$ mkdir -p '/tmp/luny-essai/Margot, l'\''apprentie'
+$ ls /tmp/luny-essai
+Margot, Apprentie véto en Australie
+Margot, l'apprentie
+```
+
+Tous les chemins distants passent désormais par `quote_remote` : `mkdir`,
+`rm -rf`, `chown`, `df`, et la cible scp. Un test relit chaque commande avec
+`shlex.split` et vérifie qu'un shell y retrouve exactement le chemin d'origine.
+
+### 7.3 L'espace casse aussi l'inventaire
+
+`remote_inventory` lisait le chemin comme le **dernier champ** d'une ligne
+`ls -l`. Ligne réelle relevée sur l'appareil :
+
+```
+-rw-r--r-- 1 root wheel 2 Aug 23 15:23 /tmp/luny-essai/Margot, Apprentie véto en Australie/story.json
+```
+
+`split()` en tire 24 champs, et `parts[-1]` vaut `Australie/story.json`. Le
+pack était donc compté sous un nom inexistant — ou pas compté du tout.
+
+Corrigé par un découpage **borné** : `split(None, 8)`. Les huit premiers
+champs de `ls -l` sont fixes ; le neuvième est le chemin, espaces compris.
+
+### 7.4 HFS+ renormalise les accents — et celui-là, aucun quotage ne le répare
+
+Un nom envoyé en NFC revient en NFD :
+
+```
+envoyé   b' Apprentie v\xc3\xa9'      (é = U+00E9)
+relu     b' Apprentie ve\xcc\x81'     (e + U+0301)
+```
+
+Les octets diffèrent. La comparaison local/distant échouait donc **même après
+un transfert réussi** : le pack serait réapparu « absent de l'appareil » à
+chaque inventaire, et se serait reproposé indéfiniment.
+
+Ce défaut-là ne se corrige pas à la source — c'est le système de fichiers de
+l'appareil qui décide.
+
+### 7.5 La règle de nommage retenue
+
+> **Le nom de dossier est translittéré. Le titre n'est jamais touché.**
+
+```
+« Margot, Apprentie véto en Australie »
+  -> dossier   Margot_Apprentie_veto_en_Australie
+  -> titre     Margot, Apprentie véto en Australie   (story.json, intact)
+```
+
+C'est le **titre** que l'app affiche : `LunyLibraryItem -readMetadata` lit
+`story.json` et ne retombe sur le nom de dossier que si le titre est vide. La
+translittération est donc invisible pour l'enfant, et le nom de dossier
+redevient ce qu'il aurait toujours dû être — un identifiant.
+
+Jeu de caractères conservé : `A-Z a-z 0-9 . _ -`. Tout le reste devient `_`,
+les groupes se réduisent à un seul `_`, les accents partent par décomposition
+Unicode (`é` → `e`), un `-` ou un `.` en tête est retiré (option, fichier
+caché), et la longueur est bornée à 64.
+
+| entrée | dossier envoyé |
+|---|---|
+| `Margot, Apprentie véto en Australie` | `Margot_Apprentie_veto_en_Australie` |
+| `Margot, l'apprentie` | `Margot_l_apprentie` |
+| `7+ Margot, Apprentie véto au Canada` | `7_Margot_Apprentie_veto_au_Canada` |
+| `IDRISS_ET_COLETTE`, `two-branches`, `audio-demo` | **inchangés** |
+
+Ce dernier point n'est pas un détail : les packs déjà sur l'appareil gardent
+leur nom, donc leur correspondance. Aucun remue-ménage sur l'existant.
+
+**La règle ne remplace pas le quotage, elle s'y ajoute.** Le quotage reste
+indispensable pour supprimer un pack déjà déposé sous un nom riche : sans lui,
+il serait impossible à retirer.
+
+**La comparaison passe par la même fonction des deux côtés**
+(`packnames.key`), ce qui fait correspondre un dossier local
+« Margot, Apprentie véto en Australie » avec un pack déposé autrefois sous ce
+nom, quelle que soit la forme Unicode que le système de fichiers lui a donnée.
+
+**Collisions.** Deux entrées locales peuvent se réduire au même nom
+(`Margot, apprentie` et `Margot; apprentie`). Elles ne sont pas départagées :
+elles ressortent comme **noms ambigus**, décrites et jamais pré-cochées — le
+mécanisme existait déjà pour la casse et couvre celui-ci sans rien de spécial.
+
+**Ce que l'utilisateur voit.** La ligne du volet gauche affiche
+« dossier envoyé : … » quand le nom change, et le journal de transfert écrit
+« dossier renommé pour l'appareil : … (le titre affiché ne change pas) ».
+Un renommage silencieux ferait croire à un autre pack au premier inventaire.
+
+### 7.6 Ce qui reste vrai
+
+Les quatre défauts touchaient des étapes différentes — la commande scp, la
+commande shell, la lecture de l'inventaire, la comparaison. Un seul jeu
+d'essai composé de noms alphanumériques les cachait tous les quatre à la fois.
+Les tests portent désormais les caractères réels (`tests/test_noms.py`), y
+compris une lecture de l'archive d'origine quand elle est présente sur le
+poste.
+
+### 7.7 Trouvé en vérifiant : une suppression réussie annoncée « ÉCHEC »
+
+En prouvant le correctif d'apostrophe contre l'appareil, la suppression est
+revenue en échec alors que `rm -rf` avait rendu 0 :
+
+```
+ECHEC suppression : Margot, l'apprentie qui n'existe pas — Warning:
+Permanently added '192.168.1.98' (RSA) to the list of known hosts.
+```
+
+`remote_delete` tient **toute sortie** pour un échec — règle saine, le shell
+distant ne parlant qu'en cas de problème. Mais les deux flux sont fusionnés,
+et ssh écrivait cette bannière sur stderr **à chaque commande**, puisque le
+fichier des hôtes connus est `/dev/null`. Toute suppression réussie
+ressortait donc en échec, avec la bannière en guise de motif.
+
+Corrigé par `-o LogLevel=ERROR`, qui ne masque que ce bavardage : les refus de
+négociation et d'authentification, sur lesquels repose tout le diagnostic de
+connexion (§5.8), sont de niveau erreur et restent visibles. Vérifié dans les
+deux sens — la suppression rend maintenant `SUPPRESSION OK`, et
+`classify_failure` reconnaît toujours les deux pannes.
+
+### 7.8 Vérification finale — le vrai pack, le vrai appareil
+
+Le cas de test qui a révélé le défaut, transféré pour de bon :
+
+```
+CONVERSION terminee : 22 converti(s), 0 echec(s), 40 copie(s) tel(s) quel(s)
+--- transfert ---
+TRANSFERT OK : Margot_Apprentie_veto_en_Australie
+    -> 192.168.1.98:/var/mobile/Documents/packs/Margot_Apprentie_veto_en_Australie
+uicache execute
+```
+
+Inventaire de l'appareil après coup :
+
+```
+  IDRISS_ET_COLETTE                  documents   10 fichier(s)  12.1 Mo
+  Margot_Apprentie_veto_en_Australie documents   63 fichier(s)  65.4 Mo
+  audio-demo                         bundle       7 fichier(s)   4.4 Mo
+  …
+```
+
+Et la comparaison des deux bibliothèques, qui est l'autre moitié du défaut :
+
+```
+titre                                    etat             dossier sur l'appareil
+------------------------------------------------------------------------------------
+7+ Margot, Apprentie véto au Canada      local_seul       7_Margot_Apprentie_veto_au_Canada
+7+ Margot, Apprentie véto au Kenya       local_seul       7_Margot_Apprentie_veto_au_Kenya
+IDRISS ET COLETTE                        des_deux_cotes   IDRISS_ET_COLETTE
+Margot, Apprentie véto en Australie      des_deux_cotes   Margot_Apprentie_veto_en_Australie
+```
+
+`des_deux_cotes`, et non `local_seul` : le pack est reconnu comme présent, ne
+sera pas re-proposé, et son titre reste `Margot, Apprentie véto en Australie`.
+Espace disque relevé dans la foulée : 27,2 Go libres sur 28,3 Go.
+
+**189 tests**, tous verts.

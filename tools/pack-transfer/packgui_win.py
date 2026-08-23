@@ -1327,6 +1327,15 @@ class Application(tk.Frame):
         tk.Label(texte, text=row.note, bg=CARTE, fg=TEXTE_DOUX, font=POLICE_SOUS,
                  anchor="w").pack(fill="x")
 
+        # Un dossier translittere doit se dire AVANT le transfert : sinon le
+        # pack apparait sur l'appareil sous un nom que personne n'a choisi, et
+        # l'inventaire semble parler d'autre chose. Le titre, lui, ne change
+        # pas — c'est lui que l'app affiche.
+        if pack.renamed:
+            tk.Label(texte, text="dossier envoye : %s" % pack.transfer_name,
+                     bg=CARTE, fg=TEXTE_DOUX, font=POLICE_SOUS,
+                     anchor="w").pack(fill="x")
+
     def _remote_row(self, row, remote):
         cadre = self._row_frame(self.right_area.body)
         cle = "%s@%s" % (row.key, remote.location)
