@@ -5,9 +5,24 @@ format lisible par l'appareil et l'y dépose, en réutilisant la clé SSH déjà
 configurée.
 
 ```
-packcore.py   logique : validation, conversion, inventaire, envoi, suppression
-packcli.py    ligne de commande
-packgui.py    fenêtre Tkinter — même logique, même journal
+packcore.py      logique : validation, conversion, inventaire, envoi, suppression
+packtransport.py transport : binaires ssh/scp du système, ou paramiko en Python pur
+packlibrary.py   balayage local, inventaire distant, différence entre les deux
+packconfig.py    réglages mémorisés, localisation des ressources embarquées
+packcli.py       ligne de commande
+packgui.py       fenêtre Tkinter — même logique, même journal
+packgui_win.py   application Windows autoportante — voir README-windows.md
+tests/           65 tests, exécutables sans appareil ni réseau
+```
+
+**Application Windows** : `packgui_win.py` est une variante autoportante à
+deux volets (poste ↔ appareil), destinée à être empaquetée en `.exe` unique.
+Elle réutilise le même `packcore`. Tout ce qui la concerne — construction,
+ffmpeg embarqué, règle de correspondance, limites de vérification — est dans
+**[README-windows.md](README-windows.md)**.
+
+```sh
+python3 -m unittest discover -s tests -p "test_*.py"
 ```
 
 ---
@@ -24,10 +39,11 @@ packgui.py    fenêtre Tkinter — même logique, même journal
 sudo apt install python3-tk ffmpeg python3-pil
 ```
 
-État sur la machine de développement : `python3-tk` est installé depuis, la
-fenêtre a donc pu être vérifiée. **`ffmpeg` et `python3-pil` manquent
-toujours**, et `sudo` y demande un mot de passe — les conversions réelles
-n'ont donc jamais tourné. Détail plus bas, section « Ce qui a été testé ».
+État sur la machine de développement, **mis à jour** : `python3-tk` et
+`ffmpeg` sont installés. Les conversions réelles ont donc enfin tourné, et
+sont désormais couvertes par des tests automatiques — voir plus bas.
+`python3-pil` manque toujours : la conversion `.bmp` passe donc par ffmpeg et
+non par Pillow, ce qui est le repli prévu.
 
 Côté SSH, rien à faire : `~/.ssh/config` contient déjà l'entrée pour
 `192.168.1.98` avec `id_rsa_3gs`. Aucun mot de passe n'est demandé.
@@ -125,13 +141,20 @@ n'a pas été reproduite — l'explication la plus probable étant que la tentat
 précédait l'installation du paquet. Un vrai défaut de sûreté vis-à-vis des
 fils a néanmoins été trouvé et corrigé au passage : voir `NOTES.md`.
 
-**Non testé, faute de pouvoir installer le paquet :**
+**La conversion réelle a depuis été exécutée**, ffmpeg ayant été installé.
+Ce point, longtemps ouvert, est clos et couvert par `tests/test_packcore.py` :
 
-- la **conversion réelle** `.ogg` → `.mp3` et `.bmp` → `.png` : seul le
-  chemin d'échec a pu être vérifié, c'est-à-dire ffmpeg absent et fichiers
-  vides. La commande ffmpeg elle-même n'a jamais tourné.
+- `.ogg` → `.mp3` sur un vrai fichier Vorbis, résultat confirmé `mp3` par
+  `ffprobe`, et référence réécrite dans `story.json` ;
+- `.bmp` → `.png`, référence réécrite également ;
+- l'original n'est **jamais** modifié — vérifié taille et contenu ;
+- un `.ogg` de 0 octet est recopié tel quel sans arrêter le reste, et la
+  piste voisine est bien convertie malgré lui ;
+- ffmpeg absent : le fichier passe tel quel, le journal le dit.
 
-Ce point est à reprendre après `sudo apt install ffmpeg`.
+```sh
+python3 -m unittest discover -s tests -p "test_*.py"
+```
 
 ---
 

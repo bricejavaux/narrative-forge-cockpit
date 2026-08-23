@@ -15,7 +15,47 @@ import subprocess
 import tempfile
 import zipfile
 
-HOST = "192.168.1.98"
+import packtransport
+
+HOST = packtransport.DEFAULT_HOST
+
+# ------------------------------------------------------------------ #
+# Deux points d'injection, et deux seulement                          #
+# ------------------------------------------------------------------ #
+#
+# Le reste de ce module est inchange : la validation, la conversion, la
+# protection du bundle et le refus de doublon ont ete eprouves sur l'appareil
+# et n'avaient aucune raison d'etre reecrits. Seules deux hypotheses ne
+# tenaient plus pour une application Windows autoporteuse :
+#
+#   1. « ffmpeg est dans le PATH ». Faux pour un .exe unique : le binaire est
+#      livre a cote de l'application et appele par son chemin.
+#   2. « les binaires ssh et scp existent ». Faux aussi : Windows n'en a pas
+#      forcement, et un outil autoporteur ne peut pas l'exiger. D'ou un
+#      transport interchangeable (packtransport).
+#
+# Les deux defauts conservent le comportement historique, donc packcli.py et
+# packgui.py continuent de fonctionner sous WSL sans modification.
+
+FFMPEG_BINARY = None      # None -> recherche dans le PATH
+TRANSPORT = None          # None -> binaires ssh/scp du systeme
+
+
+def ffmpeg_path():
+    """Chemin du binaire ffmpeg utilisable, ou None."""
+    if FFMPEG_BINARY:
+        return FFMPEG_BINARY if os.path.isfile(FFMPEG_BINARY) else None
+
+    return shutil.which("ffmpeg")
+
+
+def default_transport():
+    global TRANSPORT
+
+    if TRANSPORT is None:
+        TRANSPORT = packtransport.SystemTransport(HOST)
+
+    return TRANSPORT
 
 # Emplacements possibles sur l'appareil.
 #
@@ -98,11 +138,13 @@ def _run(cmd):
 
 
 def _convert_audio(src, dst, log):
-    if not have("ffmpeg"):
+    binaire = ffmpeg_path()
+
+    if binaire is None:
         log("  ffmpeg absent : %s laisse tel quel" % os.path.basename(src))
         return False
 
-    code, output = _run(["ffmpeg", "-y", "-loglevel", "error",
+    code, output = _run([binaire, "-y", "-loglevel", "error",
                          "-i", src, "-codec:a", "libmp3lame", "-b:a", "96k", dst])
 
     if code != 0 or not os.path.exists(dst) or os.path.getsize(dst) == 0:
@@ -131,11 +173,13 @@ def _convert_image(src, dst, log):
                 % (os.path.basename(src), error))
             return False
 
-    if not have("ffmpeg"):
+    binaire = ffmpeg_path()
+
+    if binaire is None:
         log("  ni Pillow ni ffmpeg : %s laisse tel quel" % os.path.basename(src))
         return False
 
-    code, output = _run(["ffmpeg", "-y", "-loglevel", "error", "-i", src, dst])
+    code, output = _run([binaire, "-y", "-loglevel", "error", "-i", src, dst])
 
     if code != 0 or not os.path.exists(dst) or os.path.getsize(dst) == 0:
         detail = output.strip().splitlines()
@@ -266,15 +310,22 @@ def extract_zip(zip_path, work_root, log):
 # Appareil                                                            #
 # ------------------------------------------------------------------ #
 
-def _ssh(args, timeout=60):
-    return subprocess.run(
-        ["ssh", "-o", "ConnectTimeout=10", "-o", "BatchMode=yes", "root@" + HOST] + args,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+def _ssh(args, timeout=60, transport=None):
+    """
+    Une commande distante. `args` reste une liste, comme avant, et reste
+    toujours d'un seul element chez les appelants : elle est simplement jointe
+    avant d'etre remise au transport. Le retour garde la forme d'un
+    CompletedProcess (`.returncode`, `.stdout` en octets), pour qu'aucun
+    appelant n'ait a changer.
+    """
+    commande = " ".join(args) if isinstance(args, (list, tuple)) else args
+
+    return (transport or default_transport()).run(commande, timeout=timeout)
 
 
-def device_reachable(log):
+def device_reachable(log, transport=None):
     try:
-        proc = _ssh(["echo ok"], timeout=25)
+        proc = _ssh(["echo ok"], timeout=25, transport=transport)
     except subprocess.TimeoutExpired:
         log("ECHEC : le 3GS ne repond pas (delai depasse)")
         return False
@@ -288,10 +339,11 @@ def device_reachable(log):
     return True
 
 
-def remote_inventory(log=None):
+def remote_inventory(log=None, transport=None):
     """[(nom, emplacement, nb_fichiers, octets)] pour les deux emplacements."""
     listing = " ".join(TARGETS.values())
-    proc = _ssh([r"find %s -type f -exec ls -l {} \; 2>/dev/null" % listing])
+    proc = _ssh([r"find %s -type f -exec ls -l {} \; 2>/dev/null" % listing],
+                transport=transport)
     packs = {}
 
     for line in proc.stdout.decode("utf-8", "replace").splitlines():
@@ -322,42 +374,41 @@ def remote_inventory(log=None):
     return rows
 
 
-def remote_send(local_dir, target, log):
+def remote_send(local_dir, target, log, transport=None):
+    tr = transport or default_transport()
     base = TARGETS[target]
     name = os.path.basename(os.path.normpath(local_dir))
     remote = "%s/%s" % (base, name)
 
-    proc = _ssh(["mkdir -p '%s' && rm -rf '%s'" % (base, remote)])
+    proc = _ssh(["mkdir -p '%s' && rm -rf '%s'" % (base, remote)], transport=tr)
     if proc.returncode != 0:
         log("ECHEC transfert : preparation du dossier distant — %s"
             % proc.stdout.decode("utf-8", "replace").strip())
         return False
 
-    # -O impose le protocole SCP historique. Sans lui, le scp recent passe par
-    # SFTP, et le serveur SFTP de cet iOS 6 ne sait pas creer de repertoire :
-    # "path canonicalization failed" des qu'on envoie un dossier. Le mode
-    # historique s'appuie sur le binaire scp distant, present sur l'appareil.
-    scp = subprocess.run(
-        ["scp", "-O", "-r", "-q", "-o", "ConnectTimeout=10", "-o", "BatchMode=yes",
-         local_dir, "root@%s:%s" % (HOST, remote)],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=600)
+    # Le transport choisit comment : binaire `scp -O` du poste, ou protocole
+    # SCP historique parle en Python. Dans les deux cas c'est bien le
+    # protocole HISTORIQUE, jamais SFTP — le serveur SFTP de cet iOS 6 ne sait
+    # pas creer de repertoire et echoue en « path canonicalization failed »
+    # des qu'on lui envoie un dossier.
+    envoi = tr.send_dir(local_dir, base, name, timeout=600, log=log)
 
-    if scp.returncode != 0:
-        log("ECHEC transfert : scp — %s" % scp.stdout.decode("utf-8", "replace").strip())
+    if envoi.returncode != 0:
+        log("ECHEC transfert : %s" % envoi.stdout.decode("utf-8", "replace").strip())
         return False
 
     # Sans cela l'app, qui tourne en mobile, ne pourrait pas lire un pack
     # depose par root dans Documents — ni le supprimer.
     if target == "documents":
-        _ssh(["chown -R mobile:mobile '%s' '%s'" % (base, remote)])
+        _ssh(["chown -R mobile:mobile '%s' '%s'" % (base, remote)], transport=tr)
 
-    log("TRANSFERT OK : %s -> %s:%s" % (name, HOST, remote))
+    log("TRANSFERT OK : %s -> %s:%s" % (name, tr.host, remote))
     return True
 
 
-def remote_delete(name, target, log):
+def remote_delete(name, target, log, transport=None):
     remote = "%s/%s" % (TARGETS[target], name)
-    proc = _ssh(["rm -rf '%s'" % remote])
+    proc = _ssh(["rm -rf '%s'" % remote], transport=transport)
     output = proc.stdout.decode("utf-8", "replace").strip()
 
     if proc.returncode != 0 or output:
@@ -371,8 +422,8 @@ def remote_delete(name, target, log):
     return True
 
 
-def remote_uicache(log):
-    proc = _ssh(["su mobile -c 'uicache -a'"], timeout=90)
+def remote_uicache(log, transport=None):
+    proc = _ssh(["su mobile -c 'uicache -a'"], timeout=90, transport=transport)
 
     if proc.returncode != 0:
         log("uicache : echec — %s" % proc.stdout.decode("utf-8", "replace").strip())
