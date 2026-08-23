@@ -134,14 +134,18 @@ cela, ni les tests ni `packcli` ne s'importeraient sur cette machine.
    défaut. Le code passe `disabled_algorithms={"pubkeys": []}` et
    `AutoAddPolicy`, **sans qu'aucune poignée de main ait jamais eu lieu**. Si
    la connexion échoue, c'est le premier endroit à regarder.
-3. **L'exécutable empaqueté.** Résolution de `sys._MEIPASS`, `--add-binary`,
-   `--add-data`, fenêtre sans console.
+3. **L'exécutable empaqueté.** PyInstaller doit tourner sur Windows.
+   *Depuis la §6, la résolution de `sys._MEIPASS` est vérifiée par simulation
+   (`tests/test_config.py`) et la recette d'empaquetage est versionnée
+   (`luny-transfer.spec`) — ce qui reste non vérifié, c'est la construction
+   elle-même.*
 4. **ffmpeg.exe.** Non téléchargé, donc ni sa version ni la présence de
    `libmp3lame` ne sont établies. Voir `README-windows.md`.
 
 ### 5.4 Ce qui, lui, EST mesuré
 
-- **93 tests**, tous verts, sans appareil ni réseau.
+- **155 tests**, tous verts, sans appareil ni réseau (93 à la rédaction de
+  cette section).
 - **La conversion réelle**, enfin exécutée : ffmpeg est installé depuis. Le
   point que le README traînait comme « jamais exécuté » est clos.
 - **Non-régression de `packcore`** contre le vrai 3GS : `packcli.py liste`
@@ -257,6 +261,11 @@ rend son propre message.
 
 ### 5.9 Filigrane du bandeau : mesuré, pas ajusté à l'œil
 
+> **Section dépassée — voir §6.1.** Tout ce qui suit est exact et ne suffisait
+> pas : l'opacité était juste, le **recadrage** ne montrait rien. C'est
+> précisément l'histoire de cette section qui explique comment un décor
+> invisible a pu être livré deux fois comme corrigé.
+
 La demande suggérait d'ajuster l'opacité à l'œil « puisque tu peux voir le
 rendu réel sous Windows ». **Ce n'est pas le cas** : l'accès reste
 Linux/WSL, et rien de ce qui est écrit ici n'a été vu sous Windows.
@@ -352,3 +361,166 @@ casserait `packcli` sous WSL.
 Enfin, un réglage `transport` (`auto` / `paramiko` / `systeme`) : les deux
 transports ne rencontrent pas les mêmes murs sur ce serveur, et rester bloqué
 sur l'un ne doit pas obliger à reconstruire l'exécutable pour essayer l'autre.
+
+
+---
+
+## 6. Itération du 2026-08-23
+
+Sept points demandés : deux défauts, cinq évolutions. Ce qui suit ne consigne
+que ce qui s'est révélé instructif ou qui reste à vérifier ailleurs.
+
+### 6.1 Le décor absent — la cause n'était pas celle qu'on cherchait
+
+**L'hypothèse fournie avec la demande** : un chemin relatif qui ne
+correspondrait pas au dossier où `--onefile` extrait ses ressources
+(`sys._MEIPASS`). C'est la panne classique de ce mode d'empaquetage, et elle
+méritait d'être examinée en premier.
+
+**Elle était fausse.** `packconfig.resource_dir()` lisait déjà `sys._MEIPASS`,
+et le faisait avant même cette itération. Une simulation d'exécutable gelé —
+`sys.frozen`, `sys._MEIPASS` et `sys.executable` posés comme PyInstaller les
+pose — le confirme désormais dans `tests/test_config.py`.
+
+**La cause réelle était le recadrage**, et elle se démontre en trois nombres :
+
+| | valeur |
+|---|---|
+| bandeau | 1180 x 84, soit un rapport de **14,05** |
+| source | 772 x 1159 (portrait 2:3) |
+| bande retenue | 772 / 14,05 = **54 lignes**, soit **4,7 %** de la hauteur |
+
+Ces 54 lignes sont le haut du ciel : un dégradé gris de moyenne (175, 181,
+191), sans fusée, sans lune, sans nuage — aucun ne se trouve dans les 5 %
+supérieurs de l'image. Fondu à 15 % vers `#0B1024`, ce dégradé donne
+**`#24293B` sur toute la largeur**. Un aplat.
+
+Le rendu a été reproduit hors interface et **regardé** avant de corriger quoi
+que ce soit — c'était la consigne, et c'est ce qui manquait aux deux
+itérations précédentes.
+
+**Pourquoi les tests ne l'ont pas vu.** Le seul test du filigrane vérifiait
+que `BANDEAU_ALPHA <= 0.15`. Il était vert, et il avait raison : l'opacité
+*était* juste. Un test qui contrôle un réglage ne peut rien dire du résultat.
+Les tests actuels lisent les **pixels réellement remis à Tk** :
+
+| | couleurs distinctes | saturation maximale |
+|---|---|---|
+| ancien recadrage | 50 | 26 |
+| rendu actuel | 1 949 | 166 |
+
+Le premier de ces deux relevés est lui aussi figé dans un test
+(`test_l_ancien_cadrage_produisait_bien_un_aplat`) : le diagnostic est
+exécutable, pas seulement raconté.
+
+**Second facteur, indépendant et réel.** Le décor passait par Pillow. Absent,
+`_header_artwork` rendait `None` **sans un mot** — même symptôme exact, autre
+cause. Or Pillow n'est pas installé dans cet environnement : le chemin de code
+qui produisait le décor n'y a jamais été exécuté. Le décor est donc désormais
+décodé et composé par `packimage`, en Python pur (zlib + struct), remis à Tk
+en PNG base64. Plus aucune dépendance, et — ce qui compte autant — **le rendu
+devient vérifiable ici**. Pillow ne sert plus qu'aux vignettes de couverture,
+qui sont souvent des JPEG.
+
+**La correction visuelle.** Un portrait 2:3 ne peut pas remplir un bandeau de
+rapport 14:1 : toute tranche choisie ne montre presque rien. L'illustration
+est donc mise à l'échelle entière, posée à droite avec un fondu de 46 px sur
+son bord gauche. Le texte restant sur du fond pur, elle peut monter à 0,85
+d'opacité sans toucher aux contrastes (15,96:1 pour le titre, 7,27:1 pour le
+sous-titre). L'ancien plafond de 0,15 n'existait que parce que l'image passait
+**sous** le texte.
+
+**Le silence, enfin.** Chaque échec du décor écrit désormais une ligne dans le
+journal — illustration introuvable, illisible, ou refusée par Tk. Aucune de
+ces trois situations ne peut plus se présenter comme « rien à l'écran ».
+
+### 6.2 Les fenêtres de console
+
+L'hypothèse était juste, et vérifiée : **aucun appel n'avait
+`CREATE_NO_WINDOW`**. Une application `--windowed` n'a pas de console, donc
+Windows en crée une par processus console lancé — `ffmpeg` par fichier
+converti, `ssh` par commande distante, `scp` par transfert.
+
+Tout passe maintenant par `packproc.run`, qui pose `CREATE_NO_WINDOW` **et**
+`STARTF_USESHOWWINDOW` + `SW_HIDE`. Sur tout autre système, il ne pose rien :
+le comportement sous WSL est inchangé.
+
+Le point faible de ce genre de correction est l'appel oublié — un seul
+`subprocess.run` écrit en direct et les fenêtres reviennent pour ce binaire-là
+seulement. Un test **relit le code source** de tous les modules et échoue sur
+le premier appel direct trouvé.
+
+**Non vérifiable ici** : que plus aucune fenêtre n'apparaisse réellement. Le
+comportement est propre à Windows ; seuls les arguments transmis à
+`subprocess` sont vérifiés.
+
+### 6.3 Filtres : masquer n'est pas oublier
+
+Le piège de cette fonctionnalité n'est pas le filtrage, c'est ce qui arrive à
+une sélection quand la ligne disparaît. Un pack coché puis masqué **reste
+sélectionné**, le récapitulatif dit combien de lignes sont dans ce cas, et la
+fenêtre de confirmation les nomme une par une. L'inverse — une sélection
+annulée par un changement d'affichage — aurait été silencieux, donc pire que
+la liste bruyante qu'on cherchait à réduire.
+
+Le compteur du volet gauche annonce toujours le nombre de lignes cachées :
+une liste raccourcie sans le dire ne vaut pas mieux.
+
+### 6.4 Espace disque
+
+`df` est appelé dans le canal SSH déjà ouvert, quel que soit le transport.
+L'analyse ne se fie **pas au découpage en colonnes** mais aux trois premiers
+entiers rencontrés après l'en-tête : sur ce système minimal, `df` peut venir
+de busybox comme de BSD, et un nom de volume long renvoie les chiffres à la
+ligne suivante. La taille de bloc est lue dans l'en-tête — un `df` BSD sans
+`-k` compte en blocs de 512 octets, et prendre 1024 doublerait la capacité
+annoncée.
+
+Deux tentatives (`df -k`, puis `df`), puis repli explicite : « espace disque
+non disponible ». Cet appareil a déjà rendu plusieurs utilitaires absents ;
+une option refusée doit coder « pas de mesure », jamais « pas de place ».
+
+**Non vérifié** : que `df` existe sur ce 3GS précis, et le format exact de sa
+sortie. Les quatre variantes couvertes par les tests sont des reconstitutions.
+
+### 6.5 Taille de fenêtre
+
+80 % de l'écran, plancher à 1000x700, plafond à l'écran lui-même. **L'ordre
+des bornes compte** : sur un petit écran, c'est le plafond qui doit l'emporter
+sur le plancher, sinon la fenêtre naît plus grande que l'affichage et sa barre
+de titre passe hors champ. `minsize` est posé au minimum entre le plancher et
+la taille de départ, pour la même raison.
+
+`geometrie()` est une fonction pure : les cas d'écran (2560x1440, 1920x1080,
+1366x768, 1280x720, 1024x640) sont vérifiés sans ouvrir la moindre fenêtre.
+Relevé réel au lancement sur cette machine : `3072x960` sur un écran
+`3840x1200`.
+
+### 6.6 Icônes dessinées, pas écrites
+
+Dossier, corbeille, flèche, rafraîchir, `+`, `−` : tracés au trait sur le
+canevas. Un caractère Unicode aurait été plus court à écrire, mais rien ne
+garantit qu'une police Windows donnée possède le glyphe voulu, et un caractère
+manquant s'affiche en rectangle vide — pire que pas d'icône du tout.
+
+### 6.7 Empaquetage : une recette versionnée
+
+`luny-transfer.spec` remplace la ligne de commande du README. Une option
+`--add-data` oubliée donne un exécutable qui démarre normalement et auquel il
+manque une ressource : la panne se voit à l'écran, une fois le fichier livré.
+
+L'illustration y est en **`datas`**, jamais en `binaries` — cette dernière
+passe par l'analyse des dépendances binaires, qui n'a rien à faire d'une
+image. Elle est cherchée à côté du `.spec` puis dans les ressources de l'app
+iOS, et **son absence arrête la construction**.
+
+### 6.8 Ce qui reste non vérifiable de ce côté
+
+| | |
+|---|---|
+| rendu réel sous Windows | polices `Segoe UI`, métriques et thème ttk diffèrent de WSLg |
+| **capture d'écran de la fenêtre** | impossible ici : WSLg compose chaque fenêtre hors du root X, `ffmpeg -f x11grab` ne rend qu'un cadre noir, et ni `xwd`, ni ImageMagick, ni `Xvfb` ne sont installés. Le décor a donc été vérifié **par ses pixels** (rendu hors interface, puis relecture de l'image remise à Tk), ce qui couvre le défaut signalé mais pas la mise en page d'ensemble |
+| ouverture effective des fenêtres de console | comportement propre à Windows |
+| `df` sur ce 3GS | présence et format de sortie supposés, repli prévu |
+| l'exécutable empaqueté | PyInstaller doit tourner sur Windows |
+| ffmpeg.exe | toujours pas téléchargé — ni version, ni présence de `libmp3lame` |

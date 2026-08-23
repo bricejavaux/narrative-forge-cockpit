@@ -410,6 +410,69 @@ def remote_packs_from_rows(rows):
 
 
 # ------------------------------------------------------------------ #
+# Filtres du volet local                                              #
+# ------------------------------------------------------------------ #
+#
+# Un balayage rend TOUT ce qu'il a vu, y compris les dossiers qui ne sont pas
+# des packs : c'est voulu, un dossier qu'on croyait exploitable doit se voir
+# avec sa raison. Mais passe quelques dizaines d'entrees, ce meme principe
+# noie les vrais packs au milieu de `ffmpeg-extracted`, `PS2` et compagnie.
+#
+# Les filtres tranchent : le balayage garde son honnetete, l'affichage se
+# reduit a la demande. Rien n'est jamais supprime de `rows` — masquer et
+# oublier ne sont pas la meme chose, et `filter_rows` rend d'ailleurs les
+# deux listes pour que l'interface puisse dire ce qu'elle cache.
+
+PRESENCE_TOUS = "tous"
+PRESENCE_ABSENTS = "absents"
+PRESENCE_PRESENTS = "presents"
+
+PRESENCES = (PRESENCE_TOUS, PRESENCE_ABSENTS, PRESENCE_PRESENTS)
+
+PRESENCE_LIBELLES = {
+    PRESENCE_TOUS: "tous",
+    PRESENCE_ABSENTS: "absents de l'appareil",
+    PRESENCE_PRESENTS: "deja sur l'appareil",
+}
+
+
+def filter_rows(rows, compatibles_seuls=False, presence=PRESENCE_TOUS):
+    """
+    Partage les lignes LOCALES en (visibles, masquees).
+
+    Ne concerne que le volet gauche : une ligne sans pack local n'a rien a y
+    faire et n'est rendue dans aucune des deux listes.
+
+    Les deux filtres se combinent, et le second se lit sur `status`, donc sur
+    l'inventaire distant reel — un pack cesse d'etre « absent » des qu'il a
+    ete transfere et que l'inventaire a ete rafraichi.
+    """
+    if presence not in PRESENCES:
+        presence = PRESENCE_TOUS
+
+    visibles = []
+    masquees = []
+
+    for row in rows:
+        if row.local is None:
+            continue
+
+        garde = True
+
+        if compatibles_seuls and not row.local.valid:
+            garde = False
+
+        if presence == PRESENCE_ABSENTS and row.status != DiffRow.LOCAL_ONLY:
+            garde = False
+        elif presence == PRESENCE_PRESENTS and row.status != DiffRow.BOTH:
+            garde = False
+
+        (visibles if garde else masquees).append(row)
+
+    return visibles, masquees
+
+
+# ------------------------------------------------------------------ #
 # Difference                                                          #
 # ------------------------------------------------------------------ #
 

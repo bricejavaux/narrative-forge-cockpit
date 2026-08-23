@@ -60,6 +60,8 @@ import re
 import socket
 import subprocess
 
+import packproc
+
 DEFAULT_HOST = "192.168.1.98"
 DEFAULT_USER = "root"
 
@@ -498,9 +500,10 @@ class SystemTransport(object):
         return " ".join(shlex.quote(a) for a in self.argv())
 
     def run(self, command, timeout=60):
-        proc = subprocess.run(
-            self.argv(command),
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+        # `packproc.run` et non `subprocess.run` : sous Windows, chaque appel
+        # a ssh depuis une application `--windowed` fait clignoter une console
+        # qui vole le focus. Voir packproc.
+        proc = packproc.run(self.argv(command), timeout=timeout)
 
         return Result(proc.returncode, proc.stdout)
 
@@ -511,10 +514,10 @@ class SystemTransport(object):
         # par SFTP, et le serveur SFTP de cet iOS 6 ne sait pas creer de
         # repertoire : « path canonicalization failed » des qu'on envoie un
         # dossier.
-        proc = subprocess.run(
+        proc = packproc.run(
             ["scp", "-O", "-r", "-q"] + self.options()
             + [local_dir, "%s:%s/%s" % (self.target, base, name)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+            timeout=timeout)
 
         return Result(proc.returncode, proc.stdout)
 

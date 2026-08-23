@@ -4,5 +4,8 @@ dist/
 __pycache__/
 *.pyc
 *.spec
+# ...sauf la recette d'empaquetage, qui doit vivre avec le code : c'est elle
+# qui garantit que l'illustration part bien en `datas`.
+!luny-transfer.spec
 luny-transfer.json
 ffmpeg.exe

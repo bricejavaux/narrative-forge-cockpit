@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import zipfile
 
+import packproc
 import packtransport
 
 HOST = packtransport.DEFAULT_HOST
@@ -133,7 +134,14 @@ def referenced_assets(story):
 # ------------------------------------------------------------------ #
 
 def _run(cmd):
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    """
+    Un binaire externe — ffmpeg, en pratique.
+
+    Passe par `packproc` et non par `subprocess` directement : sous Windows,
+    une application sans console en ouvre une par appel, et une conversion en
+    enchaine des dizaines. Voir packproc.
+    """
+    proc = packproc.run(cmd)
     return proc.returncode, proc.stdout.decode("utf-8", "replace")
 
 
@@ -384,6 +392,107 @@ def remote_inventory(log=None, transport=None):
             log("  %-16s %-10s %3d fichier(s)  %s" % (name, where, count, human(size)))
 
     return rows
+
+
+# ------------------------------------------------------------------ #
+# Espace disque de l'appareil                                         #
+# ------------------------------------------------------------------ #
+
+def human_disk(octets):
+    """
+    Taille d'un volume : Go a partir du gigaoctet, Mo en dessous.
+
+    Distincte de `human`, qui plafonne au megaoctet parce qu'elle decrit des
+    packs. Un 3GS a 8 ou 16 Go : les afficher en megaoctets donnerait un
+    nombre a cinq chiffres, illisible d'un coup d'oeil.
+    """
+    if octets >= 1024 ** 3:
+        return "%.1f Go" % (octets / float(1024 ** 3))
+
+    return "%.0f Mo" % (octets / float(1024 ** 2))
+
+
+def parse_df(sortie, bloc_par_defaut=1024):
+    """
+    Lit une sortie de `df` et rend (libre, total) en octets, ou None.
+
+    Ecrite a part de l'appel reseau pour etre testable sans appareil, et
+    volontairement tolerante : ce systeme est minimal, son `df` peut venir de
+    busybox comme de BSD, et le nom du volume est parfois si long que les
+    chiffres partent a la ligne suivante. On ne se fie donc pas au decoupage
+    en colonnes, mais aux TROIS PREMIERS ENTIERS rencontres apres l'en-tete —
+    total, utilise, disponible, dans cet ordre chez toutes les variantes.
+
+    La taille de bloc est lue dans l'en-tete quand il la donne : un `df` BSD
+    sans `-k` compte en blocs de 512 octets, et prendre 1024 doublerait la
+    capacite annoncee.
+    """
+    lignes = [l for l in (sortie or "").splitlines() if l.strip()]
+
+    if len(lignes) < 2:
+        return None
+
+    entete = lignes[0].lower()
+    bloc = bloc_par_defaut
+
+    if "512-blocks" in entete or "512-block" in entete:
+        bloc = 512
+    elif "1k-blocks" in entete or "1024-blocks" in entete:
+        bloc = 1024
+
+    nombres = []
+
+    for ligne in lignes[1:]:
+        for mot in ligne.split():
+            if mot.isdigit():
+                nombres.append(int(mot))
+        if len(nombres) >= 3:
+            break
+
+    if len(nombres) < 3:
+        return None
+
+    total, _utilise, libre = nombres[0], nombres[1], nombres[2]
+
+    if total <= 0 or libre > total:
+        return None
+
+    return libre * bloc, total * bloc
+
+
+def remote_disk(log=None, transport=None, path=None):
+    """
+    (libre, total) en octets pour le volume qui porte les packs, ou None.
+
+    Deux tentatives : `df -k`, puis `df` seul. Ce n'est pas de la
+    superstition — sur cet appareil, plusieurs utilitaires courants se sont
+    deja reveles absents ou reduits, et une option refusee ne doit pas coder
+    « pas de place » mais « pas de mesure ». L'appelant affiche alors un repli
+    explicite.
+    """
+    chemin = path or TARGETS[DEFAULT_TARGET]
+
+    for commande, bloc in (("df -k '%s' 2>/dev/null" % chemin, 1024),
+                           ("df '%s' 2>/dev/null" % chemin, 512)):
+        try:
+            proc = _ssh([commande], timeout=25, transport=transport)
+        except subprocess.TimeoutExpired:
+            if log:
+                log("espace disque : l'appareil n'a pas repondu")
+            return None
+
+        if proc.returncode != 0:
+            continue
+
+        mesure = parse_df(proc.stdout.decode("utf-8", "replace"), bloc)
+
+        if mesure:
+            return mesure
+
+    if log:
+        log("espace disque non disponible (df absent ou sortie illisible)")
+
+    return None
 
 
 def remote_send(local_dir, target, log, transport=None):

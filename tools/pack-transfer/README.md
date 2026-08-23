@@ -5,14 +5,17 @@ format lisible par l'appareil et l'y dépose, en réutilisant la clé SSH déjà
 configurée.
 
 ```
-packcore.py      logique : validation, conversion, inventaire, envoi, suppression
+packcore.py      logique : validation, conversion, inventaire, envoi, suppression, espace disque
 packtransport.py transport : binaires ssh/scp du système, ou paramiko en Python pur
-packlibrary.py   balayage local, inventaire distant, différence entre les deux
-packconfig.py    réglages mémorisés, localisation des ressources embarquées
+packlibrary.py   balayage local, inventaire distant, différence entre les deux, filtres
+packconfig.py    réglages mémorisés, localisation des ressources embarquées, version
+packproc.py      appels externes sans fenêtre de console sous Windows
+packimage.py     lecture PNG, recadrage et composition, en Python pur (aucune dépendance)
 packcli.py       ligne de commande
 packgui.py       fenêtre Tkinter — même logique, même journal
 packgui_win.py   application Windows autoportante — voir README-windows.md
-tests/           93 tests, exécutables sans appareil ni réseau
+luny-transfer.spec  recette PyInstaller, versionnée avec le code
+tests/           155 tests, exécutables sans appareil ni réseau
 ```
 
 **Application Windows** : `packgui_win.py` est une variante autoportante à

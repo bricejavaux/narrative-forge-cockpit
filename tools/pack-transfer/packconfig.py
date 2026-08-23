@@ -8,11 +8,20 @@ Windows. Les chemins sont donc calcules a partir de l'EMPLACEMENT DE
 L'APPLICATION, jamais du repertoire courant ni du profil utilisateur.
 """
 
+import datetime
 import json
 import os
 import sys
 
 CONFIG_NAME = "luny-transfer.json"
+
+# Version de l'outil. Aucune n'existait : celle-ci part donc de 1.0.0, qui
+# correspond a la premiere version reellement utilisee contre l'appareil.
+# A relever a la main — un numero derive d'un git describe mentirait dans un
+# .exe recopie sur un autre poste, ou aucun depot n'existe.
+VERSION = "1.0.0"
+
+AUTEUR = "Brice avec Claude"
 
 DEFAULTS = {
     "host": "192.168.1.98",
@@ -30,6 +39,11 @@ DEFAULTS = {
     # memes murs sur ce vieux serveur : pouvoir basculer sans reconstruire
     # l'application evite de rester bloque.
     "transport": "auto",
+    # Etat des filtres du volet gauche. Memorise comme le reste : une
+    # bibliotheque qui a besoin d'etre filtree en a besoin a chaque
+    # lancement, pas seulement au premier.
+    "filtre_compatibles": False,
+    "filtre_presence": "tous",
 }
 
 TRANSPORTS = ("auto", "paramiko", "systeme")
@@ -70,6 +84,46 @@ def resource_dir():
 
 def config_path():
     return os.path.join(app_dir(), CONFIG_NAME)
+
+
+def build_date():
+    """
+    Date de construction, au format AAAA-MM-JJ.
+
+    Lue sur le fichier lui-meme : l'executable gele pour une version
+    empaquetee, le script pour un lancement depuis les sources. C'est la seule
+    date qui ne puisse pas mentir — une constante inscrite dans le code
+    resterait celle du jour ou on a pense a la changer.
+    """
+    try:
+        if frozen():
+            reference = os.path.abspath(sys.executable)
+        else:
+            reference = os.path.abspath(__file__)
+
+        horodatage = os.path.getmtime(reference)
+    except OSError:
+        return "date inconnue"
+
+    return datetime.date.fromtimestamp(horodatage).isoformat()
+
+
+def readme_path():
+    """
+    Le README a ouvrir depuis le pied de fenetre, ou None.
+
+    Cherche d'abord la version Windows — c'est celle qui parle a l'utilisateur
+    de cet executable — puis le README general.
+    """
+    noms = ("README-windows.md", "README.md")
+
+    for base in (app_dir(), resource_dir(), os.path.dirname(os.path.abspath(__file__))):
+        for nom in noms:
+            chemin = os.path.join(base, nom)
+            if os.path.isfile(chemin):
+                return chemin
+
+    return None
 
 
 def load():

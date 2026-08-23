@@ -18,14 +18,17 @@ vaut mieux la connaître avant de faire confiance à quoi que ce soit ici.
 
 | | état |
 |---|---|
-| logique de balayage, correspondance, diff, récapitulatif | **93 tests automatiques**, tous verts |
+| logique de balayage, correspondance, diff, récapitulatif, filtres | **155 tests automatiques**, tous verts |
 | protocole SCP historique | **vérifié à l'octet près** contre un faux canal |
 | conversion `.ogg → .mp3` et `.bmp → .png` | **réellement exécutée**, résultat vérifié par `ffprobe` |
 | `packcore` inchangé côté WSL | **non-régression vérifiée** contre le vrai 3GS |
 | montage de la fenêtre et câblage complet | **vérifié** sous WSLg, avec un faux appareil |
 | négociation SSH **sans** `~/.ssh/config` | **vérifiée contre le vrai 3GS** — voir ci-dessous |
-| contraste du titre sur le filigrane | **mesuré** sur la source décodée |
+| **décor de l'en-tête** | **pixels vérifiés** : l'image remise à Tk est relue et mesurée |
+| résolution des ressources en `--onefile` | **vérifiée** en simulant `sys.frozen` / `sys._MEIPASS` |
+| lecture de `df`, y compris repli | **vérifiée** sur quatre formats de sortie |
 | **rendu visuel sous Windows** | **non vérifié** — polices, métriques et thème diffèrent |
+| **absence effective des fenêtres de console** | **non vérifiable ici** — le comportement est propre à Windows |
 | **paramiko contre ce serveur SSH** | **non vérifié** — paramiko n'est pas installable ici |
 | **l'exécutable empaqueté** | **non vérifié** — PyInstaller doit tourner sur Windows |
 
@@ -118,21 +121,40 @@ $py = "C:\Users\javau\AppData\Local\Python\pythoncore-3.14-64\python.exe"
 
 & $py -m pip install pyinstaller paramiko pillow
 
-& $py -m PyInstaller --onefile --windowed `
-    --add-binary "ffmpeg.exe;." `
-    --add-data "luny_background_source_portrait.png;." `
-    packgui_win.py
+& $py -m PyInstaller luny-transfer.spec
 ```
 
-L'exécutable apparaît dans `dist\packgui_win.exe`.
+L'exécutable apparaît dans `dist\luny-transfer.exe`.
 
-`--add-data` embarque l'illustration ; sans elle l'application démarre quand
-même, simplement sans le filigrane de l'en-tête. Copier au préalable
-`../../ios/LunyUI/Resources/luny_background_source_portrait.png` à côté du
-script, ou ajuster le chemin.
+**La recette est dans [`luny-transfer.spec`](luny-transfer.spec), versionné
+avec le code.** Il n'y a plus de ligne de commande à recopier : une option
+`--add-data` oubliée donne un exécutable qui démarre normalement et auquel il
+manque simplement une ressource — exactement la panne qui a coûté deux
+allers-retours sur le décor de l'en-tête.
 
-Les modules `packcore`, `packlibrary`, `packconfig` et `packtransport` sont
-trouvés seuls : ils sont importés par leur nom depuis le même répertoire.
+Ce que le `.spec` garantit :
+
+| ressource | rangée dans | trouvée à l'exécution par |
+|---|---|---|
+| `luny_background_source_portrait.png` | `datas` | `packconfig.resource_dir()` → `sys._MEIPASS` |
+| `README-windows.md`, `README.md` | `datas` | `packconfig.readme_path()` |
+| `ffmpeg.exe` | `binaries` | `packconfig.ffmpeg_binary()` |
+
+`datas` et `binaries` ne sont pas interchangeables : `binaries` passe par
+l'analyse des dépendances binaires, qui n'a rien à faire d'une image.
+
+L'illustration est cherchée à côté du `.spec`, puis dans
+`../../ios/LunyUI/Resources/` — rien à copier à la main. **Si elle est
+introuvable, la construction s'arrête** au lieu de produire un exécutable sans
+décor, qui ne le signalerait qu'à l'écran.
+
+`ffmpeg.exe`, lui, n'est pas dans le dépôt : son absence n'arrête pas la
+construction mais affiche un avertissement, et l'application le redit dans son
+journal au démarrage.
+
+Pillow reste utile pour les **vignettes de couverture** (souvent des JPEG). Le
+décor de l'en-tête, lui, ne dépend plus de rien : il est décodé et composé par
+`packimage`, en Python pur.
 
 ### Vérifier avant d'empaqueter
 
@@ -199,6 +221,8 @@ outil qu'on déplace avec sa clé USB.
 | `transport` | `auto` (défaut), `paramiko` ou `systeme` |
 | `target` | `documents` (défaut) ou `bundle` |
 | `last_local_dir` | dernier dossier de packs choisi |
+| `filtre_compatibles` | filtre « compatibles uniquement » du volet gauche |
+| `filtre_presence` | `tous`, `absents` ou `presents` |
 
 `auto` prend paramiko dès qu'une clé est renseignée et que le module est
 présent. Les deux autres imposent un transport — utile parce que les deux ne
@@ -244,29 +268,80 @@ ou « prêt tel quel »**.
 Les entrées invalides sont affichées avec leur raison, pas filtrées : un
 dossier qu'on croyait être un pack et qui n'en est pas doit se voir.
 
+**Deux filtres, combinables**, au-dessus de la liste — parce que le même
+principe, passé quelques dizaines d'entrées, noie les vrais packs au milieu
+des `ffmpeg-extracted` et autres `PS2` :
+
+| filtre | effet |
+|---|---|
+| **Compatibles uniquement** | masque les entrées sans `story.json` valide |
+| **Afficher : tous / absents de l'appareil / déjà sur l'appareil** | isole ce qui reste à transférer |
+
+Ils **masquent, ils n'oublient pas** : le compteur annonce combien de lignes
+sont cachées, et un pack coché puis masqué **reste sélectionné** — la fenêtre
+de confirmation le nomme à part, sous « sélectionnés mais masqués par le
+filtre ». L'état des filtres est mémorisé d'un lancement à l'autre.
+
+### Les cases à cocher
+
+Cocher ne veut pas dire la même chose des deux côtés, et une case native rend
+les deux gestes identiques à l'œil. Chaque volet porte donc sa phrase, et
+chaque case son signe :
+
+| volet | légende | case |
+|---|---|---|
+| gauche | « Cocher = sera ajouté à l'appareil » | **`+` vert** (`#8FC7A8`) |
+| droite | « Cocher = sera supprimé de l'appareil » | **`−` rose** (`#D98FA6`) |
+
+Le signe est visible **avant** le clic, en creux, puis plein une fois coché :
+l'intention se lit case vide comme case pleine.
+
 ### Volet droit — bibliothèque de l'appareil
 
-Inventaire distant au chargement. Le bandeau supérieur porte l'illustration
-fusée/lune en filigrane à **15 %**, opacité choisie par mesure et non à l'œil :
-la source a été décodée et le contraste du texte posé dessus calculé sur le
-pixel le plus clair du bandeau.
+Inventaire distant au chargement, et **espace disque** dans l'en-tête du
+volet — « 4.7 Go libres sur 13.7 Go », lu par un `df` passé dans le canal SSH
+déjà ouvert, quel que soit le transport actif. Si `df` manque ou répond
+autrement — ce système minimal a déjà rendu plusieurs utilitaires absents —
+l'en-tête affiche **« espace disque non disponible »** plutôt que rien.
 
-| opacité | titre `#E7ECFA` | sous-titre `#94A0C6` |
+Vignette si le pack a été envoyé depuis cet outil (cache local), initiale du
+titre sinon — l'appareil ne renvoie jamais d'image. Les packs livrés avec
+l'application sont marqués **non supprimables** et leur case est désactivée.
+
+Après un transfert réussi, **l'inventaire est relancé automatiquement**, par
+le même chemin que le bouton « Rafraîchir » : le volet droit et l'espace
+disque reflètent le nouvel état sans action supplémentaire.
+
+### Le décor de l'en-tête
+
+L'illustration fusée/lune/nuages de l'app iOS, mise à l'échelle **entière** et
+posée **à droite**, avec un fondu de 46 px sur son bord gauche.
+
+Elle était auparavant recadrée sur sa bande haute pour servir de filigrane
+pleine largeur. Ce recadrage ne retenait que **4,7 % de la hauteur** de la
+source — un dégradé de ciel, sans fusée ni lune — que l'opacité de 15 %
+ramenait à un aplat `#24293B`. Présente dans le build, invisible à l'écran.
+
+Un portrait 2:3 ne peut pas remplir un bandeau de rapport 14:1 : quelle que
+soit la tranche choisie, elle ne montre presque rien. D'où le changement de
+principe. Le texte restant sur du **fond pur**, l'illustration peut être
+nettement plus opaque (0,85) sans toucher aux contrastes :
+
+| élément | couleur | sur | contraste |
+|---|---|---|---|
+| titre | `#E7ECFA` | `#0B1024` | **15,96:1** |
+| sous-titre | `#94A0C6` | `#0B1024` | **7,27:1** |
+
+Mesures du décor lui-même, avant et après :
+
+| | couleurs distinctes | saturation maximale |
 |---|---|---|
-| 0,10 | 13,03:1 | 5,94:1 |
-| **0,15** | **11,42:1** | **5,20:1** |
-| 0,20 | 9,83:1 | 4,48:1 — échoue AA |
-| 0,35 | 6,19:1 | 2,82:1 |
+| ancien recadrage | 50 | 26 |
+| rendu actuel | 1 949 | 166 |
 
-0,15 est le plafond, et c'est le **sous-titre** qui fixe la limite : le titre
-reste confortable bien au-delà et ne dit donc rien d'utile. Reste à confirmer
-à l'œil sous Windows que le filigrane se devine — le contraste garantit la
-lisibilité, pas l'effet recherché.
-
- Vignette si le pack a été envoyé depuis cet
-outil (cache local), initiale du titre sinon — l'appareil ne renvoie jamais
-d'image. Les packs livrés avec l'application sont marqués **non supprimables**
-et leur case est désactivée.
+Ces deux nombres sont vérifiés par les tests, sur les pixels réellement remis
+à Tk — pas sur une constante de réglage. C'est ce qui manquait : l'ancien test
+contrôlait l'opacité, laquelle était juste.
 
 ### La règle de correspondance
 
@@ -311,3 +386,62 @@ Le transfert tourne en tâche de fond : barre de progression globale, ligne
 d'état par pack (« conversion », « transfert », « OK »), et un journal où les
 packs convertis apparaissent en ambre, ceux passés tels quels en vert, les
 échecs en rose.
+
+---
+
+## Fenêtre, palette et pied de page
+
+**Taille au lancement : 80 % de l'écran**, jamais moins de 1000x700, jamais
+plus que l'écran lui-même — et redimensionnable ensuite. Une taille fixe ne
+peut pas convenir à la fois à un écran moderne, où 1080x760 était étriqué, et
+à un portable ancien, où la même fenêtre débordait. Cet ordre de bornes
+compte : sur un petit écran c'est le plafond qui l'emporte, sinon la barre de
+titre naît hors champ.
+
+**Palette : celle de `LunyTheme`**, reprise à l'identique de l'app iOS, dont
+les contrastes ont déjà été mesurés. Aucune valeur choisie à l'œil.
+
+| rôle | couleur |
+|---|---|
+| fond | `#0B1024` |
+| carte | `#141A32` |
+| accent | `#F0B357` |
+| texte vif / courant / doux | `#E7ECFA` / `#C8D3F2` / `#94A0C6` |
+| succès (ajout) | `#8FC7A8` |
+| alerte (suppression) | `#D98FA6` |
+
+**Icônes dessinées au trait** — dossier, corbeille, flèche, rafraîchir, `+`,
+`−` — et non écrites avec des caractères Unicode : rien ne garantit qu'une
+police Windows donnée possède le glyphe voulu, et un caractère manquant
+s'affiche en rectangle vide. Style plat, sans relief ni dégradé, comme le
+reste.
+
+**Pied de page**, discret : version de l'application, date de construction,
+« Brice avec Claude », et le chemin du README, cliquable. Un `.exe` recopié sur
+un autre poste ne porte aucune trace de son origine, et « quelle version
+as-tu ? » est la première question de tout diagnostic.
+
+---
+
+## Aucune fenêtre de console
+
+Une application `--windowed` n'a pas de console, donc Windows en **crée une
+pour chaque processus console qu'elle lance**. Un transfert enchaîne des
+dizaines d'appels à `ffmpeg`, `ssh` et `scp` : autant de fenêtres noires qui
+clignotent et volent le focus.
+
+Tout appel externe passe donc par `packproc.run`, qui pose deux verrous :
+
+| verrou | rôle |
+|---|---|
+| `CREATE_NO_WINDOW` | empêche la création de la console |
+| `STARTF_USESHOWWINDOW` + `SW_HIDE` | la ceinture, si le binaire reprend la main sur sa fenêtre |
+
+Sur tout autre système, `packproc` ne pose rien : le comportement sous WSL est
+strictement inchangé.
+
+Le point faible d'une telle correction est l'appel oublié — un seul
+`subprocess.run` écrit en direct et les fenêtres reviennent, pour ce
+binaire-là seulement, donc d'autant plus difficile à relier à sa cause. Un
+test **relit le code source** de tous les modules et échoue sur le premier
+appel direct qu'il y trouve.

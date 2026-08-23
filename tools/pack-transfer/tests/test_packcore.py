@@ -26,6 +26,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import packcore
+import packtransport
 
 FFMPEG = shutil.which("ffmpeg")
 FFPROBE = shutil.which("ffprobe")
@@ -89,6 +90,95 @@ class TestInjectionFfmpeg(unittest.TestCase):
         """Mieux vaut None qu'un chemin qui echouera a l'execution."""
         packcore.FFMPEG_BINARY = "/n/existe/pas/ffmpeg.exe"
         self.assertIsNone(packcore.ffmpeg_path())
+
+
+class TestEspaceDisque(unittest.TestCase):
+    """
+    Lecture de `df`, sans appareil.
+
+    L'analyse est volontairement tolerante : sur ce systeme minimal, `df` peut
+    venir de busybox comme de BSD, et un nom de volume long renvoie les
+    chiffres a la ligne suivante. Le repli — « espace disque non disponible »
+    — vaut mieux qu'un chiffre faux.
+    """
+
+    KILO = ("Filesystem 1024-blocks     Used Available Capacity Mounted on\n"
+            "/dev/disk0s2s2  14371500  9231944   4894556      66% /var\n")
+
+    BSD_512 = ("Filesystem  512-blocks      Used     Avail Capacity  Mounted on\n"
+               "/dev/disk0s2s2  28743000  18463888   9789112    66%    /var\n")
+
+    REPLIEE = ("Filesystem           1024-blocks Used Available Capacity Mounted on\n"
+               "/dev/disk0s2s2\n"
+               "                        14371500 9231944 4894556  66% /var\n")
+
+    def test_sortie_en_kilo_octets(self):
+        libre, total = packcore.parse_df(self.KILO)
+
+        self.assertEqual(libre, 4894556 * 1024)
+        self.assertEqual(total, 14371500 * 1024)
+
+    def test_les_blocs_de_512_octets_ne_doublent_pas_la_capacite(self):
+        """Un `df` BSD sans `-k` compte en blocs de 512 : l'en-tete le dit."""
+        libre, total = packcore.parse_df(self.BSD_512, bloc_par_defaut=512)
+
+        self.assertEqual(total, 14371500 * 1024)
+
+    def test_une_ligne_repliee_est_lue_quand_meme(self):
+        self.assertEqual(packcore.parse_df(self.REPLIEE),
+                         (4894556 * 1024, 14371500 * 1024))
+
+    def test_une_sortie_illisible_ne_donne_pas_un_chiffre_faux(self):
+        for sortie in ("", "sh: df: not found", "Filesystem\n", None,
+                       "Filesystem 1024-blocks\n/dev/disk0s2s2 abc def ghi"):
+            self.assertIsNone(packcore.parse_df(sortie), repr(sortie))
+
+    def test_des_chiffres_incoherents_sont_refuses(self):
+        """Plus de libre que de total : la lecture est fausse, pas la mesure."""
+        self.assertIsNone(packcore.parse_df(
+            "Filesystem 1024-blocks Used Available\n/dev/x 100 10 900\n"))
+
+    def test_affichage_en_gigaoctets(self):
+        self.assertEqual(packcore.human_disk(4894556 * 1024), "4.7 Go")
+        self.assertEqual(packcore.human_disk(512 * 1024 * 1024), "512 Mo")
+
+
+class TestEspaceDisqueDistant(unittest.TestCase):
+    """Le meme, avec le transport en carton : deux tentatives, puis repli."""
+
+    class Faux(object):
+        def __init__(self, reponses):
+            self.reponses = list(reponses)
+            self.commandes = []
+
+        def run(self, commande, timeout=60):
+            self.commandes.append(commande)
+            code, sortie = self.reponses.pop(0)
+
+            return packtransport.Result(code, sortie.encode("utf-8"))
+
+    def test_df_k_suffit(self):
+        faux = self.Faux([(0, TestEspaceDisque.KILO)])
+        mesure = packcore.remote_disk(transport=faux)
+
+        self.assertEqual(mesure, (4894556 * 1024, 14371500 * 1024))
+        self.assertEqual(len(faux.commandes), 1)
+        self.assertIn("df -k", faux.commandes[0])
+
+    def test_repli_sur_df_seul_quand_l_option_est_refusee(self):
+        faux = self.Faux([(1, "df: illegal option -- k"),
+                          (0, TestEspaceDisque.BSD_512)])
+        mesure = packcore.remote_disk(transport=faux)
+
+        self.assertEqual(mesure, (4894556 * 1024, 14371500 * 1024))
+        self.assertEqual(len(faux.commandes), 2)
+
+    def test_df_absent_rend_none_et_le_dit(self):
+        faux = self.Faux([(127, "sh: df: not found"), (127, "sh: df: not found")])
+        messages = []
+
+        self.assertIsNone(packcore.remote_disk(log=messages.append, transport=faux))
+        self.assertTrue(any("non disponible" in m for m in messages), messages)
 
 
 class TestValidation(unittest.TestCase):

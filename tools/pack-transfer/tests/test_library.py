@@ -215,6 +215,85 @@ class TestEntreesInvalides(unittest.TestCase):
         self.assertIn("illisible", pack.error)
 
 
+class TestFiltres(unittest.TestCase):
+    """
+    Les deux filtres du volet local.
+
+    Le balayage rend tout, y compris les dossiers qui ne sont pas des packs :
+    c'est voulu. Passe quelques dizaines d'entrees, ce meme principe noie les
+    vrais packs, d'ou ces filtres — qui masquent, sans jamais rien oublier.
+    """
+
+    def rows(self):
+        locaux = [
+            pl.LocalPack("/faux/nouveau", "dossier", "nouveau"),
+            pl.LocalPack("/faux/commun", "dossier", "commun"),
+            pl.LocalPack("/faux/PS2", "dossier", "PS2", error="story.json absent"),
+        ]
+        distants = [pl.RemotePack("commun", "documents"),
+                    pl.RemotePack("orphelin", "documents")]
+
+        return pl.build_diff(locaux, distants)
+
+    def cles(self, lignes):
+        return [r.key for r in lignes]
+
+    def test_sans_filtre_toutes_les_lignes_locales_sont_visibles(self):
+        visibles, masquees = pl.filter_rows(self.rows())
+
+        self.assertEqual(sorted(self.cles(visibles)), ["commun", "nouveau", "ps2"])
+        self.assertEqual(masquees, [])
+
+    def test_une_ligne_distante_seule_n_apparait_dans_aucune_des_deux_listes(self):
+        """Le volet gauche montre la bibliotheque du poste, elle seule."""
+        visibles, masquees = pl.filter_rows(self.rows())
+
+        self.assertNotIn("orphelin", self.cles(visibles))
+        self.assertNotIn("orphelin", self.cles(masquees))
+
+    def test_compatibles_seuls_ecarte_les_entrees_sans_story(self):
+        visibles, masquees = pl.filter_rows(self.rows(), compatibles_seuls=True)
+
+        self.assertEqual(sorted(self.cles(visibles)), ["commun", "nouveau"])
+        self.assertEqual(self.cles(masquees), ["ps2"])
+
+    def test_absents_de_l_appareil(self):
+        visibles, _ = pl.filter_rows(self.rows(), presence=pl.PRESENCE_ABSENTS)
+
+        self.assertEqual(sorted(self.cles(visibles)), ["nouveau", "ps2"])
+
+    def test_deja_sur_l_appareil(self):
+        visibles, _ = pl.filter_rows(self.rows(), presence=pl.PRESENCE_PRESENTS)
+
+        self.assertEqual(self.cles(visibles), ["commun"])
+
+    def test_les_deux_filtres_se_combinent(self):
+        visibles, masquees = pl.filter_rows(
+            self.rows(), compatibles_seuls=True, presence=pl.PRESENCE_ABSENTS)
+
+        self.assertEqual(self.cles(visibles), ["nouveau"])
+        self.assertEqual(sorted(self.cles(masquees)), ["commun", "ps2"])
+
+    def test_rien_n_est_perdu(self):
+        """Chaque ligne locale est dans l'une des deux listes, jamais nulle part."""
+        lignes = self.rows()
+        locales = {r.key for r in lignes if r.local is not None}
+
+        for compat in (False, True):
+            for presence in pl.PRESENCES:
+                visibles, masquees = pl.filter_rows(lignes, compat, presence)
+                vues = set(self.cles(visibles)) | set(self.cles(masquees))
+
+                self.assertEqual(vues, locales, "%s / %s" % (compat, presence))
+
+    def test_une_valeur_de_filtre_abimee_retombe_sur_tous(self):
+        """Le reglage vient d'un fichier : il peut contenir n'importe quoi."""
+        visibles, masquees = pl.filter_rows(self.rows(), presence="n'importe quoi")
+
+        self.assertEqual(len(visibles), 3)
+        self.assertEqual(masquees, [])
+
+
 class TestDiff(unittest.TestCase):
 
     def rows(self, locaux, distants):

@@ -24,6 +24,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import packimage
+import packlibrary
 import packtransport
 
 try:
@@ -72,18 +74,30 @@ class FauxAppareil(object):
         "/var/mobile/Documents/packs/commun/story.json",
     ]
 
-    def __init__(self, lignes=None):
+    # Sortie de `df -k` telle qu'un systeme de ce genre la rend. `None`
+    # simule l'utilitaire absent — le cas explicitement prevu par la demande,
+    # et deja rencontre sur cet appareil pour d'autres commandes.
+    DF = ("Filesystem 1024-blocks     Used Available Capacity Mounted on\n"
+          "/dev/disk0s2s2  14371500  9231944   4894556      66% /var\n")
+
+    def __init__(self, lignes=None, df=DF):
         self.commandes = []
-        # Modifiable en cours de test : l'inventaire d'un appareil change
+        # Modifiables en cours de test : l'inventaire d'un appareil change
         # entre deux rafraichissements, et c'est exactement ce qu'il faut
         # pouvoir simuler.
         self.lignes = list(self.LIGNES if lignes is None else lignes)
+        self.df = df
 
     def run(self, command, timeout=60):
         self.commandes.append(command)
 
         if command.startswith("find"):
             return packtransport.Result(0, "\n".join(self.lignes))
+
+        if command.startswith("df"):
+            if self.df is None:
+                return packtransport.Result(1, b"sh: df: not found\n")
+            return packtransport.Result(0, self.df.encode("utf-8"))
 
         return packtransport.Result(0, b"ok\n")
 
@@ -356,14 +370,370 @@ class TestMontage(unittest.TestCase):
         self.assertEqual(
             textes_du_bandeau().count("Gestion de la bibliotheque LunyUI"), 1)
 
-    def test_opacite_du_filigrane_sous_le_seuil_mesure(self):
+    # ---------------------------------------------------------------- #
+    # Le decor de l'en-tete                                            #
+    # ---------------------------------------------------------------- #
+    #
+    # Ces deux tests remplacent l'ancien controle d'opacite. Celui-ci
+    # verifiait une CONSTANTE, et la constante etait juste : le decor avait
+    # bien l'opacite prevue. Il etait recadre sur une zone vide, ce qu'aucune
+    # verification de constante ne pouvait voir — et c'est ainsi qu'un decor
+    # invisible est passe deux fois.
+    #
+    # On regarde donc maintenant les PIXELS reellement remis a Tk.
+
+    def _attendre_decor(self, app, secondes=25.0):
+        """L'illustration est preparee dans un fil ; on attend qu'elle arrive."""
+        import time
+        fin = time.time() + secondes
+
+        while time.time() < fin:
+            self.racine.update()
+
+            if app._header_image is not None:
+                return app._header_image
+
+            time.sleep(0.05)
+
+        return None
+
+    def test_le_decor_de_l_en_tete_montre_vraiment_l_illustration(self):
         """
-        0,15 est le plafond mesure : a 0,20 le sous-titre #94A0C6 tombe a
-        4,48:1 sur le pixel le plus clair du bandeau, sous le seuil AA.
+        Le defaut d'origine : l'image etait chargee, recadree sur les 4,7 %
+        superieurs de la source — un ciel uni — puis fondue a 15 %. Le
+        resultat etait un aplat #24293B sur toute la largeur. Present dans le
+        build, invisible a l'ecran.
+
+        On compte donc les couleurs distinctes et on cherche une teinte
+        SATUREE : le ciel n'en a aucune, la fusee en est faite.
+        """
+        import packconfig
+        import packgui_win
+
+        if not packconfig.artwork_path():
+            self.skipTest("illustration absente de cet environnement")
+
+        app = self.make_app()
+        image = self._attendre_decor(app)
+
+        self.assertIsNotNone(image, "l'illustration n'a jamais atteint Tk")
+
+        attendue = packgui_win.Application.BANDEAU_HAUTEUR
+        self.assertEqual(image.height(), attendue)
+        self.assertGreater(image.width(), 40)
+
+        couleurs = set()
+        sature = 0
+
+        for x in range(0, image.width(), 2):
+            for y in range(0, image.height(), 2):
+                r, g, b = image.get(x, y)[:3]
+                couleurs.add((r, g, b))
+                sature = max(sature, max(r, g, b) - min(r, g, b))
+
+        self.assertGreater(len(couleurs), 200,
+                           "bande quasi unie : le recadrage ne montre rien")
+        self.assertGreater(sature, 60,
+                           "aucune couleur franche : ce n'est pas l'illustration")
+
+    def test_le_decor_laisse_le_texte_sur_du_fond_pur(self):
+        """
+        L'illustration est posee a DROITE, et le titre commence a gauche. Cet
+        ecart est ce qui permet de l'afficher a 0,85 sans toucher aux
+        contrastes mesures pour l'app — 15,96:1 pour #E7ECFA sur #0B1024.
+
+        Verifie sur la largeur la plus etroite acceptee : c'est la que le
+        risque de recouvrement est le plus grand.
+        """
+        import packconfig
+        import packgui_win
+
+        if not packconfig.artwork_path():
+            self.skipTest("illustration absente de cet environnement")
+
+        app = self.make_app()
+        image = self._attendre_decor(app)
+        self.assertIsNotNone(image)
+
+        largeur = packgui_win.Application.BANDEAU_LARGEUR_MINI
+        debut = largeur - image.width() - packgui_win.Application.BANDEAU_MARGE
+
+        # Le titre est en 15 points gras ; 420 px le couvrent largement.
+        self.assertGreater(debut, 420,
+                           "l'illustration mordrait sur le titre")
+
+        # Et le bord gauche du decor doit etre fondu vers le fond, sinon il
+        # apparait comme une vignette collee.
+        gauche = image.get(0, image.height() // 2)[:3]
+        self.assertEqual(tuple(gauche), packimage.hex_rgb(packgui_win.FOND))
+
+    # ---------------------------------------------------------------- #
+    # Ce que les cases veulent dire                                    #
+    # ---------------------------------------------------------------- #
+
+    def _textes(self, widget):
+        """Tous les libelles affiches, a plat."""
+        trouves = []
+
+        try:
+            texte = widget.cget("text")
+            if texte:
+                trouves.append(str(texte))
+        except tk.TclError:
+            pass
+
+        for enfant in widget.winfo_children():
+            trouves.extend(self._textes(enfant))
+
+        return trouves
+
+    def test_chaque_volet_dit_ce_qu_une_case_cochee_provoque(self):
+        """
+        A gauche cocher ajoute, a droite cocher supprime. Rien dans une case
+        ne le dit : la phrase doit etre a l'ecran, dans chaque volet.
+        """
+        app = self.make_app()
+        textes = self._textes(app)
+
+        self.assertIn("Cocher = sera ajoute a l'appareil", textes)
+        self.assertIn("Cocher = sera supprime de l'appareil", textes)
+
+    def test_les_deux_cases_ne_se_ressemblent_pas(self):
+        """
+        La phrase seule ne suffit pas : elle est lue une fois, la case est
+        cliquee vingt fois. Signe et couleur doivent differer.
         """
         import packgui_win
 
-        self.assertLessEqual(packgui_win.Application.BANDEAU_ALPHA, 0.15)
+        ajout = packgui_win.CheckBox.GENRES["ajout"]
+        suppression = packgui_win.CheckBox.GENRES["suppression"]
+
+        self.assertNotEqual(ajout[0], suppression[0])      # couleur
+        self.assertNotEqual(ajout[1], suppression[1])      # pictogramme
+        self.assertEqual(ajout[0], packgui_win.SUCCES)
+        self.assertEqual(suppression[0], packgui_win.ALERTE)
+
+    # ---------------------------------------------------------------- #
+    # Filtres du volet local                                           #
+    # ---------------------------------------------------------------- #
+
+    def _bibliotheque_melangee(self, tmp):
+        """Deux vrais packs, deux dossiers qui n'en sont pas."""
+        make_pack(tmp, "nouveau")     # local seul
+        make_pack(tmp, "commun")      # deja sur l'appareil
+
+        for bruit in ("ffmpeg-extracted", "PS2"):
+            os.makedirs(os.path.join(tmp, bruit), exist_ok=True)
+            with open(os.path.join(tmp, bruit, "note.txt"), "w") as handle:
+                handle.write("pas un pack")
+
+    def test_filtre_compatibles_masque_les_entrees_sans_story(self):
+        app = self.make_app()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._bibliotheque_melangee(tmp)
+            self.demander(app, lambda: app.scan_local(tmp))
+
+            # `rows` porte aussi les packs presents sur le seul appareil ;
+            # le volet gauche n'affiche que les quatre entrees locales.
+            locales = [r for r in app.rows if r.local is not None]
+            self.assertEqual(len(locales), 4)
+            self.assertEqual(app.hidden_rows, [])
+
+            app.filtre_compat_var.set(True)
+            app.rebuild_rows()
+
+            self.assertEqual({r.key for r in app.hidden_rows},
+                             {"ffmpeg-extracted", "ps2"})
+            self.assertEqual(set(app.send_vars), {"nouveau", "commun"})
+
+            # Le compteur doit AVOUER ce qu'il cache.
+            self.assertIn("masque", app.left_count.cget("text"))
+
+    def test_filtre_de_presence_isole_ce_qui_reste_a_transferer(self):
+        app = self.make_app()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._bibliotheque_melangee(tmp)
+            self.demander(app, lambda: app.scan_local(tmp))
+
+            app.filtre_presence_var.set(packlibrary.PRESENCE_ABSENTS)
+            app.rebuild_rows()
+
+            # Les deux dossiers qui ne sont pas des packs sont bien absents de
+            # l'appareil : ce filtre-la ne les concerne pas, c'est celui des
+            # entrees compatibles qui s'en charge. Les combiner est le geste
+            # utile, et il a son propre test.
+            self.assertEqual(set(app.send_vars),
+                             {"nouveau", "ffmpeg-extracted", "ps2"})
+
+            app.filtre_presence_var.set(packlibrary.PRESENCE_PRESENTS)
+            app.rebuild_rows()
+
+            self.assertEqual(set(app.send_vars), {"commun"})
+
+    def test_les_deux_filtres_se_combinent(self):
+        app = self.make_app()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._bibliotheque_melangee(tmp)
+            self.demander(app, lambda: app.scan_local(tmp))
+
+            app.filtre_compat_var.set(True)
+            app.filtre_presence_var.set(packlibrary.PRESENCE_ABSENTS)
+            app.rebuild_rows()
+
+            self.assertEqual(set(app.send_vars), {"nouveau"})
+
+    def test_un_pack_coche_puis_masque_reste_selectionne_et_annonce(self):
+        """
+        Le piege du filtre : masquer n'est pas deselectionner.
+
+        Un pack coche puis cache par un filtre partirait sans etre relu — ou,
+        pire, ne partirait pas alors qu'il a ete demande. Il reste donc dans la
+        selection, et le recapitulatif dit combien de lignes sont dans ce cas.
+        """
+        app = self.make_app()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._bibliotheque_melangee(tmp)
+            self.demander(app, lambda: app.scan_local(tmp))
+
+            app.user_send["commun"] = True          # choix explicite
+            app.rebuild_rows()
+            self.assertIn("commun", app._selection()[0])
+
+            app.filtre_presence_var.set(packlibrary.PRESENCE_ABSENTS)
+            app.rebuild_rows()
+
+            self.assertNotIn("commun", app.send_vars)       # plus a l'ecran
+            self.assertIn("commun", app._selection()[0])    # toujours demande
+            self.assertEqual([r.key for r in app._masques_selectionnes()],
+                             ["commun"])
+            self.assertIn("masque", app.summary_label.cget("text"))
+
+    def test_les_filtres_sont_memorises(self):
+        import packconfig
+
+        app = self.make_app()
+        ecrits = []
+
+        reel = packconfig.save
+        packconfig.save = lambda valeurs: ecrits.append(dict(valeurs))
+
+        try:
+            app.filtre_compat_var.set(True)
+            app.filtre_presence_var.set(packlibrary.PRESENCE_PRESENTS)
+            app._filters_changed()
+        finally:
+            packconfig.save = reel
+
+        self.assertTrue(app.config_values["filtre_compatibles"])
+        self.assertEqual(app.config_values["filtre_presence"],
+                         packlibrary.PRESENCE_PRESENTS)
+        self.assertTrue(ecrits, "le choix n'a pas ete enregistre")
+
+    # ---------------------------------------------------------------- #
+    # Espace disque et rafraichissement                                #
+    # ---------------------------------------------------------------- #
+
+    def test_espace_disque_affiche_apres_inventaire(self):
+        app = self.make_app()
+        self.demander(app, app.refresh_remote)
+
+        self.assertIsNotNone(app.disk)
+        texte = app.disk_label.cget("text")
+
+        self.assertIn("libres sur", texte)
+        self.assertIn("Go", texte)
+
+    def test_df_absent_donne_un_repli_explicite(self):
+        """
+        Cet appareil minimal a deja rendu plusieurs utilitaires absents. Un
+        `df` qui echoue ne doit ni bloquer l'inventaire ni laisser un champ
+        vide dont personne ne sait s'il charge encore.
+        """
+        self.faux.df = None
+
+        app = self.make_app()
+        self.demander(app, app.refresh_remote)
+
+        self.assertIsNone(app.disk)
+        self.assertEqual(app.disk_label.cget("text"),
+                         "espace disque non disponible")
+        # L'inventaire, lui, a bien abouti.
+        self.assertTrue(app.remote_packs)
+
+    def test_l_inventaire_est_relance_apres_un_transfert(self):
+        """
+        Le volet droit doit refleter le nouvel etat sans action
+        supplementaire. On fait donc changer l'appareil PENDANT le transfert :
+        si l'inventaire n'etait pas relance, l'ancien etat resterait affiche.
+        """
+        app = self.make_app()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            make_pack(tmp, "nouveau")
+            self.demander(app, lambda: app.scan_local(tmp))
+
+            resume = packlibrary.summarise(app.rows, {"nouveau"}, set())
+
+            apres = list(FauxAppareil.LIGNES) + [
+                "-rw-r--r-- 1 mobile mobile 2048 Aug 23 10:00 "
+                "/var/mobile/Documents/packs/nouveau/story.json"]
+            self.faux.lignes = apres
+
+            self.demander(app, lambda: app._work(
+                lambda: app._run(resume, "documents")))
+
+            self.assertIn("nouveau", {p.key for p in app.remote_packs})
+            self.assertEqual({r.key: r.status for r in app.rows}["nouveau"],
+                             "des_deux_cotes")
+
+    # ---------------------------------------------------------------- #
+    # Taille de la fenetre                                             #
+    # ---------------------------------------------------------------- #
+
+    def test_geometrie_proportionnelle_a_l_ecran(self):
+        """
+        Fonction pure : verifiable sans ouvrir la moindre fenetre.
+
+        Les trois cas qui comptent — un grand ecran ou 1080x760 etait etrique,
+        un portable ou 80 % passe encore, un petit ecran ou le plancher de
+        1000x700 ne doit PAS faire deborder la fenetre.
+        """
+        import packgui_win
+
+        largeur, hauteur, x, y = packgui_win.geometrie(2560, 1440)
+        self.assertEqual((largeur, hauteur), (2048, 1152))
+        self.assertEqual(x, (2560 - 2048) // 2)
+        self.assertGreaterEqual(y, 0)
+
+        largeur, hauteur, _x, _y = packgui_win.geometrie(1920, 1080)
+        self.assertEqual((largeur, hauteur), (1536, 864))
+
+        for ecran in ((1366, 768), (1280, 720), (1024, 640)):
+            largeur, hauteur, x, y = packgui_win.geometrie(*ecran)
+
+            self.assertLessEqual(largeur, ecran[0], "deborde en largeur sur %s" % (ecran,))
+            self.assertLessEqual(hauteur, ecran[1], "deborde en hauteur sur %s" % (ecran,))
+            self.assertGreaterEqual(x, 0)
+            self.assertGreaterEqual(y, 0)
+
+    # ---------------------------------------------------------------- #
+    # Pied de fenetre                                                  #
+    # ---------------------------------------------------------------- #
+
+    def test_le_pied_porte_version_date_et_auteur(self):
+        import packconfig
+
+        app = self.make_app()
+        textes = " | ".join(self._textes(app))
+
+        self.assertIn(packconfig.VERSION, textes)
+        self.assertIn(packconfig.build_date(), textes)
+        self.assertIn("Brice avec Claude", textes)
+        self.assertIn("README", textes)
 
     def test_choix_du_transport(self):
         """

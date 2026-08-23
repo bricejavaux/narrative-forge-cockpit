@@ -35,7 +35,9 @@ except ImportError:
 
 import packconfig
 import packcore
+import packimage
 import packlibrary
+import packproc
 import packtransport
 
 # ------------------------------------------------------------------ #
@@ -71,11 +73,77 @@ VIGNETTE = 44
 
 
 def _pillow():
+    """
+    Pillow, s'il est installe — pour les VIGNETTES uniquement.
+
+    Le decor de l'en-tete ne passe plus par ici : il est calcule par
+    `packimage`, en Python pur, precisement parce que l'absence de Pillow le
+    faisait disparaitre sans un mot. Les couvertures de packs, elles, sont
+    souvent des JPEG : ecrire un decodeur JPEG a la main serait deraisonnable,
+    et leur repli — l'initiale du titre — est visible et deja en place.
+    """
     try:
         from PIL import Image, ImageTk
     except ImportError:
         return None, None
     return Image, ImageTk
+
+
+# ------------------------------------------------------------------ #
+# Icones                                                              #
+# ------------------------------------------------------------------ #
+#
+# Dessinees au trait sur le canevas, et non ecrites avec des caracteres
+# Unicode : rien ne garantit qu'une police Windows donnee possede le glyphe
+# voulu, et un caractere manquant s'affiche en rectangle vide — pire que pas
+# d'icone du tout. Le trait, lui, est toujours rendu.
+#
+# Aucun relief, aucun degrade : le meme style plat que le reste.
+
+def draw_icon(canvas, nom, cx, cy, taille=13, couleur="#FFFFFF", tags=()):
+    """Pose une icone centree sur (cx, cy), inscrite dans un carre `taille`."""
+    r = taille / 2.0
+    e = max(1, int(round(taille / 9.0)))       # epaisseur du trait
+
+    if nom == "dossier":
+        canvas.create_line(cx - r, cy - r * 0.55, cx - r * 0.15, cy - r * 0.55,
+                           cx + r * 0.05, cy - r * 0.15, fill=couleur, width=e,
+                           tags=tags)
+        canvas.create_rectangle(cx - r, cy - r * 0.15, cx + r, cy + r * 0.7,
+                                outline=couleur, width=e, tags=tags)
+    elif nom == "corbeille":
+        canvas.create_line(cx - r, cy - r * 0.55, cx + r, cy - r * 0.55,
+                           fill=couleur, width=e, tags=tags)
+        canvas.create_line(cx - r * 0.35, cy - r * 0.55, cx - r * 0.35, cy - r,
+                           cx + r * 0.35, cy - r, cx + r * 0.35, cy - r * 0.55,
+                           fill=couleur, width=e, tags=tags)
+        canvas.create_line(cx - r * 0.75, cy - r * 0.35, cx - r * 0.55, cy + r,
+                           cx + r * 0.55, cy + r, cx + r * 0.75, cy - r * 0.35,
+                           fill=couleur, width=e, tags=tags)
+    elif nom == "fleche":
+        canvas.create_line(cx - r, cy, cx + r * 0.3, cy, fill=couleur, width=e,
+                           tags=tags)
+        canvas.create_polygon(cx + r, cy, cx + r * 0.2, cy - r * 0.55,
+                              cx + r * 0.2, cy + r * 0.55,
+                              fill=couleur, outline=couleur, tags=tags)
+    elif nom == "rafraichir":
+        canvas.create_arc(cx - r, cy - r, cx + r, cy + r, start=35, extent=290,
+                          style="arc", outline=couleur, width=e, tags=tags)
+        canvas.create_polygon(cx + r, cy - r * 0.25, cx + r * 0.35, cy - r * 0.45,
+                              cx + r * 0.95, cy + r * 0.45,
+                              fill=couleur, outline=couleur, tags=tags)
+    elif nom == "plus":
+        canvas.create_line(cx - r * 0.6, cy, cx + r * 0.6, cy, fill=couleur,
+                           width=e + 1, tags=tags)
+        canvas.create_line(cx, cy - r * 0.6, cx, cy + r * 0.6, fill=couleur,
+                           width=e + 1, tags=tags)
+    elif nom == "moins":
+        canvas.create_line(cx - r * 0.6, cy, cx + r * 0.6, cy, fill=couleur,
+                           width=e + 1, tags=tags)
+    elif nom == "coche":
+        canvas.create_line(cx - r * 0.6, cy, cx - r * 0.1, cy + r * 0.5,
+                           cx + r * 0.65, cy - r * 0.55,
+                           fill=couleur, width=e + 1, tags=tags)
 
 
 # ------------------------------------------------------------------ #
@@ -95,7 +163,7 @@ class FlatButton(tk.Canvas):
     RAYON = 6
 
     def __init__(self, master, text, command, fill=ACCENT, fg=FOND,
-                 width=170, height=30, font=POLICE_GRAS, **kw):
+                 width=170, height=30, font=POLICE_GRAS, icon=None, **kw):
         tk.Canvas.__init__(self, master, width=width, height=height,
                            highlightthickness=0, bd=0, bg=master["bg"], **kw)
         self._command = command
@@ -104,6 +172,7 @@ class FlatButton(tk.Canvas):
         self._enabled = True
         self._font = font
         self._text = text
+        self._icon = icon
 
         # PAS `self._w` ni `self._h` : `_w` est le nom Tcl interne du widget
         # dans tkinter.Misc. L'ecraser remplace le chemin du widget par un
@@ -141,8 +210,18 @@ class FlatButton(tk.Canvas):
             couleur = self._fg
 
         self._rounded(fill)
-        self.create_text(self._largeur / 2, self._hauteur / 2, text=self._text,
-                         fill=couleur, font=self._font)
+
+        if self._icon:
+            # Icone a gauche, libelle a sa suite : centrer les deux ensemble
+            # demanderait de mesurer le texte, ce que Tk ne fait qu'une fois
+            # le widget affiche. Un alignement a gauche est stable, et se lit
+            # aussi bien.
+            draw_icon(self, self._icon, 17, self._hauteur / 2, 13, couleur)
+            self.create_text(31, self._hauteur / 2, text=self._text, anchor="w",
+                             fill=couleur, font=self._font)
+        else:
+            self.create_text(self._largeur / 2, self._hauteur / 2, text=self._text,
+                             fill=couleur, font=self._font)
 
     def _press(self, _event):
         if self._enabled:
@@ -164,6 +243,103 @@ class FlatButton(tk.Canvas):
     def set_enabled(self, enabled):
         self._enabled = bool(enabled)
         self._draw(self._fill)
+
+
+# ------------------------------------------------------------------ #
+# Case a cocher                                                       #
+# ------------------------------------------------------------------ #
+
+class CheckBox(tk.Canvas):
+    """
+    Case a cocher dessinee, parce que les deux volets ne demandent pas la
+    meme chose.
+
+    A gauche, cocher AJOUTE ; a droite, cocher SUPPRIME. Une case native rend
+    les deux gestes strictement identiques a l'oeil : meme carre, meme
+    couleur, meme coche. Rien ne distingue alors un envoi d'une suppression
+    avant la fenetre de confirmation — c'est tard.
+
+    Ici, la case porte son signe : un `+` vert pour l'ajout, un `-` rose pour
+    la suppression, dans le meme code couleur que le reste de l'application.
+    Le signe est visible AVANT le clic, en creux, puis plein une fois coche —
+    l'intention se lit donc case vide comme case pleine.
+
+    Le modele reste une `BooleanVar` : les tests et le reste de l'interface la
+    lisent comme avant.
+    """
+
+    COTE = 17
+    GENRES = {
+        # genre        : (couleur, icone)
+        "ajout":        (SUCCES, "plus"),
+        "suppression":  (ALERTE, "moins"),
+        "filtre":       (ACCENT, "coche"),
+    }
+
+    def __init__(self, master, variable, command=None, genre="ajout",
+                 bg=CARTE, taille=None):
+        cote = taille or self.COTE
+
+        tk.Canvas.__init__(self, master, width=cote + 2, height=cote + 2,
+                           highlightthickness=0, bd=0, bg=bg)
+
+        self._variable = variable
+        self._command = command
+        self._couleur, self._icone = self.GENRES.get(genre, self.GENRES["ajout"])
+        self._cote = cote
+        self._enabled = True
+
+        self.bind("<Button-1>", self._click)
+        self._draw()
+
+    def _draw(self):
+        self.delete("all")
+
+        coche = bool(self._variable.get())
+        c = self._cote
+        r = 4
+
+        if not self._enabled:
+            bord, fond, signe = CARTE_SURVOL, "", TEXTE_DOUX
+        elif coche:
+            bord = fond = self._couleur
+            signe = FOND
+        else:
+            bord, fond, signe = self._couleur, "", self._couleur
+
+        # Carre a coins arrondis : quatre arcs et deux rectangles, comme le
+        # bouton plat — Tk ne sait pas arrondir un rectangle.
+        if fond:
+            self.create_rectangle(r + 1, 1, c - r + 1, c + 1, fill=fond, outline=fond)
+            self.create_rectangle(1, r + 1, c + 1, c - r + 1, fill=fond, outline=fond)
+            for x, y in ((1, 1), (c - 2 * r + 1, 1), (1, c - 2 * r + 1),
+                         (c - 2 * r + 1, c - 2 * r + 1)):
+                self.create_oval(x, y, x + 2 * r, y + 2 * r, fill=fond, outline=fond)
+        else:
+            self.create_rectangle(1, 1, c + 1, c + 1, outline=bord, width=1)
+
+        # Le signe est TOUJOURS dessine : en creux quand la case est vide, en
+        # negatif quand elle est pleine. C'est lui qui dit ce que le clic fera.
+        draw_icon(self, self._icone, (c + 2) / 2.0, (c + 2) / 2.0,
+                  c * 0.62, signe)
+
+    def _click(self, _event):
+        if not self._enabled:
+            return
+
+        self._variable.set(not self._variable.get())
+        self._draw()
+
+        if self._command:
+            self._command()
+
+    def set_enabled(self, enabled):
+        self._enabled = bool(enabled)
+        self._draw()
+
+    def refresh(self):
+        """A appeler quand la variable a ete changee par le programme."""
+        self._draw()
 
 
 # ------------------------------------------------------------------ #
@@ -231,6 +407,8 @@ class Application(tk.Frame):
         self.local_packs = []
         self.remote_packs = []
         self.rows = []
+        self.hidden_rows = []      # lignes locales masquees par un filtre
+        self.disk = None           # (libre, total) en octets, ou None
 
         self.send_vars = {}        # cle -> BooleanVar
         self.delete_vars = {}      # cle -> BooleanVar
@@ -387,34 +565,68 @@ class Application(tk.Frame):
         self.right = self._build_pane(volets, "Sur l'appareil", "right")
 
         self._build_footer()
+        self._build_version_bar()
 
     def _card(self, master):
         return tk.Frame(master, bg=CARTE, highlightthickness=0, bd=0)
 
-    # Opacite du filigrane. Ce n'est pas un reglage a l'oeil : la source a ete
-    # decodee et le contraste du texte pose dessus mesure, pixel le plus clair
-    # du bandeau, pour la palette exacte de l'app.
+    # ---------------------------------------------------------------- #
+    # En-tete                                                          #
+    # ---------------------------------------------------------------- #
     #
-    #   alpha | titre #E7ECFA | sous-titre #94A0C6
-    #   0,10  |    13,03:1    |   5,94:1
-    #   0,15  |    11,42:1    |   5,20:1   <- retenu
-    #   0,20  |     9,83:1    |   4,48:1   echoue AA
-    #   0,35  |     6,19:1    |   2,82:1   nettement insuffisant
+    # Ce qui n'allait pas, et qui a fait croire deux fois a une ressource
+    # absente
+    # ------------------------------------------------------------------
     #
-    # 0,15 est le plafond : au-dela, c'est le SOUS-TITRE qui casse, pas le
-    # titre — celui-ci reste confortable bien plus loin, et ne dit donc rien
-    # sur la limite reelle. La premiere version melangeait a 0,35.
-    BANDEAU_ALPHA = 0.15
-    BANDEAU_HAUTEUR = 84
+    # L'illustration etait bien trouvee et bien decodee. Elle etait RECADREE
+    # sur sa bande haute, et cette bande ne contenait rien.
+    #
+    # Le calcul : un bandeau de 1180x84 fait un rapport de 14,05 ; la source
+    # portrait fait 772x1159 ; la bande retenue mesurait donc 772/14,05 = 54
+    # lignes, soit 4,7 % de la hauteur de l'image. Ces 54 lignes sont le haut
+    # du ciel, un degrade gris quasi uniforme de moyenne (175, 181, 191). Fondu
+    # a 15 % vers #0B1024, ce degrade donne #24293B sur toute la largeur : un
+    # aplat, impossible a distinguer d'un fond legerement plus clair. Ni fusee,
+    # ni lune, ni nuage — aucun ne se trouve dans les 5 % superieurs de
+    # l'image.
+    #
+    # Le rendu a ete reproduit hors interface et regarde avant correction :
+    # une bande unie. Le chemin `sys._MEIPASS`, lui, etait deja correct
+    # (packconfig.resource_dir), et un test le verifie desormais en simulant
+    # un executable gele.
+    #
+    # La correction
+    # -------------
+    #
+    # Un portrait 2:3 ne peut pas remplir un bandeau de rapport 14:1 : quelle
+    # que soit la tranche choisie, elle ne montre qu'une lichette de la scene.
+    # L'illustration est donc mise a l'echelle ENTIERE — hauteur du bandeau,
+    # rapport respecte — et posee a droite, la ou aucun texte ne passe, avec un
+    # fondu de 46 px sur son bord gauche pour qu'elle sorte du fond au lieu
+    # d'y etre collee.
+    #
+    # Elle peut de ce fait etre nettement plus opaque (0,85) qu'un filigrane
+    # de pleine largeur : le texte reste sur du fond PUR, donc aux contrastes
+    # deja mesures pour l'app — 15,96:1 pour le titre #E7ECFA, 7,27:1 pour le
+    # sous-titre #94A0C6. L'ancien plafond de 0,15 n'existait que parce que
+    # l'image passait sous le texte.
+    BANDEAU_HAUTEUR = 120
+    BANDEAU_ALPHA = 0.85
+    BANDEAU_FONDU = 46          # largeur du degrade sur le bord gauche
+    BANDEAU_MARGE = 20          # entre l'illustration et le bord droit
+
+    # En dessous, l'illustration mordrait sur le titre : mieux vaut pas de
+    # decor qu'un decor qui gene la lecture.
+    BANDEAU_LARGEUR_MINI = 620
 
     def _build_header(self):
         """
-        Bandeau dessine sur un canevas, et non composé de Labels.
+        Bandeau dessine sur un canevas, et non compose de Labels.
 
-        Le filigrane doit passer DERRIERE le titre sur toute la largeur : un
-        Label d'image ne peut pas servir de fond a un autre Label en Tkinter,
-        faute de transparence entre widgets. Sur un canevas, l'image est un
-        objet et le texte un autre, posé par-dessus.
+        Le decor et le texte doivent cohabiter sur la meme surface : un Label
+        d'image ne peut pas servir de fond a un autre Label en Tkinter, faute
+        de transparence entre widgets. Sur un canevas, l'image est un objet et
+        le texte un autre.
         """
         self.header = tk.Canvas(self, bg=FOND, height=self.BANDEAU_HAUTEUR,
                                 highlightthickness=0, bd=0)
@@ -423,69 +635,95 @@ class Application(tk.Frame):
         self._header_width = 0
         self.header.bind("<Configure>", self._redraw_header)
 
+        self._load_artwork()
+
     def _redraw_header(self, event=None):
         largeur = event.width if event is not None else self.header.winfo_width()
 
         if largeur <= 1:
             return
 
-        # Le redimensionnement d'une fenetre emet des dizaines d'evenements :
-        # re-echantillonner l'illustration a chacun rendrait la fenetre
-        # poisseuse. On ne refait le travail que si la largeur a change.
+        # Le redimensionnement d'une fenetre emet des dizaines d'evenements.
+        # L'illustration, elle, ne depend pas de la largeur : elle est
+        # calculee une fois pour toutes et seulement REPOSEE plus a droite.
+        # Redessiner reste inutile tant que la largeur n'a pas bouge —
+        # `_artwork_ready` remet ce cache a zero pour forcer le premier trace.
         if largeur == self._header_width:
             return
 
         self._header_width = largeur
         self.header.delete("all")
 
-        image = self._header_artwork(largeur, self.BANDEAU_HAUTEUR)
+        if (self._header_image is not None
+                and largeur >= self.BANDEAU_LARGEUR_MINI):
+            x = largeur - self._header_image.width() - self.BANDEAU_MARGE
+            self.header.create_image(x, 0, image=self._header_image, anchor="nw")
 
-        if image is not None:
-            self.header.create_image(0, 0, image=image, anchor="nw")
-
-        self.header.create_text(14, 26, anchor="w", text="Gestion de la bibliotheque LunyUI",
+        self.header.create_text(16, 44, anchor="w",
+                                text="Gestion de la bibliotheque LunyUI",
                                 fill=TEXTE_VIF, font=POLICE_TITRE)
-        self.header.create_text(14, 54, anchor="w",
-                                text="poste de travail  ↔  iPhone 3GS",
+        self.header.create_text(16, 76, anchor="w",
+                                text="poste de travail  \u2194  iPhone 3GS",
                                 fill=TEXTE_DOUX, font=POLICE_SOUS)
 
-    def _header_artwork(self, largeur, hauteur):
-        """
-        Filigrane : l'illustration deja produite pour l'icone et le fond de
-        l'app, melangee vers le fond du bandeau.
+    # -------------------------------------------------------------- #
+    # Illustration de l'en-tete                                       #
+    # -------------------------------------------------------------- #
 
-        Recadree sur sa BANDE HAUTE — lune, nuages, etoiles. Redimensionner un
-        portrait 2:3 en bandeau l'ecraserait et rendrait la scene
-        meconnaissable.
+    def _load_artwork(self):
         """
-        Image, ImageTk = _pillow()
+        Prepare l'illustration dans un FIL DE FOND, puis la remet au fil
+        principal.
+
+        Le decodage PNG en Python pur coute environ une seconde sur cette
+        source de 772x1159. Une seconde sur le fil de Tk, c'est une fenetre
+        qui s'affiche figee au lancement. Le fil de fond ne touche a aucun
+        widget : il ne produit que des octets, et c'est `_artwork_ready`,
+        appele par la file, qui construit l'objet Tk.
+        """
         chemin = packconfig.artwork_path()
 
-        if Image is None or not chemin:
-            return None
+        if not chemin:
+            # Plus jamais en silence : c'est ce silence qui a laisse partir
+            # deux corrections sans que personne puisse voir ce qui manquait.
+            self.log("illustration introuvable : en-tete sans decor "
+                     "(cherchee dans %s)" % packconfig.resource_dir(), TEXTE_DOUX)
+            return
 
+        def travail():
+            try:
+                source = packimage.read_png(chemin)
+                hauteur = self.BANDEAU_HAUTEUR
+                largeur = max(1, int(round(
+                    hauteur * source.width / float(source.height))))
+
+                motif = packimage.scale(source, largeur, hauteur)
+                bande = packimage.blend_into(
+                    packimage.solid(largeur, hauteur, FOND), motif, 0,
+                    alpha=self.BANDEAU_ALPHA, fade=self.BANDEAU_FONDU)
+
+                donnees = packimage.to_tk_data(bande)
+            except Exception as error:
+                self.log("illustration illisible (%s) : en-tete sans decor"
+                         % error, ALERTE)
+                return
+
+            self.call_on_main(lambda: self._artwork_ready(donnees))
+
+        threading.Thread(target=travail, daemon=True).start()
+
+    def _artwork_ready(self, donnees):
+        """Construction de l'objet Tk : fil principal exclusivement."""
         try:
-            source = Image.open(chemin).convert("RGB")
+            # Reference gardee sur l'application : sans elle, Tk libere
+            # l'image des la fin de la fonction et le bandeau reste vide.
+            self._header_image = tk.PhotoImage(data=donnees)
+        except tk.TclError as error:
+            self.log("illustration refusee par Tk (%s)" % error, ALERTE)
+            return
 
-            rapport = float(largeur) / float(hauteur)
-            hauteur_source = int(source.width / rapport)
-            source = source.crop((0, 0, source.width,
-                                  min(hauteur_source, source.height)))
-            source = source.resize((largeur, hauteur), Image.LANCZOS)
-
-            fond = Image.new("RGB", source.size, FOND)
-            melange = Image.blend(fond, source, self.BANDEAU_ALPHA)
-
-            photo = ImageTk.PhotoImage(melange)
-
-            # Reference gardee : sans elle Tk libere l'image et le bandeau
-            # reste vide. On ne garde QUE la courante, sinon chaque
-            # redimensionnement empilerait une image de plus en memoire.
-            self._header_image = photo
-            return photo
-        except Exception:
-            # Un decor absent ne doit jamais empecher l'outil de demarrer.
-            return None
+        self._header_width = 0
+        self._redraw_header()
 
     def _build_settings(self):
         barre = self._card(self)
@@ -550,7 +788,7 @@ class Application(tk.Frame):
                    padx=(0, 6) if side == "left" else (6, 0))
 
         entete = tk.Frame(carte, bg=CARTE)
-        entete.pack(fill="x", padx=10, pady=(8, 4))
+        entete.pack(fill="x", padx=10, pady=(8, 2))
 
         tk.Label(entete, text=titre, bg=CARTE, fg=TEXTE_VIF,
                  font=POLICE_GRAS).pack(side="left")
@@ -558,24 +796,58 @@ class Application(tk.Frame):
         compteur = tk.Label(entete, text="", bg=CARTE, fg=TEXTE_DOUX, font=POLICE_SOUS)
         compteur.pack(side="right")
 
+        # La legende, juste sous le titre du volet.
+        #
+        # Une case cochee ne veut pas dire la meme chose des deux cotes, et
+        # rien dans une case ne le dit. La phrase l'ecrit, le pictogramme la
+        # repete, et la couleur — vert pour ce qui arrive, rose pour ce qui
+        # part — la porte jusqu'au bout de la ligne.
+        gauche = (side == "left")
+        couleur = SUCCES if gauche else ALERTE
+        icone = "plus" if gauche else "corbeille"
+        phrase = ("Cocher = sera ajoute a l'appareil" if gauche
+                  else "Cocher = sera supprime de l'appareil")
+
+        legende = tk.Frame(carte, bg=CARTE)
+        legende.pack(fill="x", padx=10, pady=(0, 6))
+
+        pastille = tk.Canvas(legende, width=16, height=16, bg=CARTE,
+                             highlightthickness=0, bd=0)
+        pastille.pack(side="left")
+        draw_icon(pastille, icone, 8, 8, 12, couleur)
+
+        tk.Label(legende, text=phrase, bg=CARTE, fg=couleur,
+                 font=POLICE_SOUS).pack(side="left", padx=(5, 0))
+
         actions = tk.Frame(carte, bg=CARTE)
         actions.pack(fill="x", padx=10, pady=(0, 6))
 
-        if side == "left":
-            FlatButton(actions, "Choisir un dossier…", self.choose_local,
-                       width=150, height=28).pack(side="left")
+        if gauche:
+            FlatButton(actions, "Choisir un dossier\u2026", self.choose_local,
+                       icon="dossier", width=172, height=28).pack(side="left")
             self.local_dir_label = tk.Label(
                 actions, text=self.config_values["last_local_dir"] or "aucun dossier",
                 bg=CARTE, fg=TEXTE_DOUX, font=POLICE_SOUS, anchor="w")
             self.local_dir_label.pack(side="left", padx=8, fill="x", expand=True)
         else:
             FlatButton(actions, "Rafraichir", self.refresh_remote,
-                       fill=CARTE_SURVOL, fg=TEXTE, width=110, height=28).pack(side="left")
+                       icon="rafraichir", fill=CARTE_SURVOL, fg=TEXTE,
+                       width=124, height=28).pack(side="left")
+
+            # Espace disque : dans l'en-tete du volet, la ou on se demande si
+            # le prochain pack tiendra.
+            self.disk_label = tk.Label(actions, text="espace disque : \u2026",
+                                       bg=CARTE, fg=TEXTE_DOUX, font=POLICE_SOUS,
+                                       anchor="e")
+            self.disk_label.pack(side="right", padx=(8, 2))
+
+        if gauche:
+            self._build_filters(carte)
 
         zone = ScrollArea(carte)
         zone.pack(fill="both", expand=True, padx=6, pady=(0, 8))
 
-        if side == "left":
+        if gauche:
             self.left_count = compteur
             self.left_area = zone
         else:
@@ -583,6 +855,62 @@ class Application(tk.Frame):
             self.right_area = zone
 
         return carte
+
+    def _build_filters(self, carte):
+        """
+        Les deux filtres du volet local, combinables.
+
+        Ils ne touchent pas au balayage : `scan_local` continue de rendre tout
+        ce qu'il a vu, y compris les dossiers qui ne sont pas des packs et la
+        raison pour laquelle ils n'en sont pas. Seul l'AFFICHAGE se reduit, et
+        le compteur annonce combien de lignes sont masquees — une liste
+        raccourcie sans le dire serait pire que la liste bruyante.
+        """
+        barre = tk.Frame(carte, bg=CARTE)
+        barre.pack(fill="x", padx=10, pady=(0, 6))
+
+        self.filtre_compat_var = tk.BooleanVar(
+            value=bool(self.config_values.get("filtre_compatibles")))
+        self.filtre_presence_var = tk.StringVar(
+            value=self.config_values.get("filtre_presence") or packlibrary.PRESENCE_TOUS)
+
+        case = CheckBox(barre, self.filtre_compat_var, self._filters_changed,
+                        genre="filtre", taille=15)
+        case.pack(side="left")
+
+        etiquette = tk.Label(barre, text="Compatibles uniquement", bg=CARTE,
+                             fg=TEXTE, font=POLICE_SOUS)
+        etiquette.pack(side="left", padx=(5, 14))
+
+        # Cliquer le libelle coche la case : viser un carre de 15 px n'est pas
+        # une exigence raisonnable.
+        etiquette.bind("<Button-1>", lambda _e: case._click(None))
+
+        tk.Label(barre, text="Afficher", bg=CARTE, fg=TEXTE_DOUX,
+                 font=POLICE_SOUS).pack(side="left", padx=(0, 4))
+
+        for cle in packlibrary.PRESENCES:
+            tk.Radiobutton(barre, text=packlibrary.PRESENCE_LIBELLES[cle],
+                           value=cle, variable=self.filtre_presence_var,
+                           command=self._filters_changed,
+                           bg=CARTE, fg=TEXTE, selectcolor=FOND,
+                           activebackground=CARTE, activeforeground=ACCENT,
+                           font=POLICE_SOUS, bd=0,
+                           highlightthickness=0).pack(side="left")
+
+    def _filters_changed(self):
+        self.config_values["filtre_compatibles"] = bool(self.filtre_compat_var.get())
+        self.config_values["filtre_presence"] = self.filtre_presence_var.get()
+        packconfig.save(self.config_values)
+        self.rebuild_rows()
+
+    def _filtres(self):
+        """Etat courant des filtres, tolerant a une interface pas encore batie."""
+        compat = getattr(self, "filtre_compat_var", None)
+        presence = getattr(self, "filtre_presence_var", None)
+
+        return (bool(compat.get()) if compat is not None else False,
+                presence.get() if presence is not None else packlibrary.PRESENCE_TOUS)
 
     def _build_footer(self):
         pied = self._card(self)
@@ -596,7 +924,8 @@ class Application(tk.Frame):
         self.summary_label.pack(side="left", fill="x", expand=True)
 
         self.go_button = FlatButton(haut, "Go — transferer la selection",
-                                    self.execute, width=210, height=32)
+                                    self.execute, icon="fleche",
+                                    width=228, height=32)
         self.go_button.pack(side="right")
 
         # ttk n'obeit pas aux couleurs sans passer par un theme modifiable :
@@ -627,6 +956,47 @@ class Application(tk.Frame):
         for nom, couleur in (("accent", ACCENT), ("succes", SUCCES),
                              ("alerte", ALERTE), ("doux", TEXTE_DOUX)):
             self.journal.tag_configure(nom, foreground=couleur)
+
+    def _build_version_bar(self):
+        """
+        Version, date de construction, auteur, et un lien vers le README.
+
+        Discret, en bas, dans le ton le plus doux de la palette : ce n'est pas
+        une information de travail. Elle sert quand un doute surgit sur ce qui
+        tourne reellement — un .exe recopie sur un autre poste ne porte
+        aucune trace de son origine, et « quelle version as-tu ? » est la
+        premiere question de tout diagnostic.
+        """
+        barre = tk.Frame(self, bg=FOND)
+        barre.pack(fill="x", padx=14, pady=(0, 8))
+
+        texte = "Luny Transfer %s  \u00b7  build %s  \u00b7  %s" % (
+            packconfig.VERSION, packconfig.build_date(), packconfig.AUTEUR)
+
+        tk.Label(barre, text=texte, bg=FOND, fg=TEXTE_DOUX,
+                 font=POLICE_SOUS).pack(side="left")
+
+        readme = packconfig.readme_path()
+
+        if readme:
+            lien = tk.Label(barre, text="README", bg=FOND, fg=ACCENT,
+                            font=POLICE_SOUS, cursor="hand2")
+            lien.pack(side="right")
+            lien.bind("<Button-1>", lambda _e: self._open_readme(readme))
+
+            tk.Label(barre, text=readme, bg=FOND, fg=TEXTE_DOUX,
+                     font=POLICE_SOUS).pack(side="right", padx=(0, 8))
+        else:
+            tk.Label(barre, text="README introuvable", bg=FOND, fg=TEXTE_DOUX,
+                     font=POLICE_SOUS).pack(side="right")
+
+    def _open_readme(self, chemin):
+        message = packproc.open_document(chemin)
+
+        if message:
+            # Le chemin reste affiche a cote du lien : meme si rien ne s'ouvre,
+            # il est recopiable a la main.
+            self.log(message, ALERTE)
 
     # -------------------------------------------------------------- #
     # Journal et file                                                 #
@@ -785,21 +1155,63 @@ class Application(tk.Frame):
 
     def refresh_remote(self):
         def travail():
-            self.status("inventaire de l'appareil…")
-
-            if not packcore.device_reachable(self._core_log):
-                self.remote_packs = []
-                self.call_on_main(self.rebuild_rows)
-                self.status("appareil injoignable")
-                return
-
-            rows = packcore.remote_inventory()
-            self.remote_packs = packlibrary.remote_packs_from_rows(rows)
-            self.log("appareil : %d pack(s)" % len(self.remote_packs), TEXTE_DOUX)
-            self.call_on_main(self.rebuild_rows)
-            self.status("")
+            if self._inventaire():
+                self.status("")
 
         self._work(travail)
+
+    def _inventaire(self):
+        """
+        Interroge l'appareil : packs presents, puis espace disque.
+
+        Extrait du bouton « Rafraichir » pour etre reutilise TEL QUEL a la fin
+        d'un transfert. Deux chemins differents finiraient par diverger, et
+        c'est le volet droit — celui qui dit ce qui existe reellement sur
+        l'appareil — qui en porterait la difference.
+
+        S'execute dans un fil de fond : aucun widget n'est touche ici, tout
+        passe par la file.
+        """
+        self.status("inventaire de l'appareil…")
+
+        if not packcore.device_reachable(self._core_log):
+            self.remote_packs = []
+            self._set_disk(None)
+            self.call_on_main(self.rebuild_rows)
+            self.status("appareil injoignable")
+            return False
+
+        rows = packcore.remote_inventory()
+        self.remote_packs = packlibrary.remote_packs_from_rows(rows)
+        self.log("appareil : %d pack(s)" % len(self.remote_packs), TEXTE_DOUX)
+
+        self._set_disk(packcore.remote_disk(self._core_log))
+        self.call_on_main(self.rebuild_rows)
+
+        return True
+
+    def _set_disk(self, mesure):
+        """
+        Affiche l'espace disque, ou dit franchement qu'il n'a pas pu etre lu.
+
+        Ce systeme est minimal et plusieurs utilitaires courants s'y sont deja
+        reveles absents. Un `df` qui echoue ne doit ni bloquer l'inventaire ni
+        laisser un champ vide dont personne ne sait s'il charge encore.
+        """
+        self.disk = mesure
+
+        if mesure:
+            libre, total = mesure
+            texte = "%s libres sur %s" % (packcore.human_disk(libre),
+                                          packcore.human_disk(total))
+        else:
+            texte = "espace disque non disponible"
+
+        def poser():
+            if getattr(self, "disk_label", None) is not None:
+                self.disk_label.configure(text=texte)
+
+        self.call_on_main(poser)
 
     # -------------------------------------------------------------- #
     # Rendu des deux volets                                           #
@@ -824,18 +1236,28 @@ class Application(tk.Frame):
         self.left_area.clear()
         self.right_area.clear()
 
-        gauche = droite = 0
+        # Le filtre ne concerne QUE le volet gauche. Le volet droit montre ce
+        # qui est sur l'appareil, sans exception : masquer une entree distante
+        # reviendrait a cacher quelque chose qui occupe reellement la place.
+        visibles, self.hidden_rows = packlibrary.filter_rows(
+            self.rows, *self._filtres())
+
+        for row in visibles:
+            self._local_row(row)
+
+        droite = 0
 
         for row in self.rows:
-            if row.local is not None:
-                self._local_row(row)
-                gauche += 1
-
             for remote in row.remotes:
                 self._remote_row(row, remote)
                 droite += 1
 
-        self.left_count.configure(text="%d pack(s)" % gauche)
+        compte = "%d pack(s)" % len(visibles)
+
+        if self.hidden_rows:
+            compte += "  \u00b7  %d masque(s)" % len(self.hidden_rows)
+
+        self.left_count.configure(text=compte)
         self.right_count.configure(text="%d pack(s)" % droite)
         self.update_summary()
 
@@ -880,14 +1302,11 @@ class Application(tk.Frame):
             self.user_send[cle] = var.get()
             self.update_summary()
 
-        case = tk.Checkbutton(cadre, variable=variable, command=choisi,
-                              bg=CARTE, fg=TEXTE,
-                              selectcolor=FOND, activebackground=CARTE,
-                              bd=0, highlightthickness=0)
-        case.pack(side="left")
+        case = CheckBox(cadre, variable, choisi, genre="ajout")
+        case.pack(side="left", padx=(2, 0))
 
         if not pack.valid:
-            case.configure(state="disabled")
+            case.set_enabled(False)
 
         self._thumb(cadre, packlibrary.read_cover_bytes(pack),
                     pack.title, ACCENT).pack(side="left", padx=6)
@@ -921,14 +1340,11 @@ class Application(tk.Frame):
             self.user_delete[k] = var.get()
             self.update_summary()
 
-        case = tk.Checkbutton(cadre, variable=variable, command=choisi,
-                              bg=CARTE, fg=TEXTE,
-                              selectcolor=FOND, activebackground=CARTE,
-                              bd=0, highlightthickness=0)
-        case.pack(side="left")
+        case = CheckBox(cadre, variable, choisi, genre="suppression")
+        case.pack(side="left", padx=(2, 0))
 
         if remote.protected:
-            case.configure(state="disabled")
+            case.set_enabled(False)
 
         self._thumb(cadre, self._cached_cover(row.key), remote.name,
                     TEXTE_DOUX if remote.protected else ACCENT).pack(side="left", padx=6)
@@ -989,12 +1405,31 @@ class Application(tk.Frame):
     def _selection(self):
         envois = {k for k, v in self.send_vars.items() if v.get()}
         supprs = {k.split("@")[0] for k, v in self.delete_vars.items() if v.get()}
+
+        # Un pack coche puis masque par un filtre reste selectionne. L'oublier
+        # serait le pire des deux mondes : l'utilisateur a demande son envoi,
+        # et un changement d'affichage l'annulerait sans un mot. Le
+        # recapitulatif dit combien de lignes sont dans ce cas, et la fenetre
+        # de confirmation les nomme comme les autres.
+        envois |= {row.key for row in self.hidden_rows
+                   if self.user_send.get(row.key)}
+
         return envois, supprs
+
+    def _masques_selectionnes(self):
+        return [row for row in self.hidden_rows if self.user_send.get(row.key)]
 
     def update_summary(self):
         envois, supprs = self._selection()
         resume = packlibrary.summarise(self.rows, envois, supprs)
-        self.summary_label.configure(text=packlibrary.summary_text(resume))
+        texte = packlibrary.summary_text(resume)
+
+        caches = self._masques_selectionnes()
+
+        if caches:
+            texte += "  (dont %d masque(s) par le filtre)" % len(caches)
+
+        self.summary_label.configure(text=texte)
 
     def execute(self):
         envois, supprs = self._selection()
@@ -1008,6 +1443,17 @@ class Application(tk.Frame):
         # doit rester dans une fenetre. Elle nomme les suppressions une par
         # une — une suppression ne doit jamais se cacher derriere un chiffre.
         lignes = [packlibrary.summary_text(resume), ""]
+
+        # Un envoi demande puis masque par un filtre n'est plus a l'ecran. Il
+        # part quand meme — c'est un choix explicite — mais il doit etre
+        # nomme ici, sinon il partirait sans avoir jamais ete relu.
+        caches = self._masques_selectionnes()
+
+        if caches:
+            lignes.append("Selectionnes mais MASQUES par le filtre :")
+            for row in caches:
+                lignes.append("   \u2022 %s" % row.title)
+            lignes.append("")
 
         if resume["lignes_suppression"]:
             lignes.append("Seront SUPPRIMES de l'appareil :")
@@ -1099,18 +1545,62 @@ class Application(tk.Frame):
         if envois or supprs:
             packcore.remote_uicache(self._core_log)
 
+        # Inventaire distant relance automatiquement, par le meme chemin que
+        # le bouton « Rafraichir » : le volet droit et l'espace disque
+        # refletent le nouvel etat sans qu'on ait a le demander. Une liste qui
+        # reste sur l'etat d'avant le transfert invite a renvoyer ce qui vient
+        # d'arriver.
+        self.log("")
+        self.log("inventaire de l'appareil relance apres transfert", TEXTE_DOUX)
+        self._inventaire()
         self.status("termine")
-        rows = packcore.remote_inventory()
-        self.remote_packs = packlibrary.remote_packs_from_rows(rows)
-        self.call_on_main(self.rebuild_rows)
+
+
+# Part de l'ecran occupee au lancement, et plancher en dessous duquel
+# l'interface se serre trop pour rester lisible — deux volets, une barre de
+# reglages et un journal.
+PART_ECRAN = 0.80
+TAILLE_MINI = (1000, 700)
+
+
+def geometrie(largeur_ecran, hauteur_ecran, part=PART_ECRAN, mini=TAILLE_MINI):
+    """
+    Taille et position de la fenetre au lancement : (l, h, x, y).
+
+    Une taille fixe de 1080x760 etait sous-dimensionnee sur un ecran moderne
+    et DEBORDAIT d'un ecran de portable ancien — le meme nombre ne peut pas
+    convenir aux deux. La regle : `part` de l'ecran, jamais moins que `mini`,
+    jamais plus que l'ecran lui-meme. Cet ordre compte : sur un petit ecran,
+    c'est la borne haute qui doit l'emporter, sinon la fenetre nait plus
+    grande que l'affichage et sa barre de titre passe hors champ.
+
+    Fonction pure, donc verifiable sans ouvrir de fenetre.
+    """
+    # 64 px reserves pour la barre des taches et le cadre de la fenetre.
+    plafond_h = max(240, hauteur_ecran - 64)
+
+    largeur = min(max(int(largeur_ecran * part), mini[0]), largeur_ecran)
+    hauteur = min(max(int(hauteur_ecran * part), mini[1]), plafond_h)
+
+    x = max(0, (largeur_ecran - largeur) // 2)
+    y = max(0, (hauteur_ecran - hauteur) // 2 - 16)
+
+    return largeur, hauteur, x, y
 
 
 def main():
     racine = tk.Tk()
     racine.title("Gestion de la bibliotheque LunyUI")
     racine.configure(bg=FOND)
-    racine.geometry("1080x760")
-    racine.minsize(900, 640)
+
+    largeur, hauteur, x, y = geometrie(racine.winfo_screenwidth(),
+                                       racine.winfo_screenheight())
+    racine.geometry("%dx%d+%d+%d" % (largeur, hauteur, x, y))
+
+    # Redimensionnable ensuite, sans plancher plus haut que la fenetre
+    # elle-meme : sur un petit ecran, un minsize superieur a la taille de
+    # depart la ferait grandir toute seule.
+    racine.minsize(min(TAILLE_MINI[0], largeur), min(TAILLE_MINI[1], hauteur))
 
     try:
         Application(racine)
