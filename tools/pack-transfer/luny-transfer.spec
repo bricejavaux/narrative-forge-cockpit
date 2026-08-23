@@ -28,15 +28,43 @@ le dise. Elle n'a rien a y faire.
 
 Dans les deux cas, `--onefile` extrait le contenu dans un dossier temporaire
 expose par `sys._MEIPASS`, ou `packconfig.resource_dir()` va le chercher.
+
+Le nom de l'illustration et sa destination ne sont PAS ecrits ici
+-------------------------------------------------------------------
+
+Un premier build a produit un executable qui demarre, ffmpeg trouve au bon
+endroit (« ffmpeg : C:\\...\\_MEIxxxxxx\\ffmpeg.exe »), et l'illustration
+introuvable — alors que le nom ecrit ici et celui cherche par
+`packconfig.artwork_path()` etaient, a l'oeil, identiques. Deux litteraux
+identiques par coincidence ne sont pas la meme garantie qu'une seule
+definition partagee : si l'un des deux change un jour sans l'autre, plus rien
+ne le signale avant l'ecran vide chez l'utilisateur.
+
+Ce fichier importe donc `packconfig` et lui delegue la recherche
+(`build_source`) et le nom (`ARTWORK_NAMES[0]`) : c'est la fonction qui sait
+aussi ce que `artwork_path()` cherchera a l'execution, dans le meme module.
+Il ne reste plus qu'une definition possible a faire diverger, et
+`tests/test_spec.py` verifie qu'elle n'a pas ete recopiee en dur ailleurs.
+
+Ce que ce fichier NE PEUT PAS garantir depuis ici, faute d'un poste Windows
+pour construire et lancer le resultat : que PyInstaller embarque reellement
+ce qu'on lui demande. La ligne imprimee ci-dessous, dans la console qui
+lance `pyinstaller`, en est la seule preuve directe — a lire au moment de la
+construction, avant de lancer l'executable. Si un nouveau build ne l'affiche
+pas identique a ce qui suit, la cause est ICI et pas dans le code de lecture.
 """
 
 import os
+import sys
 
 ICI = os.path.abspath(SPECPATH)                                    # noqa: F821
-DEPOT = os.path.abspath(os.path.join(ICI, "..", ".."))
+
+# Pour importer packconfig depuis ce fichier : ce module n'est pas installe,
+# il vit a cote du .spec.
+sys.path.insert(0, ICI)
+import packconfig                                                  # noqa: E402
 
 NOM = "luny-transfer"
-ILLUSTRATION = "luny_background_source_portrait.png"
 
 
 def premier_existant(*chemins):
@@ -48,14 +76,14 @@ def premier_existant(*chemins):
 
 # --- Illustration ---------------------------------------------------------
 #
-# Cherchee a cote du .spec d'abord — c'est la que l'on copie une image
-# retouchee — puis dans les ressources de l'app iOS, ou vit l'originale. Le
-# depot n'a donc pas a en garder deux exemplaires.
+# `packconfig.build_source` cherche a cote du .spec d'abord — c'est la que
+# l'on copie une image retouchee — puis dans les ressources de l'app iOS, ou
+# vit l'originale. Le depot n'a donc pas a en garder deux exemplaires.
+# `packconfig.ARTWORK_NAMES[0]` est le MEME nom que celui que
+# `packconfig.artwork_path()` cherchera au demarrage : une seule definition,
+# importee ici, pas recopiee.
 
-illustration = premier_existant(
-    os.path.join(ICI, ILLUSTRATION),
-    os.path.join(DEPOT, "ios", "LunyUI", "Resources", ILLUSTRATION),
-)
+illustration = packconfig.build_source(spec_dir=ICI)
 
 if illustration is None:
     # Volontairement fatal. Un executable sans decor demarre normalement et ne
@@ -66,10 +94,20 @@ if illustration is None:
         "Cherche dans :\n  %s\n  %s\n"
         "Copier l'image a cote de ce fichier .spec, ou retablir les "
         "ressources de l'app iOS." % (
-            ILLUSTRATION, ICI,
-            os.path.join(DEPOT, "ios", "LunyUI", "Resources")))
+            packconfig.ARTWORK_NAMES[0], ICI,
+            os.path.join(packconfig.repo_root(), "ios", "LunyUI", "Resources")))
 
-datas = [(illustration, ".")]
+# Preuve, dans la console qui lance `pyinstaller` — pas dans l'executable —
+# de ce qui va reellement etre embarque. `RESOURCE_DEST` (".") est la meme
+# valeur que celle qui rend `os.path.join(resource_dir(), nom)` correct cote
+# lecture : la racine du paquet, jamais un sous-dossier.
+print("[luny-transfer] illustration embarquee : %s (%d octets)"
+      % (illustration, os.path.getsize(illustration)))
+print("[luny-transfer]   -> sera extraite a l'execution sous "
+      "<dossier temporaire>/%s, cherchee par packconfig.artwork_path()"
+      % packconfig.ARTWORK_NAMES[0])
+
+datas = [(illustration, packconfig.RESOURCE_DEST)]
 
 # --- README ---------------------------------------------------------------
 #

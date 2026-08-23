@@ -751,3 +751,97 @@ sera pas re-proposé, et son titre reste `Margot, Apprentie véto en Australie`.
 Espace disque relevé dans la foulée : 27,2 Go libres sur 28,3 Go.
 
 **189 tests**, tous verts.
+
+
+---
+
+## 8. Itération du 2026-08-24 — l'illustration, une troisième fois
+
+Journal fourni par l'utilisateur, depuis un vrai build Windows :
+
+```
+illustration introuvable : en-tete sans decor (cherchee dans
+C:\Users\javau\AppData\Local\Temp\_MEI000059c42)
+ffmpeg : C:\...\_MEI000059c42\ffmpeg.exe
+```
+
+Deux faits établis d'emblée par ce seul journal, avant toute hypothèse :
+
+- **Le mécanisme `_MEIPASS` fonctionne.** `resource_dir()` a rendu ce même
+  dossier pour ffmpeg, qui y a été trouvé. Rouvrir l'hypothèse « le code lit
+  le mauvais dossier » — déjà écartée en §6.1 par simulation — n'aurait rien
+  apporté.
+- **Le nom cherché et le nom écrit dans `luny-transfer.spec` étaient
+  identiques, relus caractère par caractère.** Deux définitions du même
+  texte, jamais liées entre elles.
+
+### 8.1 Ce qui a changé : une seule définition, importée, pas recopiée
+
+`luny-transfer.spec` **importe désormais `packconfig`** et lui délègue la
+recherche (`packconfig.build_source`) et le nom
+(`packconfig.ARTWORK_NAMES[0]`) — la même fonction, le même module, que ceux
+que `artwork_path()` utilise au démarrage. Il n'existe plus qu'une seule
+définition possible à faire diverger.
+
+`tests/test_spec.py` **exécute réellement** la partie « résolution de
+ressources » du `.spec` (pas `Analysis`/`EXE`, qui n'existent que dans le
+processus PyInstaller — seulement le code du dépôt, sans modification) et
+vérifie :
+
+- que le `.spec` ne recopie plus le nom en dur (garde-fou structurel : un
+  texte recopié, même correct aujourd'hui, peut diverger demain sans que
+  rien ne le signale — c'est exactement ce qui s'est produit) ;
+- que le fichier qu'il résout porte le nom que `artwork_path()` cherchera ;
+- que la destination dans le paquet est la racine (`"."`), jamais un
+  sous-dossier — sans quoi un fichier réellement présent dans le paquet ne
+  serait simplement pas au chemin lu ;
+- **bout en bout** : le fichier résolu par le `.spec`, copié à plat dans un
+  `_MEIPASS` simulé — exactement ce que fait `--onefile` — est retrouvé par
+  `artwork_path()` en mode gelé (`sys.frozen`, `sys._MEIPASS`,
+  `sys.executable` posés comme PyInstaller les pose).
+
+Ce test aurait échoué sur l'ancien `.spec` **si** les deux noms avaient
+divergé. Il ne prouve pas qu'ils ont divergé cette fois-ci — la relecture à
+l'œil ne trouvait déjà rien — mais il rend la question impossible à se
+reposer une quatrième fois de la même façon.
+
+### 8.2 Ce que ce dépôt ne peut toujours pas trancher
+
+**Aucun PyInstaller, aucun Windows, aucune image de _MEIPASS réelle
+accessible d'ici.** Le nom demandé et le nom cherché coïncident, exécuté et
+vérifié — mais rien ici ne peut prouver que PyInstaller a réellement copié
+le fichier dans le paquet produit sur le poste de l'utilisateur.
+
+L'hypothèse la plus vraisemblable, non vérifiée : un **cache de build
+périmé**. `luny-transfer.spec` est arrivé à la §6 (2026-08-23), remplaçant
+la commande manuelle du README ; s'il existait déjà un dossier
+`build/luny-transfer/` issu d'une construction antérieure (méthode manuelle,
+sans le PNG en `datas`), PyInstaller peut réutiliser certains éléments de ce
+cache selon la version installée — un point de bascule CLI → `.spec` connu
+pour poser ce genre de problème. **Action recommandée avant tout nouveau
+build** : supprimer `build/` et `dist/` du côté Windows (ou passer
+`--clean`), puis reconstruire.
+
+### 8.3 Le journal, enrichi pour que le prochain échec s'explique lui-même
+
+`packconfig.describe_resource_search()` liste désormais le **contenu réel**
+des deux dossiers inspectés, au lieu de seulement les nommer :
+
+```
+ressources embarquees (C:\...\_MEIxxxxxx) :
+  ffmpeg.exe
+  README-windows.md
+  README.md
+  (…)
+a cote de l'executable (C:\...\Bureau) :
+  luny-transfer.exe
+  luny-transfer.json
+```
+
+Si l'illustration manque encore, ce relevé dira lequel des deux cas s'est
+produit — absente des deux dossiers, ou présente sous un autre nom — sans
+qu'il faille reconstruire une fois de plus pour le savoir. C'est la
+différence recherchée : documenter la correspondance et ajouter un test qui
+échoue si elle diverge, plutôt que recompiler à l'aveugle une troisième fois.
+
+**194 tests**, tous verts (189 avant).

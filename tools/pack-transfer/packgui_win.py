@@ -686,8 +686,23 @@ class Application(tk.Frame):
         if not chemin:
             # Plus jamais en silence : c'est ce silence qui a laisse partir
             # deux corrections sans que personne puisse voir ce qui manquait.
-            self.log("illustration introuvable : en-tete sans decor "
-                     "(cherchee dans %s)" % packconfig.resource_dir(), TEXTE_DOUX)
+            #
+            # Un simple « cherchee dans <dossier> » ne dit pas ce que ce
+            # dossier CONTIENT reellement — et c'est exactement la question
+            # restee sans reponse la troisieme fois : le nom de fichier
+            # attendu par `packconfig.ARTWORK_NAMES` et celui embarque par
+            # `luny-transfer.spec` sont desormais LA MEME valeur importee (a
+            # verifier malgre tout par `tests/test_spec.py`, au cas ou l'un
+            # des deux serait un jour recopie en dur). Si le decor manque
+            # encore apres ca, ce journal doit suffire a dire pourquoi, sans
+            # reconstruire une nouvelle fois pour le decouvrir : soit le
+            # fichier n'est nulle part dans les deux dossiers listes
+            # ci-dessous, soit il y est sous un autre nom.
+            self.log("illustration introuvable : en-tete sans decor", TEXTE_DOUX)
+
+            for ligne in packconfig.describe_resource_search().splitlines():
+                self.log("  " + ligne, TEXTE_DOUX)
+
             return
 
         def travail():

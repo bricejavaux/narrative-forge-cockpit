@@ -193,25 +193,120 @@ def ffmpeg_binary():
     return None
 
 
+# Nom de l'illustration, dans l'ordre de preference. UNE SEULE definition :
+# `luny-transfer.spec` l'importe pour savoir quel fichier embarquer, et
+# `artwork_path()` ci-dessous l'importe pour savoir quel fichier chercher.
+# Avant cette version, le nom etait ecrit une fois dans le .spec et une
+# seconde fois ici — deux litteraux identiques par coincidence, jamais lies.
+# Un dossier construit et un chemin lu qui « doivent utiliser exactement le
+# meme nom » sans qu'aucun mecanisme ne le garantisse driftent tot ou tard.
+ARTWORK_NAMES = ("luny_background_source_portrait.png", "luny-artwork.png")
+
+# Destination des ressources dans le paquet : la RACINE, jamais un
+# sous-dossier. C'est cette valeur, passee telle quelle a `datas=[(source,
+# RESOURCE_DEST)]` dans le .spec, qui rend valide la lecture par un simple
+# `os.path.join(resource_dir(), nom)` ici — sans elle, un sous-dossier cote
+# empaquetage romprait la correspondance en silence, le fichier existant bel
+# et bien dans le paquet mais pas au chemin cherche.
+RESOURCE_DEST = "."
+
+
+def repo_root():
+    """
+    Racine du depot, `narrative-forge-cockpit`.
+
+    N'a de sens QUE lance depuis les sources ou au moment de la construction
+    — jamais depuis un executable gele, ou aucun depot n'existe forcement a
+    cote. Employe par `build_source` et par le repli de developpement de
+    `artwork_path`.
+    """
+    return os.path.abspath(os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+
+
+def build_source(spec_dir=None):
+    """
+    Chemin SOURCE de l'illustration au moment de la CONSTRUCTION.
+
+    Appelee par `luny-transfer.spec` pour peupler `datas`, et par
+    `artwork_path()` ci-dessous comme dernier repli quand on tourne depuis les
+    sources sans rien avoir copie. Le nom cherche est `ARTWORK_NAMES[0]` dans
+    les deux cas : c'est la meme fonction, pas une copie.
+
+    Deux emplacements, dans cet ordre : a cote du `.spec` — c'est la qu'une
+    image retouchee serait rangee — puis dans les ressources de l'app iOS, ou
+    vit l'originale. `spec_dir` est le repertoire du `.spec` (`SPECPATH` cote
+    PyInstaller) ; par defaut, le repertoire de ce fichier, qui est le meme
+    lorsqu'on tourne depuis les sources.
+    """
+    ici = spec_dir or os.path.dirname(os.path.abspath(__file__))
+
+    candidats = [
+        os.path.join(ici, ARTWORK_NAMES[0]),
+        os.path.join(repo_root(), "ios", "LunyUI", "Resources", ARTWORK_NAMES[0]),
+    ]
+
+    for chemin in candidats:
+        if os.path.isfile(chemin):
+            return os.path.normpath(chemin)
+
+    return None
+
+
 def artwork_path():
     """
     Illustration fusee/lune/nuages, celle deja produite pour l'app iOS.
 
-    Cherchee d'abord parmi les ressources embarquees, puis dans le depot :
-    lance depuis les sources, l'outil trouve ainsi l'image d'origine sans
-    qu'on ait a la dupliquer.
+    Cherchee d'abord parmi les ressources embarquees (`resource_dir`, donc
+    `sys._MEIPASS` en `--onefile`), puis a cote de l'executable, puis —
+    lance depuis les sources — via `build_source`, qui la trouve dans le
+    depot sans qu'on ait besoin de la dupliquer.
     """
-    noms = ("luny_background_source_portrait.png", "luny-artwork.png")
-
     for base in (resource_dir(), app_dir()):
-        for nom in noms:
+        for nom in ARTWORK_NAMES:
             chemin = os.path.join(base, nom)
             if os.path.isfile(chemin):
                 return chemin
 
-    # Depuis le depot : ../../ios/LunyUI/Resources/
-    depot = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                         "..", "..", "ios", "LunyUI", "Resources",
-                         "luny_background_source_portrait.png")
+    return build_source()
 
-    return os.path.normpath(depot) if os.path.isfile(depot) else None
+
+def _lister(base, limite=12):
+    """Contenu d'un dossier, tronque, ou le message d'erreur s'il est illisible."""
+    try:
+        noms = sorted(os.listdir(base))
+    except OSError as error:
+        return ["illisible (%s)" % error]
+
+    if not noms:
+        return ["(vide)"]
+
+    lignes = ["%s" % nom for nom in noms[:limite]]
+
+    if len(noms) > limite:
+        lignes.append("... et %d de plus" % (len(noms) - limite))
+
+    return lignes
+
+
+def describe_resource_search():
+    """
+    Diagnostic a afficher quand `artwork_path()` (ou toute autre recherche de
+    ressource embarquee) ne trouve rien.
+
+    Le journal se contentait jusqu'ici d'annoncer le repertoire cherche, sans
+    dire ce qu'il contenait reellement. Cela laissait une seule question sans
+    reponse — le fichier a-t-il ete embarque sous un autre nom, dans un autre
+    dossier, ou pas du tout ? — et c'est precisement la question qui a coute
+    plusieurs allers-retours sur ce meme decor. Le contenu REEL des deux
+    dossiers vraiment inspectes tranche la question sans avoir a reconstruire
+    l'executable une fois de plus pour le savoir.
+    """
+    blocs = []
+
+    for etiquette, base in (("ressources embarquees", resource_dir()),
+                            ("a cote de l'executable", app_dir())):
+        blocs.append("%s (%s) :" % (etiquette, base))
+        blocs.extend("  " + ligne for ligne in _lister(base))
+
+    return "\n".join(blocs)

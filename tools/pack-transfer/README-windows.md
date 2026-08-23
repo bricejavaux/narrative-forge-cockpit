@@ -18,8 +18,9 @@ vaut mieux la connaître avant de faire confiance à quoi que ce soit ici.
 
 | | état |
 |---|---|
-| logique de balayage, correspondance, diff, récapitulatif, filtres | **189 tests automatiques**, tous verts |
+| logique de balayage, correspondance, diff, récapitulatif, filtres | **194 tests automatiques**, tous verts |
 | **noms de packs** (espace, virgule, accent, apostrophe) | **vérifiés contre le vrai 3GS**, et un transfert réel de bout en bout |
+| **correspondance nom embarqué / nom cherché** (`.spec` ↔ `packconfig`) | **une seule définition, importée** ; exécutée et vérifiée par `tests/test_spec.py` |
 | protocole SCP historique | **vérifié à l'octet près** contre un faux canal |
 | conversion `.ogg → .mp3` et `.bmp → .png` | **réellement exécutée**, résultat vérifié par `ffprobe` |
 | `packcore` inchangé côté WSL | **non-régression vérifiée** contre le vrai 3GS |
@@ -122,6 +123,13 @@ $py = "C:\Users\javau\AppData\Local\Python\pythoncore-3.14-64\python.exe"
 
 & $py -m pip install pyinstaller paramiko pillow
 
+# Recommandé avant une reconstruction, surtout après avoir modifié le .spec
+# ou changé de méthode de construction (ligne de commande manuelle -> .spec) :
+# PyInstaller garde un cache dans build\, et il est arrivé qu'un cache
+# provenant d'une construction antérieure fasse ignorer une ressource
+# nouvellement ajoutée au .spec sans avertissement. Voir NOTES.md §8.2.
+Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
+
 & $py -m PyInstaller luny-transfer.spec
 ```
 
@@ -144,10 +152,27 @@ Ce que le `.spec` garantit :
 `datas` et `binaries` ne sont pas interchangeables : `binaries` passe par
 l'analyse des dépendances binaires, qui n'a rien à faire d'une image.
 
+**Le nom du fichier n'est écrit qu'une fois.** `luny-transfer.spec` importe
+`packconfig` et lui délègue le nom (`ARTWORK_NAMES[0]`) et la recherche
+(`build_source`) — la même fonction que celle utilisée au démarrage pour
+chercher le fichier. Un précédent build avait démarré, trouvé `ffmpeg.exe` au
+bon endroit, mais pas l'illustration, alors que les deux noms se relisaient
+identiques à l'œil : deux définitions du même texte, jamais liées entre
+elles. `tests/test_spec.py` exécute la résolution du `.spec` pour de vrai et
+échoue si les deux venaient à diverger de nouveau — voir NOTES.md §8.
+
 L'illustration est cherchée à côté du `.spec`, puis dans
 `../../ios/LunyUI/Resources/` — rien à copier à la main. **Si elle est
 introuvable, la construction s'arrête** au lieu de produire un exécutable sans
 décor, qui ne le signalerait qu'à l'écran.
+
+**Si le décor manque quand même à l'écran**, le journal de démarrage liste
+désormais le contenu réel des deux dossiers inspectés (ressources embarquées,
+puis à côté de l'exécutable) — pas seulement leur chemin. Ce relevé dit
+lequel des deux cas s'est produit : fichier absent des deux, ou présent sous
+un autre nom. Voir NOTES.md §8.2 pour l'hypothèse retenue si le décor manque
+malgré tout — un cache de build périmé — d'où le nettoyage de `build\` et
+`dist\` recommandé ci-dessus avant de reconstruire.
 
 `ffmpeg.exe`, lui, n'est pas dans le dépôt : son absence n'arrête pas la
 construction mais affiche un avertissement, et l'application le redit dans son

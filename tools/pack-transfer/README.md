@@ -16,7 +16,7 @@ packcli.py       ligne de commande
 packgui.py       fenêtre Tkinter — même logique, même journal
 packgui_win.py   application Windows autoportante — voir README-windows.md
 luny-transfer.spec  recette PyInstaller, versionnée avec le code
-tests/           189 tests, exécutables sans appareil ni réseau
+tests/           194 tests, exécutables sans appareil ni réseau
 ```
 
 **Application Windows** : `packgui_win.py` est une variante autoportante à
