@@ -94,6 +94,35 @@ DEFAULT_USER = "root"
 
 LEGACY_HOST_KEY_TYPES = ("ssh-rsa", "ssh-dss")
 
+# ------------------------------------------------------------------ #
+# Le second mur : la SIGNATURE d'authentification                     #
+# ------------------------------------------------------------------ #
+#
+# Distinct du precedent, et facile a confondre avec lui parce qu'il se
+# manifeste par un banal « Permission denied » — donc comme une mauvaise cle.
+#
+# Cet appareil tourne sous **OpenSSH_6.7** (releve : « remote software version
+# OpenSSH_6.7 »). Or :
+#
+#   - les signatures RSA-SHA2 (rsa-sha2-256/512) datent d'OpenSSH 7.2 ;
+#   - l'extension `server-sig-algs`, par laquelle un serveur annonce les
+#     signatures qu'il accepte, date de la meme version.
+#
+# Un serveur 6.7 n'accepte donc QUE des signatures `ssh-rsa` (SHA-1) pour une
+# cle RSA, et n'a aucun moyen de le dire. paramiko, depuis la 2.9, propose
+# `rsa-sha2-512` en premier : le serveur la refuse, et l'echec ressemble trait
+# pour trait a une cle rejetee.
+#
+# La meme cle passe pourtant en ligne de commande, parce qu'OpenSSH retombe
+# seul sur ssh-rsa. C'est exactement le symptome rapporte : « la cle marche
+# hors de l'app, pas dedans ».
+#
+# On tente donc l'authentification normalement, puis, en cas d'echec, on
+# recommence en interdisant les signatures RSA-SHA2. L'ordre compte : un hote
+# moderne doit continuer d'obtenir une signature moderne.
+
+MODERN_PUBKEY_SIGNATURES = ("rsa-sha2-512", "rsa-sha2-256")
+
 # Droits poses sur ce qui est envoye. Les fichiers d'un pack sont lus par
 # l'app, jamais executes.
 DIR_MODE = "0755"
@@ -137,6 +166,7 @@ _MOTIFS = (
         r"couldn't agree on",
     )),
     (PANNE_AUTH, (
+        r"unsupported public key algorithm",
         r"permission denied",
         r"authentication failed",
         r"no authentication methods",
@@ -166,9 +196,12 @@ _CONSEILS = {
         "Reessayer n'y changera rien : c'est un reglage du client, pose par "
         "cet outil — si le message persiste, le reglage n'a pas ete applique.",
     PANNE_AUTH:
-        "l'appareil a refuse la cle. Verifier le fichier de cle privee "
-        "renseigne, et que la cle publique correspondante est bien dans "
-        "/var/root/.ssh/authorized_keys sur l'appareil.",
+        "l'appareil a refuse la cle. Si la MEME cle passe en ligne de "
+        "commande, ce n'est pas la cle : cet OpenSSH 6.7 n'accepte que des "
+        "signatures ssh-rsa (SHA-1) et refuse les rsa-sha2 que paramiko "
+        "propose d'abord — l'outil reessaie seul en les interdisant. Sinon, "
+        "verifier le fichier de cle prive renseigne, et que la cle publique "
+        "correspondante est bien dans /var/root/.ssh/authorized_keys.",
     PANNE_RESEAU:
         "l'appareil ne repond pas. Il coupe son Wi-Fi en veille : reveiller "
         "l'ecran et reessayer.",
@@ -197,6 +230,16 @@ def classify_failure(text):
 
 class TransportError(Exception):
     """Panne de transport : connexion, authentification, protocole."""
+
+
+class AuthError(TransportError):
+    """
+    L'appareil a refuse la cle.
+
+    Distincte de TransportError pour une raison de fond : c'est la SEULE panne
+    dont on sache qu'une seconde tentative, avec d'autres algorithmes de
+    signature, peut venir a bout. Les autres ne gagnent rien a etre reessayees.
+    """
 
 
 class ScpError(TransportError):
@@ -400,7 +443,21 @@ class SystemTransport(object):
         premier essai reel contre l'appareil. Un outil autoporteur porte sa
         configuration avec lui.
         """
-        opts = [
+        opts = []
+
+        if self.key_path:
+            # `-F` ignore TOUT fichier de configuration ssh — celui de
+            # l'utilisateur comme celui du systeme (sous Windows,
+            # C:\ProgramData\ssh\ssh_config). Une machine peut y avoir des
+            # reglages qui contredisent les notres, et on ne le saurait pas.
+            #
+            # Uniquement quand une cle est renseignee : sans cle, l'outil
+            # DEPEND encore de `~/.ssh/config` pour savoir laquelle employer,
+            # et c'est ainsi que packcli fonctionne sous WSL. Couper la
+            # configuration dans ce cas casserait l'usage historique.
+            opts += ["-F", os.devnull]
+
+        opts += [
             "-o", "ConnectTimeout=%d" % self.connect_timeout,
             "-o", "BatchMode=yes",
             # Le mur d'algorithme de cet appareil. `+` ajoute a la liste par
@@ -425,9 +482,24 @@ class SystemTransport(object):
 
         return opts
 
+    def argv(self, command="<commande>"):
+        """La ligne de commande exacte, telle que subprocess la recevra."""
+        return ["ssh"] + self.options() + [self.target, command]
+
+    def detail(self):
+        """
+        Ce qui sera reellement execute, recopiable dans un terminal.
+
+        Existe pour une raison precise : diagnostiquer un refus de connexion a
+        demande de reconstruire la commande a la main hors de l'app, et de
+        comparer option par option. L'outil doit dire ce qu'il fait.
+        """
+        import shlex
+        return " ".join(shlex.quote(a) for a in self.argv())
+
     def run(self, command, timeout=60):
         proc = subprocess.run(
-            ["ssh"] + self.options() + [self.target, command],
+            self.argv(command),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
 
         return Result(proc.returncode, proc.stdout)
@@ -478,7 +550,9 @@ class ParamikoTransport(object):
         self.passphrase = passphrase
         self.connect_timeout = connect_timeout
         self.transport = None
-        self.negotiated = None
+        self.negotiated = None       # type de cle d'hote retenu
+        self.remote_version = None   # banniere du serveur, ex. « OpenSSH_6.7 »
+        self.signature = None        # signature d'authentification employee
 
     @property
     def target(self):
@@ -565,13 +639,10 @@ class ParamikoTransport(object):
             # API differente, ou algorithme retire du paramiko installe.
             return None
 
-    def connect(self):
+    def _ouvre(self, disabled_algorithms=None):
+        """Une tentative : socket, poignee de main, authentification."""
         import paramiko
 
-        if self.transport is not None and self.transport.is_active():
-            return True
-
-        self.transport = None
         key = self.load_key(self.key_path, self.passphrase)
 
         try:
@@ -580,21 +651,19 @@ class ParamikoTransport(object):
         except OSError as error:
             raise TransportError("%s injoignable : %s" % (self.target, error))
 
-        transport = paramiko.Transport(sock)
+        if disabled_algorithms:
+            transport = paramiko.Transport(sock,
+                                           disabled_algorithms=disabled_algorithms)
+        else:
+            transport = paramiko.Transport(sock)
+
         types = self.allow_legacy_host_keys(transport)
 
-        if types is None:
+        if types is None or not any(t in types for t in LEGACY_HOST_KEY_TYPES):
             transport.close()
             raise TransportError(
-                "paramiko %s ne permet pas de reactiver les cles d'hote %s, "
-                "que cet appareil est seul a offrir"
-                % (self.version(), "/".join(LEGACY_HOST_KEY_TYPES)))
-
-        if not any(t in types for t in LEGACY_HOST_KEY_TYPES):
-            transport.close()
-            raise TransportError(
-                "paramiko %s ne connait aucune des cles d'hote %s ; la "
-                "negociation avec cet appareil ne peut pas aboutir"
+                "paramiko %s ne permet pas d'accepter les cles d'hote %s, que "
+                "cet appareil est seul a offrir"
                 % (self.version(), "/".join(LEGACY_HOST_KEY_TYPES)))
 
         try:
@@ -605,18 +674,74 @@ class ParamikoTransport(object):
             raise TransportError("negociation avec %s impossible (%s) : %s\n  %s"
                                  % (self.target, genre, error, conseil))
 
+        self.remote_version = getattr(transport, "remote_version", None)
+
         try:
             transport.auth_publickey(self.user, key)
         except Exception as error:
             transport.close()
-            raise TransportError(
-                "authentification refusee par %s : %s\n  %s"
-                % (self.target, error, _CONSEILS[PANNE_AUTH]))
+            raise AuthError(str(error))
 
-        cle_hote = transport.get_remote_server_key()
+        return transport
+
+    def connect(self):
+        """
+        Connexion, avec une seconde tentative sur le mur de signature.
+
+        Cet appareil est un OpenSSH 6.7 : il n'accepte que des signatures
+        `ssh-rsa`, et n'a aucun moyen de l'annoncer, l'extension
+        `server-sig-algs` datant de la 7.2. paramiko propose `rsa-sha2-512`
+        d'abord et se fait refuser — ce qui ressemble a une cle invalide alors
+        que la meme cle passe en ligne de commande.
+
+        On tente donc normalement, puis on recommence en interdisant les
+        signatures RSA-SHA2. Dans cet ordre : un hote moderne doit continuer
+        d'obtenir une signature moderne, et ne paie jamais la seconde
+        tentative.
+        """
+        if self.transport is not None and self.transport.is_active():
+            return True
+
+        self.transport = None
+        self.signature = None
+
+        try:
+            self.transport = self._ouvre()
+            self.signature = "rsa-sha2 (moderne)"
+        except AuthError as premier:
+            try:
+                self.transport = self._ouvre(
+                    disabled_algorithms={"pubkeys": list(MODERN_PUBKEY_SIGNATURES)})
+                self.signature = "ssh-rsa (SHA-1, repli pour serveur ancien)"
+            except AuthError as second:
+                raise TransportError(
+                    "authentification refusee par %s.\n"
+                    "  signature moderne : %s\n"
+                    "  repli ssh-rsa     : %s\n"
+                    "  %s"
+                    % (self.target, premier, second, _CONSEILS[PANNE_AUTH]))
+
+        cle_hote = self.transport.get_remote_server_key()
         self.negotiated = getattr(cle_hote, "get_name", lambda: "?")()
-        self.transport = transport
         return True
+
+    def detail(self):
+        """Ce que l'on sait de la liaison, pour un diagnostic sans devinette."""
+        lignes = [
+            "paramiko %s" % self.version(),
+            "  hote           %s port %d" % (self.target, self.port),
+            "  cle privee     %s" % (self.key_path or "aucune"),
+            "  cles d'hote    defaut + %s" % ", ".join(LEGACY_HOST_KEY_TYPES),
+        ]
+
+        if self.remote_version:
+            lignes.append("  serveur        %s" % self.remote_version)
+        if self.negotiated:
+            lignes.append("  cle d'hote     %s" % self.negotiated)
+        if self.signature:
+            lignes.append("  signature      %s" % self.signature)
+
+        return "\n".join(lignes)
 
     def close(self):
         if self.transport is not None:

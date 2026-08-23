@@ -269,10 +269,23 @@ class Application(tk.Frame):
         transport = packcore.default_transport()
         self.log("transport : %s" % transport.describe(), TEXTE_DOUX)
 
+        # La commande exacte, ou les parametres exacts, des le demarrage.
+        #
+        # Diagnostiquer un refus de connexion a demande de reconstruire la
+        # commande a la main hors de l'app et de la comparer option par
+        # option. L'outil doit dire ce qu'il execute, sans qu'on ait a le
+        # deviner.
+        for ligne in transport.detail().splitlines():
+            self.log("  %s" % ligne, TEXTE_DOUX)
+
         if isinstance(transport, packtransport.SystemTransport):
             cle = (self.config_values.get("key_path") or "").strip()
 
-            if cle and not packtransport.ParamikoTransport.available():
+            if (self.config_values.get("transport") == "paramiko"
+                    and not packtransport.ParamikoTransport.available()):
+                self.log("  transport « paramiko » demande mais le module est "
+                         "absent : repli sur ssh/scp du systeme", ALERTE)
+            elif cle and not packtransport.ParamikoTransport.available():
                 self.log("  paramiko absent : repli sur les binaires ssh/scp "
                          "du systeme, la cle renseignee est ignoree", ALERTE)
             elif not cle:
@@ -317,8 +330,17 @@ class Application(tk.Frame):
         comportement historique.
         """
         cle = (self.config_values.get("key_path") or "").strip()
+        choix = (self.config_values.get("transport") or "auto").strip().lower()
 
-        if cle and packtransport.ParamikoTransport.available():
+        if choix not in packconfig.TRANSPORTS:
+            choix = "auto"
+
+        # Un choix explicite est honore, mais jamais jusqu'a l'absurde :
+        # imposer un module absent n'aiderait personne. Le repli est annonce
+        # haut et fort au demarrage (_announce), donc jamais silencieux.
+        veut_paramiko = (choix == "paramiko" or (choix == "auto" and cle))
+
+        if veut_paramiko and packtransport.ParamikoTransport.available():
             return packtransport.ParamikoTransport(
                 host=self.config_values["host"],
                 user=self.config_values["user"],
@@ -339,6 +361,7 @@ class Application(tk.Frame):
         self.config_values["user"] = self.user_var.get().strip() or "root"
         self.config_values["key_path"] = self.key_var.get().strip()
         self.config_values["target"] = self.target_var.get()
+        self.config_values["transport"] = self.transport_var.get()
 
         message = packconfig.save(self.config_values)
 
@@ -475,6 +498,7 @@ class Application(tk.Frame):
         self.user_var = tk.StringVar(value=self.config_values["user"])
         self.key_var = tk.StringVar(value=self.config_values["key_path"])
         self.target_var = tk.StringVar(value=self.config_values["target"])
+        self.transport_var = tk.StringVar(value=self.config_values.get("transport", "auto"))
 
         def champ(parent, libelle, variable, largeur):
             tk.Label(parent, text=libelle, bg=CARTE, fg=TEXTE_DOUX,
@@ -505,6 +529,20 @@ class Application(tk.Frame):
 
         FlatButton(inner, "Enregistrer", self._save_config, fill=CARTE_SURVOL,
                    fg=TEXTE, width=94, height=26).pack(side="right")
+
+        # Choix du transport, a portee de main : les deux ne rencontrent pas
+        # les memes murs sur ce serveur ancien, et basculer ne doit pas exiger
+        # de reconstruire l'application.
+        for cle_t in reversed(packconfig.TRANSPORTS):
+            tk.Radiobutton(inner, text=cle_t, value=cle_t,
+                           variable=self.transport_var,
+                           bg=CARTE, fg=TEXTE, selectcolor=FOND,
+                           activebackground=CARTE, activeforeground=ACCENT,
+                           font=POLICE_SOUS, bd=0,
+                           highlightthickness=0).pack(side="right")
+
+        tk.Label(inner, text="Transport", bg=CARTE, fg=TEXTE_DOUX,
+                 font=POLICE_SOUS).pack(side="right", padx=(12, 4))
 
     def _build_pane(self, master, titre, side):
         carte = self._card(master)

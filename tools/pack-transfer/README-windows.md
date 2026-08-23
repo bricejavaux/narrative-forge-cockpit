@@ -18,7 +18,7 @@ vaut mieux la connaître avant de faire confiance à quoi que ce soit ici.
 
 | | état |
 |---|---|
-| logique de balayage, correspondance, diff, récapitulatif | **82 tests automatiques**, tous verts |
+| logique de balayage, correspondance, diff, récapitulatif | **93 tests automatiques**, tous verts |
 | protocole SCP historique | **vérifié à l'octet près** contre un faux canal |
 | conversion `.ogg → .mp3` et `.bmp → .png` | **réellement exécutée**, résultat vérifié par `ffprobe` |
 | `packcore` inchangé côté WSL | **non-régression vérifiée** contre le vrai 3GS |
@@ -71,6 +71,26 @@ MAC      umac, hmac-sha2-256/512, hmac-sha1
 **Vérifié contre le vrai 3GS**, en pointant `HOME` sur un répertoire vide pour
 reproduire l'absence de `~/.ssh/config` : la connexion aboutit et l'inventaire
 complet des sept packs revient.
+
+### Le second mur : la signature d'authentification
+
+Distinct du premier, et facile à confondre avec lui : il se manifeste par un
+banal **« Permission denied »**, donc comme une mauvaise clé — alors que la
+même clé passe en ligne de commande.
+
+L'appareil tourne sous **OpenSSH 6.7**. Or les signatures RSA-SHA2
+(`rsa-sha2-256/512`) et l'extension `server-sig-algs`, par laquelle un serveur
+annonce les signatures qu'il accepte, datent toutes deux d'**OpenSSH 7.2**.
+
+Ce serveur n'accepte donc que des signatures `ssh-rsa` (SHA-1) pour une clé
+RSA, et n'a aucun moyen de le dire. paramiko, depuis la 2.9, propose
+`rsa-sha2-512` en premier et se fait refuser. OpenSSH en ligne de commande,
+lui, retombe seul sur `ssh-rsa` — d'où l'asymétrie observée.
+
+L'outil tente donc l'authentification normalement, puis recommence en
+interdisant les signatures RSA-SHA2. Dans cet ordre : un hôte moderne
+continue d'obtenir une signature moderne et ne paie jamais la seconde
+tentative. Le journal indique laquelle a abouti.
 
 ### Trois pannes, trois messages
 
@@ -175,12 +195,36 @@ outil qu'on déplace avec sa clé USB.
 |---|---|
 | `host` | adresse du 3GS, `192.168.1.98` par défaut |
 | `user` | `root` |
-| `key_path` | fichier de clé privée. **Renseigné → paramiko**, vide → ssh du système |
+| `key_path` | fichier de clé privée, transmis aux **deux** transports |
+| `transport` | `auto` (défaut), `paramiko` ou `systeme` |
 | `target` | `documents` (défaut) ou `bundle` |
 | `last_local_dir` | dernier dossier de packs choisi |
 
-Le choix du transport suit `key_path`, et l'application l'annonce dans son
-journal au démarrage : il n'y a pas de repli silencieux.
+`auto` prend paramiko dès qu'une clé est renseignée et que le module est
+présent. Les deux autres imposent un transport — utile parce que les deux ne
+rencontrent pas les mêmes murs sur ce serveur ancien : rester bloqué sur l'un
+ne doit pas obliger à reconstruire l'exécutable pour essayer l'autre. Un
+`paramiko` demandé mais absent retombe sur le transport système, annoncé dans
+le journal.
+
+**Le journal de démarrage écrit la commande exacte**, recopiable telle quelle
+dans un terminal :
+
+```
+transport : ssh/scp du systeme vers root@192.168.1.98
+  ssh -F /dev/null -o ConnectTimeout=10 -o BatchMode=yes
+      -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -o PubkeyAcceptedKeyTypes=+ssh-rsa
+      -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+      -i <clé> -o IdentitiesOnly=yes root@192.168.1.98 '<commande>'
+```
+
+Sur le transport paramiko, le journal donne à la place la version du module,
+celle du serveur, le type de clé d'hôte négocié et la signature retenue. Le
+prochain diagnostic n'exige donc plus de reconstruire la commande à la main.
+
+`-F` n'est posé **que** si une clé est renseignée : sans clé, l'outil dépend
+encore de `~/.ssh/config` pour savoir laquelle employer, et c'est ainsi que
+`packcli` fonctionne sous WSL.
 
 Formats de clé acceptés : RSA, Ed25519, ECDSA, DSA. Une clé protégée par mot
 de passe est refusée avec un message explicite plutôt qu'une erreur

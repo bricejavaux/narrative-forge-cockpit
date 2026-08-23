@@ -365,6 +365,59 @@ class TestMontage(unittest.TestCase):
 
         self.assertLessEqual(packgui_win.Application.BANDEAU_ALPHA, 0.15)
 
+    def test_choix_du_transport(self):
+        """
+        Le reglage doit pouvoir imposer un transport.
+
+        Il existe parce que les deux ne rencontrent pas les memes murs sur ce
+        serveur ancien : un blocage sur l'un ne doit pas exiger de
+        reconstruire l'application pour essayer l'autre.
+        """
+        import packconfig
+        import packtransport
+
+        app = self.make_app()
+        dispo = packtransport.ParamikoTransport.available()
+
+        cas = [
+            # (transport demande, cle renseignee, classe attendue)
+            ("systeme", "/c/cle", packtransport.SystemTransport),
+            ("systeme", "",       packtransport.SystemTransport),
+            ("auto",    "",       packtransport.SystemTransport),
+            ("paramiko", "/c/cle",
+             packtransport.ParamikoTransport if dispo else packtransport.SystemTransport),
+            ("auto", "/c/cle",
+             packtransport.ParamikoTransport if dispo else packtransport.SystemTransport),
+            # Valeur abimee dans le fichier de config : on retombe sur auto.
+            ("n'importe quoi", "", packtransport.SystemTransport),
+        ]
+
+        for demande, cle, attendu in cas:
+            app.config_values["transport"] = demande
+            app.config_values["key_path"] = cle
+
+            self.assertIsInstance(app._make_transport(), attendu,
+                                  "transport=%r cle=%r" % (demande, cle))
+
+    def test_la_cle_atteint_le_transport_systeme(self):
+        """
+        Sous Windows il n'y a pas de `~/.ssh/config` pour designer la cle :
+        si elle n'atteint pas la ligne de commande, l'authentification echoue
+        sans que rien ne l'explique.
+        """
+        import packtransport
+
+        app = self.make_app()
+        app.config_values["transport"] = "systeme"
+        app.config_values["key_path"] = "/chemin/vers/ma_cle"
+
+        transport = app._make_transport()
+        options = transport.options()
+
+        self.assertIn("-i", options)
+        self.assertIn("/chemin/vers/ma_cle", options)
+        self.assertIn("-F", options)
+
     def test_bouton_plat_ne_casse_pas_le_nom_tcl_du_widget(self):
         """
         Regression directe du defaut trouve au premier lancement : un

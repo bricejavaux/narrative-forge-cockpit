@@ -133,5 +133,91 @@ class TestOptionsSysteme(unittest.TestCase):
         self.assertEqual(source.count("self.options()"), 2)
 
 
+
+class TestMurDeSignature(unittest.TestCase):
+    """
+    Second mur, distinct du premier et facilement confondu avec lui.
+
+    L'appareil est un OpenSSH 6.7 : les signatures RSA-SHA2 et l'extension
+    `server-sig-algs` datent de la 7.2. Il n'accepte donc que `ssh-rsa`, sans
+    pouvoir le dire, et refuse ce que paramiko propose en premier. L'echec se
+    presente comme un « Permission denied », c'est-a-dire comme une mauvaise
+    cle — alors que la meme cle passe en ligne de commande, OpenSSH retombant
+    seul sur ssh-rsa.
+    """
+
+    def test_les_signatures_modernes_sont_nommees(self):
+        self.assertEqual(pt.MODERN_PUBKEY_SIGNATURES,
+                         ("rsa-sha2-512", "rsa-sha2-256"))
+
+    def test_le_refus_de_signature_se_classe_en_authentification(self):
+        genre, conseil = pt.classify_failure(
+            "userauth_pubkey: unsupported public key algorithm: rsa-sha2-512")
+        self.assertEqual(genre, pt.PANNE_AUTH)
+
+    def test_le_conseil_distingue_la_cle_de_la_signature(self):
+        """
+        Le conseil doit dire quoi faire du fait que la cle marche DEHORS :
+        c'est l'indice qui separe les deux causes.
+        """
+        conseil = pt._CONSEILS[pt.PANNE_AUTH]
+        self.assertIn("ligne de commande", conseil)
+        self.assertIn("ssh-rsa", conseil)
+        self.assertIn("authorized_keys", conseil)
+
+    def test_AuthError_est_distincte(self):
+        """
+        Seule cette panne merite une seconde tentative : les autres ne
+        gagneraient rien a etre reessayees.
+        """
+        self.assertTrue(issubclass(pt.AuthError, pt.TransportError))
+        self.assertFalse(issubclass(pt.ScpError, pt.AuthError))
+
+
+class TestCommandeAffichee(unittest.TestCase):
+    """
+    L'outil doit dire ce qu'il execute. Diagnostiquer le refus precedent a
+    demande de reconstruire la commande a la main hors de l'app.
+    """
+
+    def test_la_commande_systeme_est_recopiable(self):
+        detail = pt.SystemTransport(host="1.2.3.4", key_path="/c/k").detail()
+
+        self.assertTrue(detail.startswith("ssh "))
+        for attendu in ("-F", "UserKnownHostsFile", "StrictHostKeyChecking=no",
+                        "HostKeyAlgorithms=+ssh-rsa,ssh-dss",
+                        "PubkeyAcceptedKeyTypes=+ssh-rsa",
+                        "-i", "/c/k", "root@1.2.3.4"):
+            self.assertIn(attendu, detail)
+
+    def test_la_commande_correspond_a_ce_qui_est_execute(self):
+        """
+        `detail()` doit decrire `argv()`, pas une approximation : une
+        divergence rendrait le journal trompeur, ce qui est pire que rien.
+        """
+        transport = pt.SystemTransport(host="1.2.3.4", key_path="/c/k")
+
+        for element in transport.argv():
+            self.assertIn(element.strip("<>"), transport.detail())
+
+    def test_sans_cle_la_config_du_systeme_reste_employee(self):
+        """
+        Non-regression packcli : sans cle renseignee, l'outil depend encore de
+        `~/.ssh/config` pour savoir laquelle employer. Couper la configuration
+        casserait l'usage historique sous WSL.
+        """
+        self.assertNotIn("-F", pt.SystemTransport(host="1.2.3.4").options())
+
+    def test_avec_cle_aucune_config_exterieure_n_est_lue(self):
+        self.assertIn("-F", pt.SystemTransport(host="1.2.3.4", key_path="/c/k").options())
+
+    def test_paramiko_annonce_ses_parametres(self):
+        detail = pt.ParamikoTransport(host="1.2.3.4", key_path="/c/k").detail()
+
+        self.assertIn("paramiko", detail)
+        self.assertIn("root@1.2.3.4", detail)
+        self.assertIn("/c/k", detail)
+        self.assertIn("ssh-rsa", detail)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -21,7 +21,18 @@ DEFAULTS = {
     "target": "documents",
     "last_local_dir": "",
     "port": 22,
+    # auto     : paramiko si une cle est renseignee et qu'il est installe
+    # paramiko : impose paramiko meme sans cle ; s'il manque, repli sur les
+    #            binaires du systeme, annonce dans le journal
+    # systeme  : impose les binaires ssh/scp du poste
+    #
+    # Le choix existe parce que les deux transports ne rencontrent pas les
+    # memes murs sur ce vieux serveur : pouvoir basculer sans reconstruire
+    # l'application evite de rester bloque.
+    "transport": "auto",
 }
+
+TRANSPORTS = ("auto", "paramiko", "systeme")
 
 
 def frozen():

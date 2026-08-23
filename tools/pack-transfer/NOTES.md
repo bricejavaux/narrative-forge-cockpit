@@ -141,7 +141,7 @@ cela, ni les tests ni `packcli` ne s'importeraient sur cette machine.
 
 ### 5.4 Ce qui, lui, EST mesuré
 
-- **82 tests**, tous verts, sans appareil ni réseau.
+- **93 tests**, tous verts, sans appareil ni réseau.
 - **La conversion réelle**, enfin exécutée : ffmpeg est installé depuis. Le
   point que le README traînait comme « jamais exécuté » est clos.
 - **Non-régression de `packcore`** contre le vrai 3GS : `packcli.py liste`
@@ -291,3 +291,64 @@ texte sont deux objets, et l'ordre de tracé suffit. Le ré-échantillonnage
 n'est refait que si la largeur a changé : un redimensionnement émet des
 dizaines d'événements, et refaire un Lanczos à chacun rendrait la fenêtre
 poisseuse.
+
+### 5.10 Le second mur : la signature, pas la clé
+
+Après le mur d'algorithme de clé d'hôte (§5.8), un second refus, déguisé en
+premier : **« Permission denied »** dans l'app, alors que la même clé passe
+en ligne de commande.
+
+**Le diagnostic reçu désignait `UserKnownHostsFile` manquant dans
+`SystemTransport`.** Deux erreurs dans cette hypothèse, vérifiables en une
+commande :
+
+```sh
+python3 -c "import packtransport as p; \
+  print(p.SystemTransport(host='x', key_path='/k').detail())"
+```
+
+1. `UserKnownHostsFile` et `StrictHostKeyChecking=no` y étaient **déjà**,
+   depuis §5.8.
+2. Surtout, `_make_transport` choisit **paramiko** dès qu'une clé est
+   renseignée et que le module est installé. Ce n'est donc pas
+   `SystemTransport` qui a produit ce refus.
+
+Et l'hypothèse d'une vérification d'hôte mal classée ne pouvait pas tenir sur
+ce chemin : sur le transport paramiko, l'empreinte n'est **jamais** vérifiée —
+`Transport` est employé directement, sans `HostKeys`. Aucun rejet d'hôte n'y
+est possible. Le classement « authentification » était donc juste.
+
+**La vraie cause.** L'appareil est un **OpenSSH_6.7** (relevé : `remote
+software version OpenSSH_6.7`). Or :
+
+| | apparu dans |
+|---|---|
+| signatures `rsa-sha2-256/512` | OpenSSH 7.2 |
+| extension `server-sig-algs` | OpenSSH 7.2 |
+
+Un serveur 6.7 n'accepte donc que `ssh-rsa` (SHA-1) pour une clé RSA, **et
+n'a aucun moyen de l'annoncer**. paramiko, depuis la 2.9, propose
+`rsa-sha2-512` d'abord et se fait refuser. OpenSSH en ligne de commande
+retombe seul sur `ssh-rsa` — d'où l'asymétrie « ça marche dehors, pas
+dedans », qui est l'indice décisif et non un détail.
+
+Corrigé par une seconde tentative avec `disabled_algorithms={"pubkeys":
+[...]}`, dans cet ordre : un hôte moderne obtient toujours une signature
+moderne et ne paie jamais la reprise.
+
+**Ce qui a rendu ce diagnostic coûteux** : l'app ne disait pas ce qu'elle
+faisait. Il a fallu reconstruire la commande à la main hors de l'app pour
+comparer. Le journal de démarrage écrit désormais la ligne exacte, recopiable,
+et pour paramiko la version du module, celle du serveur, la clé d'hôte
+négociée et la signature retenue.
+
+Ajouté au passage, seule vraie divergence avec la commande manuelle : `-F`,
+qui ignore **tout** fichier de configuration ssh — y compris celui du système,
+`C:\ProgramData\ssh\ssh_config` sous Windows, qu'on ne pense jamais à
+regarder. Posé uniquement si une clé est renseignée : sans clé, l'outil dépend
+encore de `~/.ssh/config` pour savoir laquelle employer, et le couper
+casserait `packcli` sous WSL.
+
+Enfin, un réglage `transport` (`auto` / `paramiko` / `systeme`) : les deux
+transports ne rencontrent pas les mêmes murs sur ce serveur, et rester bloqué
+sur l'un ne doit pas obliger à reconstruire l'exécutable pour essayer l'autre.
