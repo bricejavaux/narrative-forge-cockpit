@@ -804,11 +804,113 @@ comportement audible, lui, reste a confirmer a l'oreille.
    (mesure precedemment, glyphe 190), alors que U+2190 et U+21A9 y rendent
    `.notdef`. Le comportement est inchange, il depile la pile.
 
-   **Verification partielle** : le harnais UIKit n'a pas pu s'executer, le
-   3GS se rendormant sans cesse pendant les essais. Ce qui est etabli : les
-   trois themes compilent, et le binaire installe contient bien le selecteur
-   `backTapped`. Le rendu du bouton et l'absence de titre en double restent a
-   confirmer a l'oeil.
+   **Cette methode n'a jamais ete appelee.** Voir §43 : le bouton decrit ici
+   n'a existe que dans le source pendant tout un lot.
+
+43. **Disparition totale du bouton retour : deux causes cumulees.**
+
+   Constat par photo : plus aucun bouton retour sur l'ecran de lecture, donc
+   plus aucun moyen de revenir a la bibliotheque. La correction du §42 en
+   etait la cause, avec celle du §41 — ni l'une ni l'autre ne suffisant seule.
+
+   | cause | effet isole |
+   |---|---|
+   | `-buildBackButton` ecrite mais jamais appelee depuis `-viewDidLoad` | `leftBarButtonItem` reste nul, le bouton systeme prend le relais |
+   | `navigationItem.title = @""` sur la bibliotheque (§41) | le bouton systeme existe mais porte un libelle vide |
+
+   Le bouton retour par defaut d'`UINavigationController` tire son libelle du
+   titre du controleur **precedent**. Vider ce titre pour supprimer une
+   repetition a donc vide le bouton de l'ecran suivant : present, cliquable,
+   mais sans rien a dessiner. Le repli systeme etait mort au moment meme ou
+   son remplacant ne naissait pas.
+
+   Corrige des deux cotes : `-buildBackButton` est appelee, et la bibliotheque
+   masque sa barre entierement au lieu d'en vider le titre (§44), ce qui
+   supprime la cause a la racine plutot que de la contourner.
+
+   **Lecon de methode** : les deux points avaient ete livres comme
+   « verification partielle, le rendu reste a confirmer a l'oeil ». Aucun oeil
+   n'etant jamais venu, un ecran sans issue est reste en place tout un lot.
+   D'ou l'audit du §45, qui remplace l'oeil par une mesure.
+
+44. **La bibliotheque masque sa barre de navigation, elle ne la vide pas.**
+
+   Vider le titre laissait la barre affichee : 44pt de bande sombre vide
+   au-dessus de « Mes histoires », visible sur photo. `setNavigationBarHidden:`
+   dans `-viewWillAppear:` recupere cet espace et supprime au passage la cause
+   du §43.
+
+   Le reglage appartient a la **pile**, pas a l'ecran : chaque controleur doit
+   donc le reposer a chaque apparition. L'ecran de lecture remet donc `NO` de
+   son cote, sans quoi il heriterait de la barre masquee et perdrait a nouveau
+   son bouton retour. Anime avec la transition, faute de quoi la barre
+   disparait d'un coup a mi-course du pop.
+
+   Mesure apres correction (§45) : en-tete a `y=20`, c'est-a-dire directement
+   sous la barre d'etat, grille a `y=94`. Les 44pt sont bien recuperes.
+
+45. **Audit de disposition : remplacer l'oeil par une mesure.**
+
+   Aucune session n'a jamais vu cet ecran, et l'appareil n'a ni `cycript`, ni
+   debogueur, ni outil de capture — les six candidats ont ete cherches, aucun
+   n'est present. Tout defaut purement visuel ne se constatait donc que par
+   photo, apres coup. Le §43 montre ce que cela coute.
+
+   `LunyDebug.h/.m` relevent desormais la geometrie **reelle** des vues, une
+   fois la disposition faite, et l'ecrivent sur disque :
+
+   ```sh
+   make LUNY_DEBUG=1 package install
+   touch /tmp/LunyUI-audit                    # arme le parcours automatique
+   su mobile -c 'uiopen lunydebug://audit'
+   cat /tmp/LunyUI-layout.txt
+   ```
+
+   Trois details rendent la mesure honnete plutot que rassurante :
+
+   - le cadre est rapporte a la **fenetre**, pas au parent : seul ce repere
+     dit si la vue tombe reellement a l'ecran ;
+   - l'opacite et le masquage sont **remontes jusqu'a la fenetre** : une vue a
+     alpha 1 dans un parent masque reste invisible, et un releve local
+     l'aurait declaree bonne ;
+   - le releve s'arrete des que l'ecran n'est plus le sommet de la pile. Sans
+     ce garde, la fin d'histoire depilait l'ecran et le releve suivant mesurait
+     des cadres decales de 320pt — soit exactement la signature d'un bouton
+     disparu, alors que rien n'etait casse.
+
+   **Lancement.** `uiopen` est le seul lanceur present et n'accepte qu'une URL,
+   jamais un identifiant de paquet (`usage: uiopen <url>`, verifie). Un schema
+   `lunydebug://` est donc necessaire — mais un schema est une porte publique,
+   que l'app livree n'a aucune raison d'exposer. Il est injecte dans le seul
+   bundle **mis en scene**, et seulement pour `LUNY_DEBUG=1`
+   (`Tools/inject_debug_url_scheme.py`). Verifie apres reinstallation du build
+   livrable : `grep -c lunydebug /Applications/LunyUI.app/Info.plist` → `0`.
+
+   **Parcours automatique.** Sans doigt sur la vitre, la bibliotheque ouvre
+   d'elle-meme le premier pack et l'ecran de lecture avance seul, noeud apres
+   noeud — OK la ou il est autorise, fin de piste ailleurs, seule transition
+   que ces noeuds acceptent. Borne a 8 pas : un pack cyclique ne finirait
+   jamais. Un garde a passage unique a du etre ajoute apres coup, la fin
+   d'histoire depilant vers la bibliotheque, qui rouvrait le pack et faisait
+   tourner l'audit en rond.
+
+   **Resultat mesure**, build 35, pack « Berceuse », 7 packs vus :
+
+   | ecran | releve |
+   |---|---|
+   | bibliotheque | barre masquee, `barreNav` hors fenetre, en-tete `{0,20,320,74}` |
+   | lecture, noeud 0 (`ok=1 pause=1`) | `boutonRetour` VISIBLE `{5,27,78,30}`, cible `backTapped:` |
+   | lecture, noeuds 1 a 7 (`ok=0 pause=1 wheel=1 home=1`) | idem, identique a l'unite pres |
+
+   Les noeuds 1 a 7 sont **precisement le cas mis en doute** : `ok=false` et
+   `pause=true`. Le bouton y est mesure visible et cable, sur huit noeuds
+   consecutifs. Ce n'est pas une deduction : le bouton est construit une fois
+   dans `-viewDidLoad` et aucun chemin de rendu ne touche `leftBarButtonItem`
+   — `-refreshMainButtonForStage:` n'agit que sur `self.mainButton`.
+
+   Ce qui reste hors de portee de cet audit : les **couleurs** et le rendu
+   typographique. L'audit prouve qu'une vue est la, ou elle est, et qu'elle
+   est atteignable. Il ne dit pas si elle est belle.
 
 ---
 
@@ -968,12 +1070,17 @@ cette passe, à regarder un par un :
 - La **lune doit être entièrement visible**, l'illustration ayant été rentrée
   de 5 % pour dégager l'arc (§2.37).
 
-**Titre et bouton retour**
+**Titre et bouton retour** — *présence désormais mesurée, voir §45*
+- Ce qui n'est plus à confirmer à l'œil : la **présence** du bouton retour et
+  le **masquage** de la barre sur la bibliothèque. L'audit du §45 les relève
+  sur l'appareil, sur huit nœuds consécutifs, `ok=false` compris.
+- Reste à l'œil, que l'audit ne sait pas juger : sur le lecteur, le bouton
+  retour doit être un **aplat ambre arrondi « ‹ Retour »**, assorti à
+  « Choisir » et « Début », et non le chevron système. Il doit s'assombrir au
+  contact.
 - Sur la bibliothèque, « Mes histoires » ne doit apparaître **qu'une fois**,
-  dans le corps de l'écran, plus dans la barre.
-- Sur le lecteur, le bouton retour doit être un **aplat ambre arrondi
-  « ‹ Retour »**, assorti à « Choisir » et « Début », et non le chevron
-  système. Il doit s'assombrir au contact et ramener à la bibliothèque.
+  et la bande sombre vide au-dessus doit avoir disparu — 44pt récupérés,
+  en-tête mesuré à `y=20`.
 - Le cadrage est plus serré qu'à l'origine — 36 % de surface retirée pour
   supprimer les coins blancs. La lune et les nuages restent présents mais
   frôlent les bords : à valider comme acceptable ou non.

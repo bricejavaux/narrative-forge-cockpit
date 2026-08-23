@@ -62,6 +62,7 @@ static const NSInteger kLunyDotMax = 10;
 @property (nonatomic, copy) NSString *packPath;
 @property (nonatomic, copy) NSString *packTitle;
 
+@property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UIView *artContainer;
 @property (nonatomic, strong) UIImageView *imageView;
 @property (nonatomic, strong) UILabel *imagePlaceholder;
@@ -122,11 +123,107 @@ static const NSInteger kLunyDotMax = 10;
     _track = [[LunyAudioTrack alloc] init];
     _track.delegate = self;
 
+    [self buildBackButton];
     [self buildSubviews];
     [self openPack];
     [self renderCurrentStage];
     [self startTrackForCurrentStage];
 }
+
+/*
+ * La barre de navigation est masquee sur la bibliotheque (voir
+ * RootViewController) : cet ecran la redemande pour lui, sans quoi son bouton
+ * retour n'aurait nulle part ou s'afficher. Le reglage est porte par la pile,
+ * donc chaque ecran doit declarer ce qu'il veut a chaque apparition.
+ */
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    [self.navigationController setNavigationBarHidden:NO animated:animated];
+}
+
+#if LUNY_DEBUG
+/*
+ * Parcours automatique : sans doigt sur la vitre, la seule facon de mesurer
+ * le bouton retour sur PLUSIEURS noeuds, y compris ceux ou ok=false et
+ * pause=true — precisement ceux dont on doute.
+ *
+ * Le pas d'avance suit l'etat du noeud : OK la ou il est autorise, fin de
+ * piste ailleurs, ce qui est aussi la seule transition que ces noeuds
+ * acceptent. Borne en nombre de pas : un pack cyclique ne finirait jamais.
+ */
+static const NSInteger kLunyAuditPasMax = 8;
+
+- (void)viewDidAppear:(BOOL)animated
+{
+    [super viewDidAppear:animated];
+
+    if (!LunyDebugAuditArmed()) {
+        return;
+    }
+
+    [self auditReleveEtape:0];
+}
+
+- (void)auditReleveEtape:(NSInteger)etape
+{
+    luny_stage_view stage;
+    BOOL ok = (_engine && luny_current_stage(_engine, &stage));
+
+    /*
+     * La fin d'une histoire depile cet ecran. Un releve fait pendant que la
+     * vue glisse dehors mesure des cadres decales de la largeur de l'ecran et
+     * se lirait comme un bouton disparu — ce n'en est pas un. On arrete donc
+     * l'audit des que cet ecran n'est plus le sommet de la pile.
+     */
+    if (self.navigationController.topViewController != self) {
+        LunyDebugTrace(@"--- LECTURE, noeud %d : ecran en cours de depilement, "
+                       @"releve sans objet, audit arrete ---", (int)etape);
+        LunyDebugTrace(@"=== FIN DE L'AUDIT ===");
+        return;
+    }
+
+    LunyDebugTrace(@"--- LECTURE, noeud %d ---", (int)etape);
+
+    if (ok) {
+        LunyDebugTrace(@"noeud=%s controls ok=%d pause=%d wheel=%d home=%d autoplay=%d",
+                       stage.uuid ? stage.uuid : "?",
+                       stage.controls.ok, stage.controls.pause, stage.controls.wheel,
+                       stage.controls.home, stage.controls.autoplay);
+    } else {
+        LunyDebugTrace(@"noeud indisponible");
+    }
+
+    LunyDebugTrace(@"barre masquee (drapeau) = %@",
+                   self.navigationController.navigationBarHidden ? @"OUI" : @"NON");
+    LunyDebugTrace(@"%@", LunyDebugDescribeView(self.navigationController.navigationBar,
+                                                @"barreNav"));
+    LunyDebugTrace(@"%@", LunyDebugDescribeView(self.backButton, @"boutonRetour"));
+    LunyDebugTrace(@"boutonRetour libelle=« %@ » cible=%@",
+                   [self.backButton titleForState:UIControlStateNormal],
+                   [self.backButton actionsForTarget:self
+                                     forControlEvent:UIControlEventTouchUpInside] ?: @"AUCUNE");
+    LunyDebugTrace(@"%@", LunyDebugDescribeView(self.homeButton, @"boutonDebut"));
+    LunyDebugTrace(@"%@", LunyDebugDescribeView(self.mainButton, @"boutonCentral"));
+
+    if (etape >= kLunyAuditPasMax || !ok) {
+        LunyDebugTrace(@"=== FIN DE L'AUDIT ===");
+        return;
+    }
+
+    // Avance d'un noeud, puis nouveau releve une fois le rendu pose.
+    if (stage.controls.ok) {
+        [self applyEvent:luny_ok label:@"audit_ok"];
+    } else {
+        [self applyEvent:luny_audio_ended label:@"audit_ended"];
+    }
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [self auditReleveEtape:etape + 1];
+    });
+}
+#endif
 
 - (void)viewWillDisappear:(BOOL)animated
 {
@@ -146,6 +243,23 @@ static const NSInteger kLunyDotMax = 10;
  * CTFontGetGlyphsForCharacters, alors que U+2039 y a un vrai glyphe (190).
  *
  * Le comportement ne change pas : depile la pile de navigation.
+ *
+ * Cette methode avait ete ecrite mais JAMAIS APPELEE, et l'ecran s'etait
+ * retrouve sans aucun retour. Deux causes cumulees, chacune insuffisante
+ * seule :
+ *   1. sans -buildBackButton, leftBarButtonItem restait nul ;
+ *   2. le bouton retour par defaut d'UINavigationController tire son libelle
+ *      du titre du controleur PRECEDENT — que la bibliotheque avait vide
+ *      (navigationItem.title = @"") pour supprimer un titre en double. Un
+ *      libelle vide donne un bouton vide, donc invisible.
+ * Le repli systeme etait donc mort au moment ou son remplacant ne naissait
+ * pas. La bibliotheque masque desormais sa barre entierement plutot que d'en
+ * vider le titre, ce qui supprime la cause 2 ; l'appel ci-dessus supprime la 1.
+ *
+ * Le bouton est construit une fois pour toutes dans -viewDidLoad et aucun
+ * chemin de rendu n'y touche : il reste donc present et actif sur tous les
+ * noeuds, y compris ceux ou ok=false et pause=true, qui n'eteignent que le
+ * bouton central.
  */
 - (void)buildBackButton
 {
@@ -160,6 +274,7 @@ static const NSInteger kLunyDotMax = 10;
     [button addTarget:self action:@selector(backTapped:)
      forControlEvents:UIControlEventTouchUpInside];
 
+    _backButton = button;
     self.navigationItem.leftBarButtonItem =
         [[UIBarButtonItem alloc] initWithCustomView:button];
 }

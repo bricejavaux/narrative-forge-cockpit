@@ -23,6 +23,7 @@ LunyUI_FILES = main.m \
                LunyLibraryItem.m \
                LunyLibraryCell.m \
                LunyTheme.m \
+               LunyDebug.m \
                LunySimulatedAudio.m \
                LunyAudioTrack.m \
                LunyARMSupport.c \
@@ -47,6 +48,17 @@ include $(THEOS_MAKE_PATH)/application.mk
 # scene, apres que les icones ont ete generees a partir d'elle.
 before-package::
 	find "$(THEOS_STAGING_DIR)" -name 'luny_*_source*.png' -delete
+
+# uiopen, seul lanceur present sur l'appareil, n'accepte qu'une URL et refuse
+# un identifiant de paquet. Un schema est donc necessaire pour demarrer l'app
+# depuis le poste de travail et relever la disposition reelle — mais il ouvre
+# une porte publique, que l'app livree n'a aucune raison d'exposer. Il n'est
+# donc injecte que dans le bundle mis en scene, et seulement en mise au point.
+ifeq ($(LUNY_DEBUG),1)
+before-package::
+	python3 Tools/inject_debug_url_scheme.py \
+		"$(THEOS_STAGING_DIR)/Applications/$(APPLICATION_NAME).app/Info.plist"
+endif
 
 after-install::
 	install.exec "su mobile -c 'uicache -a'"

@@ -3,6 +3,7 @@
 #import "LunyLibraryItem.h"
 #import "DetailViewController.h"
 #import "LunyTheme.h"
+#import "LunyDebug.h"
 
 /*
  * Grille a deux colonnes, entierement calculee a la main : iOS 6 n'a ni
@@ -63,12 +64,20 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
 
     /*
      * Le titre est porte par l'en-tete dans la vue, pas par la barre de
-     * navigation : les afficher tous les deux le repetait a l'ecran. On garde
-     * self.title pour l'identite du controleur, et on vide celui de la barre.
-     * L'ecran de detail garde le sien, qui nomme l'histoire en cours.
+     * navigation : les afficher tous les deux le repetait a l'ecran.
+     *
+     * La correction precedente vidait navigationItem.title. Mauvaise methode,
+     * pour deux raisons constatees a l'usage : la barre restait affichee et
+     * mangeait 44pt pour ne rien montrer, et surtout un titre vide vidait
+     * aussi le bouton retour de l'ecran suivant, qui derive son libelle du
+     * titre du controleur precedent — l'ecran de lecture s'est ainsi retrouve
+     * sans retour visible (voir DetailViewController -buildBackButton).
+     *
+     * La barre est donc masquee entierement sur cet ecran, dans
+     * -viewWillAppear:, et self.title reste renseigne pour l'identite du
+     * controleur.
      */
     self.title = @"Mes histoires";
-    self.navigationItem.title = @"";
     self.view.backgroundColor = [LunyTheme backgroundDeep];
 
     self.items = [LunyLibraryItem sampleLibrary];
@@ -109,6 +118,79 @@ static const CGFloat   kLunyHeaderSubHeight   = 16.0f;
 
     [self.view addSubview:self.collectionView];
 }
+
+/*
+ * Le titre vit dans l'en-tete de la vue : la barre de navigation n'aurait ici
+ * rien a montrer, et occupait 44pt de bande sombre vide au-dessus de « Mes
+ * histoires ». On la masque donc pour de bon.
+ *
+ * Le reglage appartient a la pile de navigation, pas a l'ecran : il est donc
+ * repose a chaque apparition, l'ecran de lecture le remettant a NO de son
+ * cote. Anime avec la transition pour que la barre glisse avec le pop plutot
+ * que de disparaitre d'un coup a mi-course.
+ */
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    [self.navigationController setNavigationBarHidden:YES animated:animated];
+}
+
+#if LUNY_DEBUG
+/*
+ * Releve d'audit, une fois la disposition faite — d'ou -viewDidAppear: et non
+ * -viewWillAppear:, ou les cadres ne sont pas encore poses.
+ *
+ * Quand l'audit est arme, l'ecran ouvre de lui-meme le premier pack : sans
+ * doigt sur la vitre, c'est le seul moyen d'atteindre l'ecran de lecture et
+ * d'y mesurer le bouton retour.
+ */
+- (void)viewDidAppear:(BOOL)animated
+{
+    [super viewDidAppear:animated];
+
+    if (!LunyDebugAuditArmed()) {
+        return;
+    }
+
+    /*
+     * Un seul passage. La fin d'une histoire depile vers la bibliotheque, donc
+     * -viewDidAppear: repasse ici : sans ce garde, l'audit rouvrait le pack et
+     * tournait en rond en allongeant le fichier sans fin. Constate a la
+     * premiere execution.
+     */
+    static BOOL dejaFait = NO;
+
+    if (dejaFait) {
+        return;
+    }
+
+    dejaFait = YES;
+    LunyDebugTraceReset();
+
+    LunyDebugTrace(@"=== BIBLIOTHEQUE ===");
+    LunyDebugTrace(@"barre masquee (drapeau) = %@",
+                   self.navigationController.navigationBarHidden ? @"OUI" : @"NON");
+    LunyDebugTrace(@"%@", LunyDebugDescribeView(self.navigationController.navigationBar,
+                                                @"barreNav"));
+    LunyDebugTrace(@"%@", LunyDebugDescribeView(self.header, @"enTete"));
+    LunyDebugTrace(@"%@", LunyDebugDescribeView(self.collectionView, @"grille"));
+    LunyDebugTrace(@"packs = %d", (int)self.items.count);
+
+    if (self.items.count) {
+        [self performSelector:@selector(auditOuvrePremierPack)
+                   withObject:nil afterDelay:1.2];
+    }
+}
+
+- (void)auditOuvrePremierPack
+{
+    LunyLibraryItem *item = self.items[0];
+    LunyDebugTrace(@"ouverture automatique de « %@ »", item.title);
+
+    DetailViewController *detail = [[DetailViewController alloc] initWithLibraryItem:item];
+    [self.navigationController pushViewController:detail animated:YES];
+}
+#endif
 
 #pragma mark - Suppression d'un pack
 
