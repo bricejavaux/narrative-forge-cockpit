@@ -141,7 +141,7 @@ cela, ni les tests ni `packcli` ne s'importeraient sur cette machine.
 
 ### 5.4 Ce qui, lui, EST mesuré
 
-- **65 tests**, tous verts, sans appareil ni réseau.
+- **82 tests**, tous verts, sans appareil ni réseau.
 - **La conversion réelle**, enfin exécutée : ffmpeg est installé depuis. Le
   point que le README traînait comme « jamais exécuté » est clos.
 - **Non-régression de `packcore`** contre le vrai 3GS : `packcli.py liste`
@@ -201,3 +201,93 @@ outil général ce serait une faute. Ici l'hôte est un 3GS de test sur un
 réseau local, réinstallé souvent, dont l'empreinte change à chaque fois :
 refuser rendrait l'outil inutilisable après chaque réinstallation. Le choix
 est borné à cet usage, et n'a pas à être repris ailleurs.
+
+### 5.8 Le mur d'algorithme — panne réelle, et ce qu'elle a appris
+
+Premier essai contre l'appareil physique depuis Windows :
+
+```
+Unable to negotiate with 192.168.1.98 port 22:
+no matching host key type found. Their offer: ssh-rsa,ssh-dss
+```
+
+**Le diagnostic reçu désignait paramiko. Ce n'était pas lui.** Ce libellé est
+verbatim celui du client OpenSSH ; paramiko dit « Incompatible ssh peer (no
+acceptable host key) ». C'est donc `SystemTransport` qui a échoué — le repli
+choisi quand paramiko manque ou qu'aucune clé n'est renseignée.
+
+Reproduit ici en une commande, en contournant la configuration :
+
+```sh
+ssh -F /dev/null -o BatchMode=yes root@192.168.1.98 true
+# Unable to negotiate ... Their offer: ssh-rsa,ssh-dss
+```
+
+`-F /dev/null` reproduit exactement la situation Windows : pas de
+`~/.ssh/config`, donc pas de `HostKeyAlgorithms=+ssh-rsa`. La cause n'était
+pas le client choisi, mais le fait que **la configuration vivait hors de
+l'outil** — ce qui est précisément ce qu'un outil autoporteur ne peut pas se
+permettre.
+
+Corrigé des deux côtés, et pas seulement de celui qui avait échoué : paramiko
+se heurterait au même mur.
+
+**Relevé complet avant de corriger**, pour ne pas franchir un mur et en
+découvrir un second : KEX, chiffrements et MAC de l'appareil sont tous
+acceptables par un client moderne. Seul le type de clé d'hôte bloque.
+
+**Vérifié contre le vrai 3GS**, `HOME` pointé sur un répertoire vide :
+connexion établie, inventaire des sept packs revenu.
+
+`+` plutôt qu'un remplacement : la liste par défaut est conservée et
+`ssh-rsa` seulement ajouté en fin. Un hôte moderne négocie ce qu'il a de
+mieux ; seul celui-ci retombe sur SHA-1. Côté paramiko, même principe par
+`get_security_options().key_types`, ce qui a imposé de passer de `SSHClient` à
+`Transport` — les types de clé d'hôte ne se règlent qu'à ce niveau,
+`SSHClient` n'exposant que `disabled_algorithms`, qui retire mais n'ajoute
+rien.
+
+**Le message trompeur.** `device_reachable` concluait toujours « l'appareil
+coupe son Wi-Fi en veille : réveiller l'écran et réessayer ». Devant un refus
+d'algorithme, ce conseil envoie chercher une panne qui n'existe pas et laisse
+croire qu'une nouvelle tentative peut aboutir : elle ne peut pas. Les pannes
+sont désormais classées — négociation, authentification, réseau — et les deux
+premières ont été provoquées contre le vrai réseau pour vérifier que chacune
+rend son propre message.
+
+### 5.9 Filigrane du bandeau : mesuré, pas ajusté à l'œil
+
+La demande suggérait d'ajuster l'opacité à l'œil « puisque tu peux voir le
+rendu réel sous Windows ». **Ce n'est pas le cas** : l'accès reste
+Linux/WSL, et rien de ce qui est écrit ici n'a été vu sous Windows.
+
+Plutôt que de choisir au hasard, la source a été décodée avec
+`ios/LunyUI/Tools/lunypng.py` — le lecteur PNG en Python pur écrit pour
+l'icône, qui ne demande pas Pillow — et le contraste du texte posé sur le
+mélange calculé sur le **pixel le plus clair** du bandeau :
+
+| opacité | titre `#E7ECFA` | sous-titre `#94A0C6` |
+|---|---|---|
+| 0,10 | 13,03:1 | 5,94:1 |
+| **0,15** | **11,42:1** | **5,20:1** |
+| 0,20 | 9,83:1 | 4,48:1 — échoue AA |
+| 0,35 | 6,19:1 | 2,82:1 |
+
+Les 15 % demandés se trouvent être exactement le plafond utile. La première
+version mélangeait à 0,35, ce qui mettait le sous-titre à 2,82:1.
+
+C'est le **sous-titre** qui fixe la limite, pas le titre : celui-ci reste
+au-dessus de 6:1 jusqu'à 0,35 et n'aurait rien signalé. Mesurer la mauvaise
+couleur aurait donné une réponse fausse avec l'air d'être rigoureuse.
+
+Ce que la mesure ne dit pas, et qui reste à l'œil sous Windows : que le
+filigrane **se devine**. Le contraste garantit qu'on lit le texte, pas que le
+décor produise l'effet voulu.
+
+Détail de mise en œuvre : le bandeau est un **canevas**, non un empilement de
+Labels. Tkinter n'a pas de transparence entre widgets, donc un Label d'image
+ne peut pas servir de fond à un Label de texte. Sur un canevas, l'image et le
+texte sont deux objets, et l'ordre de tracé suffit. Le ré-échantillonnage
+n'est refait que si la largeur a changé : un redimensionnement émet des
+dizaines d'événements, et refaire un Lanczos à chacun rendrait la fenêtre
+poisseuse.

@@ -12,7 +12,7 @@ packconfig.py    réglages mémorisés, localisation des ressources embarquées
 packcli.py       ligne de commande
 packgui.py       fenêtre Tkinter — même logique, même journal
 packgui_win.py   application Windows autoportante — voir README-windows.md
-tests/           65 tests, exécutables sans appareil ni réseau
+tests/           82 tests, exécutables sans appareil ni réseau
 ```
 
 **Application Windows** : `packgui_win.py` est une variante autoportante à

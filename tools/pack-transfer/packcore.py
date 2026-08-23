@@ -324,16 +324,28 @@ def _ssh(args, timeout=60, transport=None):
 
 
 def device_reachable(log, transport=None):
+    """
+    Une commande triviale, et un diagnostic qui nomme la BONNE cause.
+
+    La version precedente concluait toujours « l'appareil coupe son Wi-Fi en
+    veille : reveiller l'ecran et reessayer ». Devant un refus d'algorithme —
+    la panne reellement rencontree au premier essai sous Windows — ce conseil
+    envoyait chercher un probleme qui n'existait pas, et laissait croire qu'une
+    nouvelle tentative pouvait aboutir. Elle ne pouvait pas.
+    """
     try:
         proc = _ssh(["echo ok"], timeout=25, transport=transport)
     except subprocess.TimeoutExpired:
         log("ECHEC : le 3GS ne repond pas (delai depasse)")
+        log("  %s" % packtransport._CONSEILS[packtransport.PANNE_RESEAU])
         return False
 
     if proc.returncode != 0:
-        log("ECHEC : le 3GS ne repond pas — %s"
-            % proc.stdout.decode("utf-8", "replace").strip())
-        log("  l'appareil coupe son Wi-Fi en veille : reveiller l'ecran et reessayer")
+        detail = proc.stdout.decode("utf-8", "replace").strip()
+        genre, conseil = packtransport.classify_failure(detail)
+
+        log("ECHEC (%s) : %s" % (genre, detail or "code %d" % proc.returncode))
+        log("  %s" % conseil)
         return False
 
     return True

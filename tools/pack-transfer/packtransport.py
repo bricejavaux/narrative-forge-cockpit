@@ -56,10 +56,43 @@ essayer pour de vrai.
 """
 
 import os
+import re
+import socket
 import subprocess
 
 DEFAULT_HOST = "192.168.1.98"
 DEFAULT_USER = "root"
+
+# ------------------------------------------------------------------ #
+# Le mur d'algorithme de cet appareil                                 #
+# ------------------------------------------------------------------ #
+#
+# Cet iOS 6 n'offre que deux types de CLE D'HOTE :
+#
+#     debug2: host key algorithms: ssh-rsa,ssh-dss
+#
+# Les deux reposent sur SHA-1 et sont desactives par defaut dans les clients
+# recents. D'ou, sans reglage :
+#
+#     Unable to negotiate with 192.168.1.98 port 22:
+#     no matching host key type found. Their offer: ssh-rsa,ssh-dss
+#
+# Sous WSL, `~/.ssh/config` compensait avec `HostKeyAlgorithms=+ssh-rsa`.
+# Sous Windows ce fichier n'existe pas, et un outil autoporteur ne peut pas
+# demander d'en creer un : le reglage est donc pose DANS LE CODE, des deux
+# cotes, transport systeme comme paramiko.
+#
+# Verifie sur l'appareil : le reste de la negociation passe sans rien forcer.
+# Il n'offre que ce seul mur, pas plusieurs.
+#
+#     KEX     curve25519-sha256@libssh.org, ecdh-sha2-nistp256/384/521,
+#             diffie-hellman-group-exchange-sha256, group14-sha1
+#     chiffr. aes128/192/256-ctr, chacha20-poly1305@openssh.com
+#     MAC     umac, hmac-sha2-256/512, hmac-sha1
+#
+# Tous acceptables tels quels par un client moderne et par paramiko.
+
+LEGACY_HOST_KEY_TYPES = ("ssh-rsa", "ssh-dss")
 
 # Droits poses sur ce qui est envoye. Les fichiers d'un pack sont lus par
 # l'app, jamais executes.
@@ -67,6 +100,99 @@ DIR_MODE = "0755"
 FILE_MODE = "0644"
 
 BLOCK = 32768
+
+
+# ------------------------------------------------------------------ #
+# Classement des pannes                                               #
+# ------------------------------------------------------------------ #
+#
+# Trois causes se ressemblent a l'ecran et n'ont rien a voir :
+#
+#   negociation      le client et l'appareil n'ont aucun algorithme commun.
+#                    Reessayer n'y changera JAMAIS rien.
+#   authentification la cle est refusee, absente ou du mauvais type.
+#   reseau           l'appareil ne repond pas — c'est le seul cas ou
+#                    « reveiller l'ecran » est un conseil utile.
+#
+# Le message unique d'avant orientait toujours vers la veille de l'appareil.
+# Devant un refus d'algorithme, il envoyait chercher une panne qui n'existait
+# pas : d'ou ce classement.
+
+PANNE_NEGOCIATION = "negociation"
+PANNE_AUTH = "authentification"
+PANNE_RESEAU = "reseau"
+PANNE_INCONNUE = "inconnue"
+
+_MOTIFS = (
+    # L'ordre compte : la negociation d'abord, ses libelles etant les plus
+    # specifiques et les plus faciles a confondre avec le reste.
+    (PANNE_NEGOCIATION, (
+        r"no matching host key type",
+        r"no matching key exchange method",
+        r"no matching cipher",
+        r"no matching mac",
+        r"unable to negotiate",
+        r"incompatible ssh peer",
+        r"no acceptable host key",
+        r"couldn't agree on",
+    )),
+    (PANNE_AUTH, (
+        r"permission denied",
+        r"authentication failed",
+        r"no authentication methods",
+        r"too many authentication failures",
+        r"bad permissions",
+        r"invalid key",
+        r"not a valid .* key",
+    )),
+    (PANNE_RESEAU, (
+        r"connection timed out",
+        r"timed out",
+        r"no route to host",
+        r"connection refused",
+        r"network is unreachable",
+        r"host is down",
+        r"banner exchange",
+        r"connection reset",
+        r"connection closed",
+        r"broken pipe",
+    )),
+)
+
+_CONSEILS = {
+    PANNE_NEGOCIATION:
+        "aucun algorithme commun avec l'appareil. Il n'offre que des cles "
+        "d'hote ssh-rsa/ssh-dss, refusees par defaut depuis OpenSSH 8.8. "
+        "Reessayer n'y changera rien : c'est un reglage du client, pose par "
+        "cet outil — si le message persiste, le reglage n'a pas ete applique.",
+    PANNE_AUTH:
+        "l'appareil a refuse la cle. Verifier le fichier de cle privee "
+        "renseigne, et que la cle publique correspondante est bien dans "
+        "/var/root/.ssh/authorized_keys sur l'appareil.",
+    PANNE_RESEAU:
+        "l'appareil ne repond pas. Il coupe son Wi-Fi en veille : reveiller "
+        "l'ecran et reessayer.",
+    PANNE_INCONNUE:
+        "cause non reconnue. Si l'appareil est endormi, le reveiller et "
+        "reessayer ; sinon, le message brut ci-dessus est le seul indice.",
+}
+
+
+def classify_failure(text):
+    """
+    Classe un message d'echec. Retourne (genre, conseil).
+
+    Le texte peut venir du binaire ssh comme d'une exception paramiko : les
+    deux sont parcourus par les memes motifs, insensibles a la casse.
+    """
+    bas = (text or "").lower()
+
+    for genre, motifs in _MOTIFS:
+        for motif in motifs:
+            if re.search(motif, bas):
+                return genre, _CONSEILS[genre]
+
+    return PANNE_INCONNUE, _CONSEILS[PANNE_INCONNUE]
 
 
 class TransportError(Exception):
@@ -244,9 +370,12 @@ class SystemTransport(object):
     packcore faisait en ligne, extrait ici sans modification de comportement.
     """
 
-    def __init__(self, host=DEFAULT_HOST, user=DEFAULT_USER, connect_timeout=10):
+    def __init__(self, host=DEFAULT_HOST, user=DEFAULT_USER, key_path=None,
+                 port=22, connect_timeout=10):
         self.host = host
         self.user = user
+        self.key_path = key_path
+        self.port = port
         self.connect_timeout = connect_timeout
 
     @property
@@ -262,10 +391,43 @@ class SystemTransport(object):
     def close(self):
         pass
 
+    def options(self):
+        """
+        Les reglages communs a ssh et scp, poses en ligne de commande.
+
+        AUCUN ne doit dependre de `~/.ssh/config` : ce fichier existe sous WSL
+        et pas sous Windows, et c'est precisement ce qui a fait echouer le
+        premier essai reel contre l'appareil. Un outil autoporteur porte sa
+        configuration avec lui.
+        """
+        opts = [
+            "-o", "ConnectTimeout=%d" % self.connect_timeout,
+            "-o", "BatchMode=yes",
+            # Le mur d'algorithme de cet appareil. `+` ajoute a la liste par
+            # defaut au lieu de la remplacer : un hote moderne continue de
+            # negocier ce qu'il a de mieux.
+            "-o", "HostKeyAlgorithms=+%s" % ",".join(LEGACY_HOST_KEY_TYPES),
+            "-o", "PubkeyAcceptedKeyTypes=+ssh-rsa",
+            # Empreinte non verifiee : cet appareil de test est reinstalle
+            # souvent et la sienne change a chaque fois. Choix assume et borne
+            # a cet usage — voir NOTES.md.
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=%s" % os.devnull,
+        ]
+
+        if self.port and int(self.port) != 22:
+            opts += ["-o", "Port=%d" % int(self.port)]
+
+        if self.key_path:
+            # `IdentitiesOnly` evite que l'agent propose d'abord ses propres
+            # cles et epuise les tentatives avant d'arriver a celle-ci.
+            opts += ["-i", self.key_path, "-o", "IdentitiesOnly=yes"]
+
+        return opts
+
     def run(self, command, timeout=60):
         proc = subprocess.run(
-            ["ssh", "-o", "ConnectTimeout=%d" % self.connect_timeout,
-             "-o", "BatchMode=yes", self.target, command],
+            ["ssh"] + self.options() + [self.target, command],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
 
         return Result(proc.returncode, proc.stdout)
@@ -278,10 +440,8 @@ class SystemTransport(object):
         # repertoire : « path canonicalization failed » des qu'on envoie un
         # dossier.
         proc = subprocess.run(
-            ["scp", "-O", "-r", "-q",
-             "-o", "ConnectTimeout=%d" % self.connect_timeout,
-             "-o", "BatchMode=yes",
-             local_dir, "%s:%s/%s" % (self.target, base, name)],
+            ["scp", "-O", "-r", "-q"] + self.options()
+            + [local_dir, "%s:%s/%s" % (self.target, base, name)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
 
         return Result(proc.returncode, proc.stdout)
@@ -295,6 +455,15 @@ class ParamikoTransport(object):
     """
     SSH en Python pur. Aucun binaire suppose sur le poste.
 
+    On emploie `paramiko.Transport` directement plutot que `SSHClient` : les
+    types de cle d'hote acceptes ne se reglent qu'a ce niveau, par
+    `get_security_options()`, et c'est exactement ce qui manque pour parler a
+    cet appareil. `SSHClient` n'expose que `disabled_algorithms`, qui retire
+    des algorithmes mais n'en remet aucun.
+
+    Aucune fonctionnalite n'est perdue au passage : cette classe n'a jamais eu
+    besoin que d'ouvrir des sessions, ce que `Transport` fait directement.
+
     paramiko est importe A L'APPEL et non au chargement du module : packcore,
     packcli et les tests doivent pouvoir s'importer sur une machine qui ne
     l'a pas — c'est le cas de l'environnement de developpement de cet outil.
@@ -305,10 +474,11 @@ class ParamikoTransport(object):
         self.host = host
         self.user = user
         self.key_path = key_path
-        self.port = port
+        self.port = int(port or 22)
         self.passphrase = passphrase
         self.connect_timeout = connect_timeout
-        self.client = None
+        self.transport = None
+        self.negotiated = None
 
     @property
     def target(self):
@@ -326,6 +496,14 @@ class ParamikoTransport(object):
         return True
 
     @staticmethod
+    def version():
+        try:
+            import paramiko
+        except ImportError:
+            return None
+        return getattr(paramiko, "__version__", "inconnue")
+
+    @staticmethod
     def load_key(key_path, passphrase=None):
         """
         Le type de cle n'est pas devinable a partir du nom du fichier. On les
@@ -338,55 +516,120 @@ class ParamikoTransport(object):
             raise TransportError("fichier de cle privee introuvable : %s" % key_path)
 
         erreurs = []
+        classes = []
 
-        for classe in (paramiko.RSAKey, paramiko.Ed25519Key,
-                       paramiko.ECDSAKey, paramiko.DSSKey):
+        # DSSKey a disparu de certaines versions recentes : on ne reference
+        # que ce qui existe reellement dans le paramiko installe.
+        for nom in ("RSAKey", "Ed25519Key", "ECDSAKey", "DSSKey"):
+            classe = getattr(paramiko, nom, None)
+            if classe is not None:
+                classes.append(classe)
+
+        for classe in classes:
             try:
                 return classe.from_private_key_file(key_path, password=passphrase)
             except paramiko.PasswordRequiredException:
                 raise TransportError(
                     "la cle %s est protegee par un mot de passe" % key_path)
-            except Exception as error:      # type de cle non reconnu, on essaie le suivant
+            except Exception as error:   # type non reconnu : on essaie le suivant
                 erreurs.append("%s: %s" % (classe.__name__, error))
 
         raise TransportError(
             "cle privee illisible (%s) — formats essayes :\n  %s"
             % (key_path, "\n  ".join(erreurs)))
 
+    @staticmethod
+    def allow_legacy_host_keys(transport):
+        """
+        Remet ssh-rsa et ssh-dss dans les types de cle d'hote acceptes.
+
+        Ils sont AJOUTES EN FIN de liste, pas en tete : un hote moderne
+        continue ainsi de negocier rsa-sha2-512 ou ed25519, et seul un hote
+        qui n'a rien d'autre — celui-ci — retombe sur ssh-rsa.
+
+        Retourne la liste finale, ou None si la version de paramiko installee
+        ne permet pas ce reglage. On ne leve pas : un echec ici doit produire
+        un message clair au moment de la connexion, pas une trace a
+        l'ouverture de la fenetre.
+        """
+        try:
+            options = transport.get_security_options()
+            actuels = list(options.key_types)
+            manquants = [k for k in LEGACY_HOST_KEY_TYPES if k not in actuels]
+
+            if manquants:
+                options.key_types = tuple(actuels + manquants)
+
+            return list(transport.get_security_options().key_types)
+        except Exception:
+            # API differente, ou algorithme retire du paramiko installe.
+            return None
+
     def connect(self):
         import paramiko
 
-        if self.client is not None:
+        if self.transport is not None and self.transport.is_active():
             return True
 
+        self.transport = None
         key = self.load_key(self.key_path, self.passphrase)
-        client = paramiko.SSHClient()
-
-        # Cet appareil est un 3GS sur un reseau local, reinstalle souvent :
-        # son empreinte change, et refuser un hote inconnu rendrait l'outil
-        # inutilisable apres chaque reinstallation. Le choix est assume et
-        # borne a cet usage — voir NOTES.md.
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         try:
-            client.connect(
-                hostname=self.host, port=self.port, username=self.user,
-                pkey=key, timeout=self.connect_timeout,
-                allow_agent=False, look_for_keys=False,
-                # Cet OpenSSH est ancien : ses algorithmes le sont aussi, et
-                # paramiko recent les desactive par defaut.
-                disabled_algorithms={"pubkeys": []})
-        except Exception as error:
-            client.close()
-            raise TransportError("connexion a %s impossible : %s" % (self.target, error))
+            sock = socket.create_connection((self.host, self.port),
+                                            self.connect_timeout)
+        except OSError as error:
+            raise TransportError("%s injoignable : %s" % (self.target, error))
 
-        self.client = client
+        transport = paramiko.Transport(sock)
+        types = self.allow_legacy_host_keys(transport)
+
+        if types is None:
+            transport.close()
+            raise TransportError(
+                "paramiko %s ne permet pas de reactiver les cles d'hote %s, "
+                "que cet appareil est seul a offrir"
+                % (self.version(), "/".join(LEGACY_HOST_KEY_TYPES)))
+
+        if not any(t in types for t in LEGACY_HOST_KEY_TYPES):
+            transport.close()
+            raise TransportError(
+                "paramiko %s ne connait aucune des cles d'hote %s ; la "
+                "negociation avec cet appareil ne peut pas aboutir"
+                % (self.version(), "/".join(LEGACY_HOST_KEY_TYPES)))
+
+        try:
+            transport.start_client(timeout=self.connect_timeout)
+        except Exception as error:
+            transport.close()
+            genre, conseil = classify_failure(str(error))
+            raise TransportError("negociation avec %s impossible (%s) : %s\n  %s"
+                                 % (self.target, genre, error, conseil))
+
+        try:
+            transport.auth_publickey(self.user, key)
+        except Exception as error:
+            transport.close()
+            raise TransportError(
+                "authentification refusee par %s : %s\n  %s"
+                % (self.target, error, _CONSEILS[PANNE_AUTH]))
+
+        cle_hote = transport.get_remote_server_key()
+        self.negotiated = getattr(cle_hote, "get_name", lambda: "?")()
+        self.transport = transport
         return True
 
     def close(self):
-        if self.client is not None:
-            self.client.close()
-            self.client = None
+        if self.transport is not None:
+            self.transport.close()
+            self.transport = None
+
+    def _session(self, timeout):
+        channel = self.transport.open_session(timeout=self.connect_timeout)
+        channel.settimeout(timeout)
+        # Les deux flux sont fusionnes : packcore lit un seul `stdout`, et les
+        # messages d'erreur de l'appareil arrivent sur stderr.
+        channel.set_combine_stderr(True)
+        return channel
 
     def run(self, command, timeout=60):
         try:
@@ -395,11 +638,7 @@ class ParamikoTransport(object):
             return Result(255, str(error))
 
         try:
-            channel = self.client.get_transport().open_session(timeout=self.connect_timeout)
-            channel.settimeout(timeout)
-            # Les deux flux sont fusionnes : packcore lit un seul `stdout`, et
-            # les messages d'erreur de l'appareil arrivent sur stderr.
-            channel.set_combine_stderr(True)
+            channel = self._session(timeout)
             channel.exec_command(command)
 
             sortie = b""
@@ -426,9 +665,7 @@ class ParamikoTransport(object):
             return Result(255, str(error))
 
         try:
-            channel = self.client.get_transport().open_session(timeout=self.connect_timeout)
-            channel.settimeout(timeout)
-            channel.set_combine_stderr(True)
+            channel = self._session(timeout)
             channel.exec_command("scp -rt '%s'" % base)
 
             scp_send_directory(channel, local_dir, name, log)

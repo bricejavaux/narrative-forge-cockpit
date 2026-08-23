@@ -317,6 +317,54 @@ class TestMontage(unittest.TestCase):
 
             self.assertTrue(app.send_vars["commun"].get())
 
+    def test_bandeau_porte_le_titre_et_survit_au_redimensionnement(self):
+        """
+        Le titre est un objet de CANEVAS, pas un Label : c'est ce qui permet
+        au filigrane de passer derriere lui. Il doit donc exister comme tel,
+        et resister a un changement de largeur.
+        """
+        import packgui_win
+
+        app = self.make_app()
+
+        # La racine est retiree de l'ecran : sa geometrie n'est jamais
+        # calculee, `winfo_width` reste a 1 et <Configure> ne porte aucune
+        # largeur utile. On appelle donc le trace avec un evenement fabrique —
+        # ce qui teste la logique de dessin, et non le gestionnaire de
+        # fenetres.
+        class FauxEvenement(object):
+            def __init__(self, width):
+                self.width = width
+
+        def textes_du_bandeau():
+            return [app.header.itemcget(i, "text")
+                    for i in app.header.find_all()
+                    if app.header.type(i) == "text"]
+
+        app._redraw_header(FauxEvenement(1000))
+
+        self.assertIn("Gestion de la bibliotheque LunyUI", textes_du_bandeau())
+
+        # Une seconde largeur ne doit ni dupliquer ni perdre le titre.
+        app._redraw_header(FauxEvenement(1400))
+
+        self.assertEqual(
+            textes_du_bandeau().count("Gestion de la bibliotheque LunyUI"), 1)
+
+        # Meme largeur : le trace doit etre saute, sans rien casser.
+        app._redraw_header(FauxEvenement(1400))
+        self.assertEqual(
+            textes_du_bandeau().count("Gestion de la bibliotheque LunyUI"), 1)
+
+    def test_opacite_du_filigrane_sous_le_seuil_mesure(self):
+        """
+        0,15 est le plafond mesure : a 0,20 le sous-titre #94A0C6 tombe a
+        4,48:1 sur le pixel le plus clair du bandeau, sous le seuil AA.
+        """
+        import packgui_win
+
+        self.assertLessEqual(packgui_win.Application.BANDEAU_ALPHA, 0.15)
+
     def test_bouton_plat_ne_casse_pas_le_nom_tcl_du_widget(self):
         """
         Regression directe du defaut trouve au premier lancement : un

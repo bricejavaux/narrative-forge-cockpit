@@ -18,16 +18,74 @@ vaut mieux la connaître avant de faire confiance à quoi que ce soit ici.
 
 | | état |
 |---|---|
-| logique de balayage, correspondance, diff, récapitulatif | **65 tests automatiques**, tous verts |
+| logique de balayage, correspondance, diff, récapitulatif | **82 tests automatiques**, tous verts |
 | protocole SCP historique | **vérifié à l'octet près** contre un faux canal |
 | conversion `.ogg → .mp3` et `.bmp → .png` | **réellement exécutée**, résultat vérifié par `ffprobe` |
 | `packcore` inchangé côté WSL | **non-régression vérifiée** contre le vrai 3GS |
 | montage de la fenêtre et câblage complet | **vérifié** sous WSLg, avec un faux appareil |
+| négociation SSH **sans** `~/.ssh/config` | **vérifiée contre le vrai 3GS** — voir ci-dessous |
+| contraste du titre sur le filigrane | **mesuré** sur la source décodée |
 | **rendu visuel sous Windows** | **non vérifié** — polices, métriques et thème diffèrent |
 | **paramiko contre ce serveur SSH** | **non vérifié** — paramiko n'est pas installable ici |
 | **l'exécutable empaqueté** | **non vérifié** — PyInstaller doit tourner sur Windows |
 
 Le détail des trois derniers points est dans [NOTES.md](NOTES.md).
+
+---
+
+## Le mur d'algorithme de l'appareil
+
+Premier essai réel depuis Windows, connexion refusée :
+
+```
+Unable to negotiate with 192.168.1.98 port 22:
+no matching host key type found. Their offer: ssh-rsa,ssh-dss
+```
+
+Ce message est celui du **client OpenSSH**, pas de paramiko. L'appareil
+n'offre que `ssh-rsa` et `ssh-dss` comme clés d'hôte, toutes deux sur SHA-1 et
+refusées par défaut depuis OpenSSH 8.8. Sous WSL, `~/.ssh/config` compensait
+avec `HostKeyAlgorithms=+ssh-rsa` ; sous Windows ce fichier n'existe pas.
+
+Le réglage est désormais **porté par le code**, des deux côtés :
+
+| transport | comment |
+|---|---|
+| système (`ssh`/`scp`) | `-o HostKeyAlgorithms=+ssh-rsa,ssh-dss`, `-o PubkeyAcceptedKeyTypes=+ssh-rsa`, plus `-i <clé>` et un `UserKnownHostsFile` neutre |
+| paramiko | `paramiko.Transport` employé directement, `get_security_options().key_types` complété |
+
+`+` **ajoute** aux valeurs par défaut au lieu de les remplacer : un hôte
+moderne continue de négocier ce qu'il a de mieux, et seul un hôte qui n'a rien
+d'autre retombe sur `ssh-rsa`.
+
+Relevé sur l'appareil, le reste de la négociation passe sans rien forcer — un
+seul mur, pas plusieurs :
+
+```
+KEX      curve25519-sha256@libssh.org, ecdh-sha2-nistp256/384/521,
+         diffie-hellman-group-exchange-sha256, group14-sha1
+chiffr.  aes128/192/256-ctr, chacha20-poly1305@openssh.com
+MAC      umac, hmac-sha2-256/512, hmac-sha1
+```
+
+**Vérifié contre le vrai 3GS**, en pointant `HOME` sur un répertoire vide pour
+reproduire l'absence de `~/.ssh/config` : la connexion aboutit et l'inventaire
+complet des sept packs revient.
+
+### Trois pannes, trois messages
+
+L'ancien diagnostic concluait toujours « réveiller l'écran et réessayer ».
+Devant un refus d'algorithme, ce conseil envoyait chercher une panne
+inexistante et laissait croire qu'une nouvelle tentative pouvait aboutir.
+
+| genre | message |
+|---|---|
+| `negociation` | aucun algorithme commun ; **réessayer n'y changera rien** |
+| `authentification` | clé refusée ; vérifier `authorized_keys` sur l'appareil |
+| `reseau` | l'appareil ne répond pas — **le seul cas** où réveiller l'écran aide |
+
+Les deux premiers ont été provoqués contre le vrai réseau pour vérifier que
+chacun rend bien son propre message.
 
 ---
 
@@ -144,7 +202,24 @@ dossier qu'on croyait être un pack et qui n'en est pas doit se voir.
 
 ### Volet droit — bibliothèque de l'appareil
 
-Inventaire distant au chargement. Vignette si le pack a été envoyé depuis cet
+Inventaire distant au chargement. Le bandeau supérieur porte l'illustration
+fusée/lune en filigrane à **15 %**, opacité choisie par mesure et non à l'œil :
+la source a été décodée et le contraste du texte posé dessus calculé sur le
+pixel le plus clair du bandeau.
+
+| opacité | titre `#E7ECFA` | sous-titre `#94A0C6` |
+|---|---|---|
+| 0,10 | 13,03:1 | 5,94:1 |
+| **0,15** | **11,42:1** | **5,20:1** |
+| 0,20 | 9,83:1 | 4,48:1 — échoue AA |
+| 0,35 | 6,19:1 | 2,82:1 |
+
+0,15 est le plafond, et c'est le **sous-titre** qui fixe la limite : le titre
+reste confortable bien au-delà et ne dit donc rien d'utile. Reste à confirmer
+à l'œil sous Windows que le filigrane se devine — le contraste garantit la
+lisibilité, pas l'effet recherché.
+
+ Vignette si le pack a été envoyé depuis cet
 outil (cache local), initiale du titre sinon — l'appareil ne renvoie jamais
 d'image. Les packs livrés avec l'application sont marqués **non supprimables**
 et leur case est désactivée.

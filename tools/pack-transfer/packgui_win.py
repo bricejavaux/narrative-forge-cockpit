@@ -241,7 +241,8 @@ class Application(tk.Frame):
         # qui se declenche aussi quand le programme ecrit dedans.
         self.user_send = {}
         self.user_delete = {}
-        self._images = []          # references : sans elles Tk libere les images
+        self._images = []          # vignettes : sans ces references Tk les libere
+        self._header_image = None
 
         self.build_root = os.path.join(packconfig.app_dir(), "build")
         self.cache_dir = os.path.join(packconfig.app_dir(), "cache")
@@ -324,8 +325,14 @@ class Application(tk.Frame):
                 key_path=cle,
                 port=int(self.config_values.get("port") or 22))
 
+        # La cle est transmise au transport systeme aussi : sous Windows il
+        # n'y a pas de `~/.ssh/config` pour la designer, et c'est ce repli qui
+        # sert quand paramiko manque.
         return packtransport.SystemTransport(
-            host=self.config_values["host"], user=self.config_values["user"])
+            host=self.config_values["host"],
+            user=self.config_values["user"],
+            key_path=cle or None,
+            port=int(self.config_values.get("port") or 22))
 
     def _save_config(self):
         self.config_values["host"] = self.host_var.get().strip() or "192.168.1.98"
@@ -361,27 +368,73 @@ class Application(tk.Frame):
     def _card(self, master):
         return tk.Frame(master, bg=CARTE, highlightthickness=0, bd=0)
 
+    # Opacite du filigrane. Ce n'est pas un reglage a l'oeil : la source a ete
+    # decodee et le contraste du texte pose dessus mesure, pixel le plus clair
+    # du bandeau, pour la palette exacte de l'app.
+    #
+    #   alpha | titre #E7ECFA | sous-titre #94A0C6
+    #   0,10  |    13,03:1    |   5,94:1
+    #   0,15  |    11,42:1    |   5,20:1   <- retenu
+    #   0,20  |     9,83:1    |   4,48:1   echoue AA
+    #   0,35  |     6,19:1    |   2,82:1   nettement insuffisant
+    #
+    # 0,15 est le plafond : au-dela, c'est le SOUS-TITRE qui casse, pas le
+    # titre — celui-ci reste confortable bien plus loin, et ne dit donc rien
+    # sur la limite reelle. La premiere version melangeait a 0,35.
+    BANDEAU_ALPHA = 0.15
+    BANDEAU_HAUTEUR = 84
+
     def _build_header(self):
-        header = tk.Frame(self, bg=FOND, height=64)
-        header.pack(fill="x", padx=12, pady=(10, 4))
+        """
+        Bandeau dessine sur un canevas, et non composé de Labels.
 
-        texte = tk.Frame(header, bg=FOND)
-        texte.pack(side="left", anchor="w")
+        Le filigrane doit passer DERRIERE le titre sur toute la largeur : un
+        Label d'image ne peut pas servir de fond a un autre Label en Tkinter,
+        faute de transparence entre widgets. Sur un canevas, l'image est un
+        objet et le texte un autre, posé par-dessus.
+        """
+        self.header = tk.Canvas(self, bg=FOND, height=self.BANDEAU_HAUTEUR,
+                                highlightthickness=0, bd=0)
+        self.header.pack(fill="x", padx=12, pady=(10, 4))
 
-        tk.Label(texte, text="Bibliotheque Luny", bg=FOND, fg=TEXTE_VIF,
-                 font=POLICE_TITRE).pack(anchor="w")
-        tk.Label(texte, text="poste de travail  ↔  iPhone 3GS", bg=FOND,
-                 fg=TEXTE_DOUX, font=POLICE_SOUS).pack(anchor="w")
+        self._header_width = 0
+        self.header.bind("<Configure>", self._redraw_header)
 
-        # Filigrane : l'illustration deja produite pour l'icone et le fond de
-        # l'app. Melangee vers le fond, comme sur l'ecran Bibliotheque, pour
-        # rester un decor et non un element qui gene la lecture des listes.
-        image = self._header_artwork()
+    def _redraw_header(self, event=None):
+        largeur = event.width if event is not None else self.header.winfo_width()
+
+        if largeur <= 1:
+            return
+
+        # Le redimensionnement d'une fenetre emet des dizaines d'evenements :
+        # re-echantillonner l'illustration a chacun rendrait la fenetre
+        # poisseuse. On ne refait le travail que si la largeur a change.
+        if largeur == self._header_width:
+            return
+
+        self._header_width = largeur
+        self.header.delete("all")
+
+        image = self._header_artwork(largeur, self.BANDEAU_HAUTEUR)
 
         if image is not None:
-            tk.Label(header, image=image, bg=FOND, bd=0).pack(side="right")
+            self.header.create_image(0, 0, image=image, anchor="nw")
 
-    def _header_artwork(self):
+        self.header.create_text(14, 26, anchor="w", text="Gestion de la bibliotheque LunyUI",
+                                fill=TEXTE_VIF, font=POLICE_TITRE)
+        self.header.create_text(14, 54, anchor="w",
+                                text="poste de travail  ↔  iPhone 3GS",
+                                fill=TEXTE_DOUX, font=POLICE_SOUS)
+
+    def _header_artwork(self, largeur, hauteur):
+        """
+        Filigrane : l'illustration deja produite pour l'icone et le fond de
+        l'app, melangee vers le fond du bandeau.
+
+        Recadree sur sa BANDE HAUTE — lune, nuages, etoiles. Redimensionner un
+        portrait 2:3 en bandeau l'ecraserait et rendrait la scene
+        meconnaissable.
+        """
         Image, ImageTk = _pillow()
         chemin = packconfig.artwork_path()
 
@@ -390,22 +443,22 @@ class Application(tk.Frame):
 
         try:
             source = Image.open(chemin).convert("RGB")
-            largeur, hauteur = 200, 56
 
-            # Recadrage sur la BANDE HAUTE de l'illustration : c'est la que se
-            # trouvent la lune et les etoiles. Un simple redimensionnement
-            # ecraserait un portrait 2:3 en bandeau et rendrait la scene
-            # meconnaissable.
-            ratio = largeur / float(hauteur)
-            h_source = int(source.width / ratio)
-            source = source.crop((0, 0, source.width, min(h_source, source.height)))
+            rapport = float(largeur) / float(hauteur)
+            hauteur_source = int(source.width / rapport)
+            source = source.crop((0, 0, source.width,
+                                  min(hauteur_source, source.height)))
             source = source.resize((largeur, hauteur), Image.LANCZOS)
 
             fond = Image.new("RGB", source.size, FOND)
-            melange = Image.blend(fond, source, 0.35)
+            melange = Image.blend(fond, source, self.BANDEAU_ALPHA)
 
             photo = ImageTk.PhotoImage(melange)
-            self._images.append(photo)
+
+            # Reference gardee : sans elle Tk libere l'image et le bandeau
+            # reste vide. On ne garde QUE la courante, sinon chaque
+            # redimensionnement empilerait une image de plus en memoire.
+            self._header_image = photo
             return photo
         except Exception:
             # Un decor absent ne doit jamais empecher l'outil de demarrer.
@@ -570,6 +623,7 @@ class Application(tk.Frame):
         self.send_vars = {}
         self.delete_vars = {}
         self._images = []
+        self._header_image = None
 
         # Balayage generique plutot qu'une liste a tenir a jour : la prochaine
         # variable ajoutee a l'interface reintroduirait sinon le defaut sans
@@ -727,7 +781,7 @@ class Application(tk.Frame):
         # montage.
         self.send_vars = {}
         self.delete_vars = {}
-        self._images = [i for i in self._images[:1]]   # on garde le filigrane
+        self._images = []      # vignettes seulement ; le filigrane a sa propre reference
 
         self.left_area.clear()
         self.right_area.clear()
@@ -1015,7 +1069,7 @@ class Application(tk.Frame):
 
 def main():
     racine = tk.Tk()
-    racine.title("Bibliotheque Luny")
+    racine.title("Gestion de la bibliotheque LunyUI")
     racine.configure(bg=FOND)
     racine.geometry("1080x760")
     racine.minsize(900, 640)
